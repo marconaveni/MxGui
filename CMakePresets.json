@@ -1,0 +1,93 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 25,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "displayName": "Base",
+            "binaryDir": "${sourceDir}/build/${hostSystemName}/${presetName}",
+            "generator": "Ninja Multi-Config",
+            "cacheVariables": {
+                "CMAKE_CONFIGURATION_TYPES": "Debug;Release"
+            }
+        },
+        {
+            "name": "gcc",
+            "inherits": "base",
+            "displayName": "GCC",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "gcc",
+                "CMAKE_CXX_COMPILER": "g++"
+            }
+        },
+        {
+            "name": "clang",
+            "inherits": "base",
+            "displayName": "CLANG",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "clang",
+                "CMAKE_CXX_COMPILER": "clang++"
+            }
+        },
+        {
+            "name": "clang-cl",
+            "inherits": "base",
+            "displayName": "CLANG CL",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "clang-cl",
+                "CMAKE_CXX_COMPILER": "clang-cl",
+                "CMAKE_LINKER": "lld-link"
+            }
+        },
+        {
+            "name": "vs",
+            "displayName": "Windows Visual Studio 2026",
+            "generator": "Visual Studio 18 2026",
+            "architecture": "x64",
+            "binaryDir": "${sourceDir}/build/${hostSystemName}/${presetName}"
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "vs-debug",
+            "displayName": "Debug",
+            "configurePreset": "vs",
+            "configuration": "Debug"
+        },
+        {
+            "name": "vs-release",
+            "displayName": "Release",
+            "configurePreset": "vs",
+            "configuration": "Release"
+        },
+        {
+            "name": "gcc-debug",
+            "displayName": "Debug",
+            "configurePreset": "gcc",
+            "configuration": "Debug"
+        },
+        {
+            "name": "gcc-release",
+            "displayName": "Release",
+            "configurePreset": "gcc",
+            "configuration": "Release"
+        },
+        {
+            "name": "clang-debug",
+            "displayName": "Debug",
+            "configurePreset": "clang",
+            "configuration": "Debug"
+        },
+        {
+            "name": "clang-release",
+            "displayName": "Release",
+            "configurePreset": "clang",
+            "configuration": "Release"
+        }
+    ]
+}
