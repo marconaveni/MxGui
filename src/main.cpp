@@ -13,6 +13,8 @@
 
 // mxGui
 
+using WidgetTag = std::string;
+
 
 namespace Globals
 {
@@ -35,7 +37,17 @@ public:
         m_fonts.clear();
     }
 
-    Font* getFont(std::string name) { return &m_fonts[name]; } // do jeito que esta pode gerar uma chave uma Font vazia, fazer uma guarda
+    Font* getFont(std::string name)
+    {
+        auto it = m_fonts.find(name);
+        if (it != m_fonts.end())
+        {
+            return &it->second;
+        }
+
+        return nullptr;
+    }
+
 
 private:
 
@@ -57,8 +69,8 @@ struct MouseEvents
 struct Transforms
 {
     Rectangle bounds{};
-    Vector2 anchor{};
     Rectangle worldBounds{};
+    Vector2 anchor{};
 };
 
 void beginTransform(Transforms& transform)
@@ -91,17 +103,10 @@ struct Label
     Color color{BLACK};
     std::string fontName{"inter20"};
     Text text{};
-    FontManager* fontManager{nullptr};
 };
 
-void setLabelText(Label& label, const std::string& newText)
-{
-    label.text.value = newText;
-    label.text.size = MeasureTextEx(*label.fontManager->getFont(label.fontName), newText.c_str(), 20, 0);
-}
 
-
-struct  Button
+struct Button
 {
     enum class Style
     {
@@ -112,7 +117,6 @@ struct  Button
     Style style{Style::Contained};
     Transforms transform{};
     Color color{RED};
-    Label label{};
     MouseEvents mouseEvents{};
 };
 
@@ -213,6 +217,7 @@ void guiScrollPanelBegin(ScrollPanel& scrollPanel)
     }
 
 
+    BeginScissorMode(rect.x, rect.y, rect.width, rect.height);
     guiCanvas(scrollPanel.canvas);
 }
 
@@ -224,27 +229,121 @@ void guiScrollPanelEnd(ScrollPanel& scrollPanel)
     EndScissorMode();
 }
 
-void guiLabel(Label& label)
+
+#define INSERT_COMPONENT(componentsList, type)                                        \
+    inline type* insert##type(WidgetTag tag, type value)                              \
+    {                                                                                 \
+        const WidgetTag hash = "##" + tag;                                            \
+        auto [insertedIt, isInserted] = componentsList.insert_or_assign(hash, value); \
+        return &insertedIt->second;                                                   \
+    }
+
+#define GET_COMPONENT(componentsList, type)                                    \
+    inline type* get##type(WidgetTag tag)                                      \
+    {                                                                          \
+        const WidgetTag hash = "##" + tag;                                     \
+                                                                               \
+        auto it = componentsList.find(hash);                                   \
+        if (it != componentsList.end())                                        \
+        {                                                                      \
+            return &it->second;                                                \
+        }                                                                      \
+                                                                               \
+        auto [insertedIt, isInserted] = componentsList.insert({hash, type{}}); \
+        return &insertedIt->second;                                            \
+    }
+
+#define COMPONENT(componentsList, type)    \
+    INSERT_COMPONENT(componentsList, type) \
+    GET_COMPONENT(componentsList, type)
+
+class Context
 {
+public:
+
+    void init() { m_fontManager.init(); }
+
+    void close() { m_fontManager.unload(); }
+
+    FontManager& getFontManager() { return m_fontManager; }
+
+    COMPONENT(m_labels, Label);
+    COMPONENT(m_buttons, Button);
+
+
+private:
+
+    std::unordered_map<WidgetTag, Label> m_labels;
+    std::unordered_map<WidgetTag, Button> m_buttons;
+    FontManager m_fontManager;
+};
+
+
+void setTextValue(Context& ctx, WidgetTag tagName, const std::string& newText = "label");
+void createButton(Context& ctx, WidgetTag tagName);
+void createLabel(Context& ctx, WidgetTag tagName, const std::string& newText);
+void guiButton(Context& ctx, WidgetTag tag, Vector2 bounds = Vector2{0}, Vector2 anchor = Vector2{0});
+void guiLabel(Context& ctx, WidgetTag tag, Vector2 bounds = Vector2{0}, Vector2 anchor = Vector2{0});
+
+void setTextValue(Context& ctx, WidgetTag tagName, const std::string& newText)
+{
+    Label& label = *ctx.getLabel(tagName);
+    Font font = *ctx.getFontManager().getFont(label.fontName);
+    label.text.value = newText;
+    label.text.size = MeasureTextEx(font, newText.c_str(), 20, 0);
+}
+
+#define TEXT_LABEL "button"
+
+void createButton(Context& ctx, WidgetTag tagName)
+{
+    Button button;
+    button.transform.bounds = Rectangle{0, 0, 80, 40};
+    button.style = Button::Style::OutLine;
+    button.mouseEvents.enable = true;
+    createLabel(ctx, TEXT_LABEL + tagName, "button");
+    ctx.insertButton(tagName, button);
+}
+
+void createLabel(Context& ctx, WidgetTag tagName, const std::string& newText)
+{
+    Label label;
+    ctx.insertLabel(tagName, label);
+    setTextValue(ctx, tagName, newText);
+}
+
+void guiLabel(Context& ctx, WidgetTag tag, Vector2 bounds, Vector2 anchor)
+{
+
+    Label& label = *ctx.getLabel(tag);
+    label.transform.bounds.x = bounds.x;
+    label.transform.bounds.y = bounds.y;
+    label.transform.anchor = anchor;
+
     beginTransform(label.transform);
     Rectangle rect = label.transform.worldBounds;
 
-    Font font = GetFontDefault();
-    if (label.fontManager)
+
+    Font font = *ctx.getFontManager().getFont("inter20");
+    if (!IsFontValid(font))
     {
-        font = *label.fontManager->getFont("inter20");
+        font = GetFontDefault();
     }
 
     DrawTextEx(font, label.text.value.c_str(), Vector2{rect.x, rect.y}, 20, 0, label.color);
 }
 
-void guiButton(Button& button)
+
+void guiButton(Context& ctx, WidgetTag tag, Vector2 bounds, Vector2 anchor)
 {
+    Button& button = *ctx.getButton(tag);
+    button.transform.bounds.x = bounds.x;
+    button.transform.bounds.y = bounds.y;
+    button.transform.anchor = anchor;
+
     beginTransform(button.transform);
     Rectangle rect = button.transform.worldBounds;
 
-    Vector2 vec = Vector2{rect.x + (rect.width - button.label.text.size.x) / 2, rect.y + (rect.height - button.label.text.size.y) / 2};
-    button.label.transform.anchor = Vector2{vec.x, vec.y};
 
     int paint = 0;
 
@@ -286,64 +385,28 @@ void guiButton(Button& button)
         DrawRectangle(rect.x, rect.y, rect.width, rect.height, Fade(finalColor, 0.1f));
     }
 
-    guiLabel(button.label);
+    Label& label = *ctx.getLabel(TEXT_LABEL + tag);
+    Vector2 textSize = label.text.size;
+    Vector2 textPosition = Vector2{rect.x + (rect.width - textSize.x) / 2, rect.y + (rect.height - textSize.y) / 2};
+
+    guiLabel(ctx, TEXT_LABEL + tag, Vector2{0}, textPosition);
 }
-
-
-using WidgetTag = std::string;
-
-#define INSERT_COMPONENT(componentsList, type)                                        \
-    inline type* insert##type(WidgetTag tag, type value)                              \
-    {                                                                                 \
-        const WidgetTag hash = "##" + tag;                                            \
-        auto [insertedIt, isInserted] = componentsList.insert_or_assign(hash, value); \
-        return &insertedIt->second;                                                   \
-    }
-
-#define GET_COMPONENT(componentsList, type)                                     \
-    inline type* get##type(WidgetTag tag)                                       \
-    {                                                                           \
-        const WidgetTag hash = "##" + tag;                                      \
-                                                                                \
-        auto it = componentsList.find(hash);                                    \
-        if (it != componentsList.end())                                         \
-        {                                                                       \
-            return &it->second;                                                 \
-        }                                                                       \
-                                                                                \
-        auto [insertedIt, isInserted] = componentsList.insert({hash, type{}}); \
-        return &insertedIt->second;                                             \
-    }
-
-
-class Context
-{
-public:
-
-    INSERT_COMPONENT(m_labels, Label);
-    INSERT_COMPONENT(m_buttons, Button);
-    GET_COMPONENT(m_labels, Label);
-    GET_COMPONENT(m_buttons, Button);
-
-
-private:
-
-    std::unordered_map<WidgetTag, Label> m_labels;
-    std::unordered_map<WidgetTag, Button> m_buttons;
-};
 
 
 int main(int argc, const char** argv)
 {
 
-    Context ctx;
-    ctx.insertButton("Btn", Button{});
 
     InitWindow(800, 600, "GUI");
     SetTextLineSpacing(0);
 
-    FontManager fontManager;
-    fontManager.init();
+
+    Context ctx;
+    ctx.init();
+
+    createButton(ctx, "ButtonClick");
+    createLabel(ctx, "Label1", "hello world");
+    createLabel(ctx, "Label2", "testando");
 
 
     Canvas canvas;
@@ -354,22 +417,14 @@ int main(int argc, const char** argv)
     Canvas canvas2;
     canvas2.transform.bounds = Rectangle{0, 0, 50, 50};
 
-    Label label;
-    label.fontManager = &fontManager;
-    label.transform.bounds = Rectangle{100, 0, 20, 20};
-    setLabelText(label, "hello world");
+    // Label label;
+    // label.transform.bounds = Rectangle{100, 0, 20, 20};
+    // setTextValue(label, "hello world");
 
-    Label labelTest;
-    labelTest.fontManager = &fontManager;
-    labelTest.transform.bounds = Rectangle{0, 0, 20, 20};
-    setLabelText(labelTest, "testando");
+    // Label labelTest;
+    // labelTest.transform.bounds = Rectangle{0, 0, 20, 20};
+    // setTextValue(labelTest, "testando");
 
-    Button button;
-    button.label.fontManager = &fontManager;
-    button.transform.bounds = Rectangle{250, 100, 80, 40};
-    button.style = Button::Style::OutLine;
-    button.mouseEvents.enable = true;
-    setLabelText(button.label, "click");
 
     ScrollPanel panel;
     panel.transform.bounds = Rectangle{300, 200, 100, 200};
@@ -384,22 +439,26 @@ int main(int argc, const char** argv)
         ClearBackground(WHITE);
 
         guiCanvas(canvas);
+        const Vector2 canvasPosition = Vector2{canvas.transform.bounds.x, canvas.transform.bounds.y};
 
-        canvas2.transform.anchor = Vector2{canvas.transform.bounds.x, canvas.transform.bounds.y};
-        button.transform.anchor = Vector2{canvas.transform.bounds.x, canvas.transform.bounds.y};
+        canvas2.transform.anchor = canvasPosition;
+
+        // Button* button = ctx.getButton("ButtonClick");
+
+        // button->transform.anchor = canvasPosition;
 
         guiCanvas(canvas2);
-        guiLabel(label);
-        guiButton(button);
+        guiLabel(ctx, "Label1", Vector2{100, 0});
+        guiButton(ctx, "ButtonClick", Vector2{250, 100}, canvasPosition);
         guiScrollPanelBegin(panel);
-        guiLabel(labelTest);
+        guiLabel(ctx, "Label2", Vector2{0, 0});
         guiScrollPanelEnd(panel);
 
         DrawFPS(10, 10);
 
         EndDrawing();
     }
-    fontManager.unload();
+    ctx.close();
     CloseWindow();
 
     return 0;
