@@ -86,7 +86,7 @@ void beginTransform(Transforms& transform)
 
 struct Canvas
 {
-    Transforms transform{};
+    Transforms transform{.bounds = Rectangle{0, 0, 100, 100}};
     Color color{RED};
     MouseEvents mouseEvents{};
 };
@@ -125,58 +125,23 @@ struct ScrollPanel
     Transforms transform{};
     Color color{RED};
     MouseEvents mouseEvents{};
-    Canvas canvas{};
+    Transforms transformCanvas{};
     float scrollTop{0.0f};
     Rectangle scrollBarThumb{};
 };
 
 
-void guiCanvas(Canvas& canvas)
-{
-
-    beginTransform(canvas.transform);
-    Rectangle rect = canvas.transform.worldBounds;
-
-
-    if (canvas.mouseEvents.enable)
-    {
-        canvas.mouseEvents.isMouseHover = (CheckCollisionPointRec(GetMousePosition(), rect));
-        canvas.mouseEvents.isMouseRelease = canvas.mouseEvents.isMouseHover && IsMouseButtonReleased(MOUSE_BUTTON_LEFT);
-        canvas.mouseEvents.isMouseDown = canvas.mouseEvents.isMouseHover && IsMouseButtonDown(MOUSE_BUTTON_LEFT);
-        canvas.mouseEvents.isMousePressed = canvas.mouseEvents.isMouseHover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
-
-        if (canvas.mouseEvents.isMousePressed)
-        {
-            Vector2 mousePosition = GetMousePosition();
-            canvas.mouseEvents.mouseOffset.x = canvas.transform.anchor.x + mousePosition.x - rect.x;
-            canvas.mouseEvents.mouseOffset.y = canvas.transform.anchor.y + mousePosition.y - rect.y;
-            canvas.mouseEvents.isDrag = true;
-        }
-        if (canvas.mouseEvents.isDrag && IsMouseButtonDown(MOUSE_BUTTON_LEFT))
-        {
-            Vector2 mousePosition = GetMousePosition();
-            canvas.transform.bounds.x = mousePosition.x - canvas.mouseEvents.mouseOffset.x;
-            canvas.transform.bounds.y = mousePosition.y - canvas.mouseEvents.mouseOffset.y;
-        }
-        else
-        {
-            canvas.mouseEvents.isDrag = false;
-        }
-    }
-
-    DrawRectanglePro(rect, Vector2{}, 0, Fade(canvas.color, 0.5f));
-}
-
 void guiScrollPanelBegin(ScrollPanel& scrollPanel)
 {
     beginTransform(scrollPanel.transform);
     Rectangle rect = scrollPanel.transform.worldBounds;
+    Rectangle rectCanvas = rect;
 
     DrawRectangleLinesEx(rect, 1, Fade(scrollPanel.color, 0.5f));
     Globals::anchor = Vector2{rect.x, rect.y};
 
 
-    if (scrollPanel.canvas.transform.bounds.height > rect.height)
+    if (scrollPanel.transformCanvas.bounds.height > rect.height)
     {
         const float previousScrollTop = scrollPanel.scrollTop;
 
@@ -198,9 +163,8 @@ void guiScrollPanelBegin(ScrollPanel& scrollPanel)
         scrollPanel.scrollTop = (scrollPanel.scrollTop < 0) ? previousScrollTop : scrollPanel.scrollTop;
         Globals::scrollTop = scrollPanel.scrollTop;
 
-        beginTransform(scrollPanel.canvas.transform);
-        Rectangle rectCanvas = scrollPanel.canvas.transform.worldBounds;
-
+        beginTransform(scrollPanel.transformCanvas);
+        rectCanvas = scrollPanel.transformCanvas.worldBounds;
 
         scrollPanel.scrollTop = (rectCanvas.y + rectCanvas.height < rect.y + rect.height) ? previousScrollTop : scrollPanel.scrollTop;
         Globals::scrollTop = scrollPanel.scrollTop;
@@ -216,9 +180,8 @@ void guiScrollPanelBegin(ScrollPanel& scrollPanel)
         };
     }
 
-
-    BeginScissorMode(rect.x, rect.y, rect.width, rect.height);
-    guiCanvas(scrollPanel.canvas);
+    //BeginScissorMode(rect.x, rect.y, rect.width, rect.height);
+    DrawRectanglePro(rectCanvas, Vector2{}, 0, Fade(GRAY, 0.5f));
 }
 
 void guiScrollPanelEnd(ScrollPanel& scrollPanel)
@@ -230,12 +193,12 @@ void guiScrollPanelEnd(ScrollPanel& scrollPanel)
 }
 
 
-#define INSERT_COMPONENT(componentsList, type)                                        \
-    inline type* insert##type(WidgetTag tag, type value)                              \
-    {                                                                                 \
-        const WidgetTag hash = "##" + tag;                                            \
-        auto [insertedIt, isInserted] = componentsList.insert_or_assign(hash, value); \
-        return &insertedIt->second;                                                   \
+#define INSERT_COMPONENT(componentsList, type)                                            \
+    inline type* insert##type(WidgetTag tag, type component)                              \
+    {                                                                                     \
+        const WidgetTag hash = "##" + tag;                                                \
+        auto [insertedIt, isInserted] = componentsList.insert_or_assign(hash, component); \
+        return &insertedIt->second;                                                       \
     }
 
 #define GET_COMPONENT(componentsList, type)                                    \
@@ -262,17 +225,25 @@ class Context
 public:
 
     void init() { m_fontManager.init(); }
-
     void close() { m_fontManager.unload(); }
 
     FontManager& getFontManager() { return m_fontManager; }
 
+    COMPONENT(m_canvas, Canvas);
     COMPONENT(m_labels, Label);
     COMPONENT(m_buttons, Button);
+
+    friend Transforms getCurrentTransform(Context& ctx);
+    friend MouseEvents getCurrentMouseEvents(Context& ctx);
+    friend void guiCanvas(Context& ctx, WidgetTag tag, Vector2 bounds, Vector2 anchor, bool enableDrag);
 
 
 private:
 
+    Transforms m_currentTransform{};
+    MouseEvents m_currentMouseEvents{};
+
+    std::unordered_map<WidgetTag, Canvas> m_canvas;
     std::unordered_map<WidgetTag, Label> m_labels;
     std::unordered_map<WidgetTag, Button> m_buttons;
     FontManager m_fontManager;
@@ -280,10 +251,17 @@ private:
 
 
 void setTextValue(Context& ctx, WidgetTag tagName, const std::string& newText = "label");
+Transforms getCurrentTransform(Context& ctx);
+MouseEvents getCurrentMouseEvents(Context& ctx);
+
+void createCanvas(Context& ctx, WidgetTag tagName);
 void createButton(Context& ctx, WidgetTag tagName);
 void createLabel(Context& ctx, WidgetTag tagName, const std::string& newText);
+
+void guiCanvas(Context& ctx, WidgetTag tag, Vector2 bounds = Vector2{0}, Vector2 anchor = Vector2{0}, bool enableDrag = false);
 void guiButton(Context& ctx, WidgetTag tag, Vector2 bounds = Vector2{0}, Vector2 anchor = Vector2{0});
 void guiLabel(Context& ctx, WidgetTag tag, Vector2 bounds = Vector2{0}, Vector2 anchor = Vector2{0});
+
 
 void setTextValue(Context& ctx, WidgetTag tagName, const std::string& newText)
 {
@@ -291,6 +269,23 @@ void setTextValue(Context& ctx, WidgetTag tagName, const std::string& newText)
     Font font = *ctx.getFontManager().getFont(label.fontName);
     label.text.value = newText;
     label.text.size = MeasureTextEx(font, newText.c_str(), 20, 0);
+}
+
+Transforms getCurrentTransform(Context& ctx)
+{
+    return ctx.m_currentTransform;
+}
+
+MouseEvents getCurrentMouseEvents(Context& ctx)
+{
+    return ctx.m_currentMouseEvents;
+}
+
+void createCanvas(Context& ctx, WidgetTag tagName)
+{
+    Canvas canvas;
+    // canvas.transform.bounds = Rectangle{100, 100, 100, 100};
+    ctx.insertCanvas(tagName, canvas);
 }
 
 #define TEXT_LABEL "button"
@@ -310,6 +305,53 @@ void createLabel(Context& ctx, WidgetTag tagName, const std::string& newText)
     Label label;
     ctx.insertLabel(tagName, label);
     setTextValue(ctx, tagName, newText);
+}
+
+
+void guiCanvas(Context& ctx, WidgetTag tag, Vector2 bounds, Vector2 anchor, bool enableDrag)
+{
+
+    Canvas& canvas = *ctx.getCanvas(tag);
+    canvas.transform.bounds.x = bounds.x;
+    canvas.transform.bounds.y = bounds.y;
+    canvas.transform.anchor = anchor;
+
+
+    beginTransform(canvas.transform);
+    Rectangle rect = canvas.transform.worldBounds;
+
+    canvas.mouseEvents.enable = enableDrag;
+
+    if (canvas.mouseEvents.enable)
+    {
+        canvas.mouseEvents.isMouseHover = (CheckCollisionPointRec(GetMousePosition(), rect));
+        canvas.mouseEvents.isMouseRelease = canvas.mouseEvents.isMouseHover && IsMouseButtonReleased(MOUSE_BUTTON_LEFT);
+        canvas.mouseEvents.isMouseDown = canvas.mouseEvents.isMouseHover && IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+        canvas.mouseEvents.isMousePressed = canvas.mouseEvents.isMouseHover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+
+        if (canvas.mouseEvents.isMousePressed)
+        {
+            Vector2 mousePosition = GetMousePosition();
+            canvas.mouseEvents.mouseOffset.x = canvas.transform.anchor.x + mousePosition.x - rect.x;
+            canvas.mouseEvents.mouseOffset.y = canvas.transform.anchor.y + mousePosition.y - rect.y;
+            canvas.mouseEvents.isDrag = true;
+        }
+        if (canvas.mouseEvents.isDrag && IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+        {
+            Vector2 mousePosition = GetMousePosition();
+            canvas.transform.bounds.x = mousePosition.x - canvas.mouseEvents.mouseOffset.x - Globals::anchor.x;
+            canvas.transform.bounds.y = mousePosition.y - canvas.mouseEvents.mouseOffset.y - Globals::anchor.y + Globals::scrollTop;
+        }
+        else
+        {
+            canvas.mouseEvents.isDrag = false;
+        }
+    }
+
+    DrawRectanglePro(rect, Vector2{}, 0, Fade(canvas.color, 0.5f));
+
+    ctx.m_currentTransform = canvas.transform;
+    ctx.m_currentMouseEvents = canvas.mouseEvents;
 }
 
 void guiLabel(Context& ctx, WidgetTag tag, Vector2 bounds, Vector2 anchor)
@@ -388,6 +430,8 @@ void guiButton(Context& ctx, WidgetTag tag, Vector2 bounds, Vector2 anchor)
     Label& label = *ctx.getLabel(TEXT_LABEL + tag);
     Vector2 textSize = label.text.size;
     Vector2 textPosition = Vector2{rect.x + (rect.width - textSize.x) / 2, rect.y + (rect.height - textSize.y) / 2};
+    textPosition.x -= Globals::anchor.x;
+    textPosition.y -= Globals::anchor.y;
 
     guiLabel(ctx, TEXT_LABEL + tag, Vector2{0}, textPosition);
 }
@@ -396,7 +440,6 @@ void guiButton(Context& ctx, WidgetTag tag, Vector2 bounds, Vector2 anchor)
 int main(int argc, const char** argv)
 {
 
-
     InitWindow(800, 600, "GUI");
     SetTextLineSpacing(0);
 
@@ -404,18 +447,20 @@ int main(int argc, const char** argv)
     Context ctx;
     ctx.init();
 
-    createButton(ctx, "ButtonClick");
+    //createCanvas(ctx, "Canvas1");
+    createCanvas(ctx, "Canvas2");
+    createButton(ctx, "ButtonClick1");
     createLabel(ctx, "Label1", "hello world");
     createLabel(ctx, "Label2", "testando");
 
 
-    Canvas canvas;
-    canvas.transform.bounds = Rectangle{100, 100, 100, 100};
-    canvas.transform.anchor = Vector2{100, 100};
-    canvas.mouseEvents.enable = true;
+    // Canvas canvas;
+    // canvas.transform.bounds = Rectangle{100, 100, 100, 100};
+    // canvas.transform.anchor = Vector2{100, 100};
+    // canvas.mouseEvents.enable = true;
 
-    Canvas canvas2;
-    canvas2.transform.bounds = Rectangle{0, 0, 50, 50};
+    // Canvas canvas2;
+    // canvas2.transform.bounds = Rectangle{0, 0, 50, 50};
 
     // Label label;
     // label.transform.bounds = Rectangle{100, 0, 20, 20};
@@ -430,27 +475,28 @@ int main(int argc, const char** argv)
     panel.transform.bounds = Rectangle{300, 200, 100, 200};
     panel.transform.anchor = Vector2{100, 100};
     panel.mouseEvents.enable = true;
-    panel.canvas.transform.bounds = Rectangle{0, 0, panel.transform.bounds.width, panel.transform.bounds.height + 50};
-    panel.canvas.color = GRAY;
+    panel.transformCanvas.bounds = Rectangle{0, 0, panel.transform.bounds.width, panel.transform.bounds.height + 50};
+
+    Transforms transform;
+    transform.bounds.x = 10;
+    transform.bounds.y = 10;
+    transform.anchor.x = 100;
+    transform.anchor.y = 100;
+
 
     while (!WindowShouldClose())
     {
         BeginDrawing();
         ClearBackground(WHITE);
 
-        guiCanvas(canvas);
-        const Vector2 canvasPosition = Vector2{canvas.transform.bounds.x, canvas.transform.bounds.y};
-
-        canvas2.transform.anchor = canvasPosition;
-
-        // Button* button = ctx.getButton("ButtonClick");
-
-        // button->transform.anchor = canvasPosition;
-
-        guiCanvas(canvas2);
-        guiLabel(ctx, "Label1", Vector2{100, 0});
-        guiButton(ctx, "ButtonClick", Vector2{250, 100}, canvasPosition);
+        guiButton(ctx, "ButtonClick1", Vector2{250, 100}, Vector2{transform.bounds.x, transform.bounds.y});
         guiScrollPanelBegin(panel);
+
+        guiCanvas(ctx, "Canvas1", Vector2{transform.bounds.x, transform.bounds.y}, transform.anchor, true);
+        transform = getCurrentTransform(ctx);
+        
+        guiCanvas(ctx, "Canvas2", Vector2{0, 0}, Vector2{transform.bounds.x, transform.bounds.y} , false);
+        guiLabel(ctx, "Label1", Vector2{100, 0}, Vector2{transform.bounds.x, transform.bounds.y});
         guiLabel(ctx, "Label2", Vector2{0, 0});
         guiScrollPanelEnd(panel);
 
