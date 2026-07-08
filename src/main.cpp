@@ -13,7 +13,7 @@
 
 // mxGui
 
-using WidgetTag = std::string;
+
 
 
 namespace Globals
@@ -73,17 +73,6 @@ struct Transforms
     Vector2 anchor{};
 };
 
-void beginTransform(Transforms& transform)
-{
-    transform.worldBounds = {
-        .x = transform.bounds.x + transform.anchor.x + Globals::anchor.x,
-        .y = transform.bounds.y + transform.anchor.y + Globals::anchor.y - Globals::scrollTop,
-        .width = transform.bounds.width,
-        .height = transform.bounds.height,
-    };
-}
-
-
 struct Canvas
 {
     Transforms transform{.bounds = Rectangle{0, 0, 100, 100}};
@@ -129,6 +118,22 @@ struct ScrollPanel
     float scrollTop{0.0f};
     Rectangle scrollBarThumb{};
 };
+
+using WidgetTag = std::string;
+struct Context;
+
+void beginTransform(Transforms& transform);
+void setTextValue(Context& ctx, WidgetTag tagName, const std::string& newText = "label");
+Transforms getCurrentTransform(Context& ctx);
+MouseEvents getCurrentMouseEvents(Context& ctx);
+
+void createCanvas(Context& ctx, WidgetTag tagName);
+void createButton(Context& ctx, WidgetTag tagName);
+void createLabel(Context& ctx, WidgetTag tagName, const std::string& newText);
+
+void guiCanvas(Context& ctx, WidgetTag tag, Vector2 bounds = Vector2{0}, Vector2 anchor = Vector2{0}, bool enableDrag = false);
+void guiButton(Context& ctx, WidgetTag tag, Vector2 bounds = Vector2{0}, Vector2 anchor = Vector2{0});
+void guiLabel(Context& ctx, WidgetTag tag, Vector2 bounds = Vector2{0}, Vector2 anchor = Vector2{0});
 
 
 void guiScrollPanelBegin(ScrollPanel& scrollPanel)
@@ -220,9 +225,8 @@ void guiScrollPanelEnd(ScrollPanel& scrollPanel)
     INSERT_COMPONENT(componentsList, type) \
     GET_COMPONENT(componentsList, type)
 
-class Context
+struct Context
 {
-public:
 
     void init() { m_fontManager.init(); }
     void close() { m_fontManager.unload(); }
@@ -237,9 +241,6 @@ public:
     friend MouseEvents getCurrentMouseEvents(Context& ctx);
     friend void guiCanvas(Context& ctx, WidgetTag tag, Vector2 bounds, Vector2 anchor, bool enableDrag);
 
-
-private:
-
     Transforms m_currentTransform{};
     MouseEvents m_currentMouseEvents{};
 
@@ -250,18 +251,15 @@ private:
 };
 
 
-void setTextValue(Context& ctx, WidgetTag tagName, const std::string& newText = "label");
-Transforms getCurrentTransform(Context& ctx);
-MouseEvents getCurrentMouseEvents(Context& ctx);
-
-void createCanvas(Context& ctx, WidgetTag tagName);
-void createButton(Context& ctx, WidgetTag tagName);
-void createLabel(Context& ctx, WidgetTag tagName, const std::string& newText);
-
-void guiCanvas(Context& ctx, WidgetTag tag, Vector2 bounds = Vector2{0}, Vector2 anchor = Vector2{0}, bool enableDrag = false);
-void guiButton(Context& ctx, WidgetTag tag, Vector2 bounds = Vector2{0}, Vector2 anchor = Vector2{0});
-void guiLabel(Context& ctx, WidgetTag tag, Vector2 bounds = Vector2{0}, Vector2 anchor = Vector2{0});
-
+void beginTransform(Transforms& transform)
+{
+    transform.worldBounds = {
+        .x = transform.bounds.x + transform.anchor.x + Globals::anchor.x,
+        .y = transform.bounds.y + transform.anchor.y + Globals::anchor.y - Globals::scrollTop,
+        .width = transform.bounds.width,
+        .height = transform.bounds.height,
+    };
+}
 
 void setTextValue(Context& ctx, WidgetTag tagName, const std::string& newText)
 {
