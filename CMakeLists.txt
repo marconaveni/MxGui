@@ -55,6 +55,7 @@ FetchContent_MakeAvailable(
 
 add_executable(${PROJECT_NAME} 
     "src/main.cpp"
+    "src/mxgui.cpp"
 )
 
 set_target_properties(${PROJECT_NAME} 
@@ -64,7 +65,7 @@ set_target_properties(${PROJECT_NAME}
     CMAKE_CXX_EXTENSIONS OFF
 )
 
-target_include_directories(${PROJECT_NAME} PRIVATE 
+target_include_directories(${PROJECT_NAME} PUBLIC 
     "include" 
 )
 
