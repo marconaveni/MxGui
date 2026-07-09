@@ -13,6 +13,37 @@
 void beginTransformWorld(MxGuiContext* ctx, MxTransform& transform);
 
 
+// MxType to Raylib type helper
+inline Vector2 toVector(MxVec2 vec)
+{
+    return Vector2{vec.x, vec.y};
+}
+
+inline Rectangle toRectangle(MxRect rec)
+{
+    return Rectangle{rec.x, rec.y, rec.width, rec.height};
+}
+
+inline Color toColor(MxColor color)
+{
+    return Color{color.r, color.g, color.b, color.a};
+}
+
+inline MxVec2 toMxVec2(Vector2 vec)
+{
+    return MxVec2{vec.x, vec.y};
+}
+
+inline MxRect toMxRect(Rectangle rec)
+{
+    return MxRect{rec.x, rec.y, rec.width, rec.height};
+}
+
+inline MxColor toMxColor(Color color)
+{
+    return MxColor{color.r, color.g, color.b, color.a};
+}
+
 
 struct FontSpecs
 {
@@ -118,7 +149,7 @@ struct MxGuiContext
     std::unordered_map<MxWidgetTag, ScrollPanelComponent> m_scrollPanels;
 
     FontManager m_fontManager;
-    Vector2 m_anchor{};
+    MxVec2 m_anchor{};
     float m_scrollTop{};
 };
 
@@ -156,7 +187,7 @@ namespace mxgui
         LabelComponent& label = *ctx->getLabelComponent(tagName);
         Font font = ctx->getFontManager().getFont(label.fontName).font;
         label.text.value = newText;
-        label.text.size = MeasureTextEx(font, newText.c_str(), 20, 0);
+        label.text.size = toMxVec2(MeasureTextEx(font, newText.c_str(), 20, 0));
     }
 
     MxTransform getCurrentTransform(MxGuiContext* ctx)
@@ -180,7 +211,7 @@ namespace mxgui
     void createButton(MxGuiContext* ctx, MxWidgetTag tagName)
     {
         ButtonComponent button;
-        button.transform.bounds = Rectangle{0, 0, 80, 40};
+        button.transform.bounds = MxRect{0, 0, 80, 40};
         button.style = ButtonStyle::MxOutLine;
         button.mouseEvents.enable = true;
         createLabel(ctx, TEXT_LABEL + tagName, "button");
@@ -198,13 +229,13 @@ namespace mxgui
     {
         ScrollPanelComponent panel;
         panel.mouseEvents.enable = true;
-        panel.transform.bounds = Rectangle{0, 0, 100, 200};
-        panel.transformCanvas.bounds = Rectangle{0, 0, panel.transform.bounds.width, panel.transform.bounds.height + 50};
+        panel.transform.bounds = MxRect{0, 0, 100, 200};
+        panel.transformCanvas.bounds = MxRect{0, 0, panel.transform.bounds.width, panel.transform.bounds.height + 50};
         ctx->insertScrollPanelComponent(tagName, panel);
     }
 
 
-    void guiCanvas(MxGuiContext* ctx, MxWidgetTag tag, Vector2 bounds, Vector2 anchor, bool enableDrag)
+    void guiCanvas(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds, MxVec2 anchor, bool enableDrag)
     {
 
         CanvasComponent& canvas = *ctx->getCanvasComponent(tag);
@@ -214,13 +245,13 @@ namespace mxgui
 
 
         beginTransformWorld(ctx, canvas.transform);
-        Rectangle rect = canvas.transform.worldBounds;
+        MxRect rect = canvas.transform.worldBounds;
 
         canvas.mouseEvents.enable = enableDrag;
 
         if (canvas.mouseEvents.enable)
         {
-            canvas.mouseEvents.isMouseHover = (CheckCollisionPointRec(GetMousePosition(), rect));
+            canvas.mouseEvents.isMouseHover = (CheckCollisionPointRec(GetMousePosition(), toRectangle(rect)));
             canvas.mouseEvents.isMouseRelease = canvas.mouseEvents.isMouseHover && IsMouseButtonReleased(MOUSE_BUTTON_LEFT);
             canvas.mouseEvents.isMouseDown = canvas.mouseEvents.isMouseHover && IsMouseButtonDown(MOUSE_BUTTON_LEFT);
             canvas.mouseEvents.isMousePressed = canvas.mouseEvents.isMouseHover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
@@ -244,13 +275,13 @@ namespace mxgui
             }
         }
 
-        DrawRectanglePro(rect, Vector2{}, 0, Fade(canvas.color, 0.5f));
+        DrawRectanglePro(toRectangle(rect), Vector2{}, 0, Fade(toColor(canvas.color), 0.5f));
 
         ctx->m_currentTransform = canvas.transform;
         ctx->m_currentMouseEvents = canvas.mouseEvents;
     }
 
-    void guiLabel(MxGuiContext* ctx, MxWidgetTag tag, Vector2 bounds, Vector2 anchor)
+    void guiLabel(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds, MxVec2 anchor)
     {
 
         LabelComponent& label = *ctx->getLabelComponent(tag);
@@ -259,20 +290,20 @@ namespace mxgui
         label.transform.anchor = anchor;
 
         beginTransformWorld(ctx, label.transform);
-        Rectangle rect = label.transform.worldBounds;
+        MxRect rect = label.transform.worldBounds;
 
 
-        Font font = ctx->getFontManager().getFont(label.fontName).font;
-        if (!IsFontValid(font))
+        FontSpecs font = ctx->getFontManager().getFont(label.fontName);
+        if (!IsFontValid(font.font))
         {
-            font = GetFontDefault();
+            font.font = GetFontDefault();
         }
 
-        DrawTextEx(font, label.text.value.c_str(), Vector2{rect.x, rect.y}, 20, 0, label.color);
+        DrawTextEx(font.font, label.text.value.c_str(), Vector2{rect.x, rect.y}, 20, 0, toColor(label.color));
     }
 
 
-    void guiButton(MxGuiContext* ctx, MxWidgetTag tag, Vector2 bounds, Vector2 anchor)
+    void guiButton(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds, MxVec2 anchor)
     {
         ButtonComponent& button = *ctx->getButtonComponent(tag);
         button.transform.bounds.x = bounds.x;
@@ -280,14 +311,14 @@ namespace mxgui
         button.transform.anchor = anchor;
 
         beginTransformWorld(ctx, button.transform);
-        Rectangle rect = button.transform.worldBounds;
+        MxRect rect = button.transform.worldBounds;
 
 
         int paint = 0;
 
         if (button.mouseEvents.enable)
         {
-            button.mouseEvents.isMouseHover = (CheckCollisionPointRec(GetMousePosition(), rect));
+            button.mouseEvents.isMouseHover = (CheckCollisionPointRec(GetMousePosition(), toRectangle(rect)));
             button.mouseEvents.isMouseRelease = button.mouseEvents.isMouseHover && IsMouseButtonReleased(MOUSE_BUTTON_LEFT);
             button.mouseEvents.isMouseDown = button.mouseEvents.isMouseHover && IsMouseButtonDown(MOUSE_BUTTON_LEFT);
             button.mouseEvents.isMousePressed = button.mouseEvents.isMouseHover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
@@ -324,15 +355,15 @@ namespace mxgui
         }
 
         LabelComponent& label = *ctx->getLabelComponent(TEXT_LABEL + tag);
-        Vector2 textSize = label.text.size;
-        Vector2 textPosition = Vector2{rect.x + (rect.width - textSize.x) / 2, rect.y + (rect.height - textSize.y) / 2};
+        MxVec2 textSize = label.text.size;
+        MxVec2 textPosition = MxVec2{rect.x + (rect.width - textSize.x) / 2, rect.y + (rect.height - textSize.y) / 2};
         textPosition.x -= ctx->m_anchor.x;
         textPosition.y -= ctx->m_anchor.y;
 
-        guiLabel(ctx, TEXT_LABEL + tag, Vector2{0}, textPosition);
+        guiLabel(ctx, TEXT_LABEL + tag, MxVec2{0}, textPosition);
     }
 
-    void guiScrollPanelBegin(MxGuiContext* ctx, MxWidgetTag tag, Vector2 bounds, Vector2 anchor)
+    void guiScrollPanelBegin(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds, MxVec2 anchor)
     {
         ScrollPanelComponent& scrollPanel = *ctx->getScrollPanelComponent(tag);
         scrollPanel.transform.bounds.x = bounds.x;
@@ -341,18 +372,18 @@ namespace mxgui
 
 
         beginTransformWorld(ctx, scrollPanel.transform);
-        Rectangle rect = scrollPanel.transform.worldBounds;
-        Rectangle rectCanvas = rect;
+        MxRect rect = scrollPanel.transform.worldBounds;
+        MxRect rectCanvas = rect;
 
-        DrawRectangleLinesEx(rect, 1, Fade(scrollPanel.color, 0.5f));
-        ctx->m_anchor = Vector2{rect.x, rect.y};
+        DrawRectangleLinesEx( toRectangle(rect), 1, Fade(toColor(scrollPanel.color), 0.5f));
+        ctx->m_anchor = MxVec2{rect.x, rect.y};
 
 
         if (scrollPanel.transformCanvas.bounds.height > rect.height)
         {
             const float previousScrollTop = scrollPanel.scrollTop;
 
-            if (CheckCollisionPointRec(GetMousePosition(), scrollPanel.scrollBarThumb) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+            if (CheckCollisionPointRec(GetMousePosition(), toRectangle(scrollPanel.scrollBarThumb)) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
             {
                 scrollPanel.mouseEvents.isDrag = true;
             }
@@ -379,7 +410,7 @@ namespace mxgui
             float visibleProportion = rect.height / rectCanvas.height;
             float progress = scrollPanel.scrollTop / (rectCanvas.height - rect.height);
 
-            scrollPanel.scrollBarThumb = Rectangle{
+            scrollPanel.scrollBarThumb = MxRect{
                 .x = rect.x + rect.width - 5,
                 .y = rect.y + (rect.height - rect.height * visibleProportion) * progress,
                 .width = 5,
@@ -387,20 +418,18 @@ namespace mxgui
             };
         }
 
-        // BeginScissorMode(rect.x, rect.y, rect.width, rect.height);
-        DrawRectanglePro(rectCanvas, Vector2{}, 0, Fade(GRAY, 0.5f));
+        BeginScissorMode(rect.x, rect.y, rect.width, rect.height);
+        DrawRectanglePro(toRectangle(rectCanvas), Vector2{}, 0, Fade(GRAY, 0.5f));
     }
 
     void guiScrollPanelEnd(MxGuiContext* ctx, MxWidgetTag tag)
     {
         ScrollPanelComponent& scrollPanel = *ctx->getScrollPanelComponent(tag);
-        ctx->m_anchor = Vector2{};
+        ctx->m_anchor = MxVec2{};
         ctx->m_scrollTop = 0.0f;
-        DrawRectangleRec(scrollPanel.scrollBarThumb, RED);
+        DrawRectangleRec(toRectangle(scrollPanel.scrollBarThumb), RED);
         EndScissorMode();
     }
-
-
 
 
 } // namespace mxgui

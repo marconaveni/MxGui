@@ -7,7 +7,6 @@
 
 #include <string>
 
-#include "raylib.h"
 
 #define MX_DEFAULT_FONT "notosans20"
 
@@ -135,7 +134,7 @@ inline MxColor MxColor::Transparent{0, 0, 0, 255};     // Transparent (no color)
 
 struct MxMouseEvents
 {
-    Vector2 mouseOffset{};
+    MxVec2 mouseOffset{};
     bool isMouseHover{false};
     bool isMousePressed{false};
     bool isMouseRelease{false};
@@ -146,15 +145,15 @@ struct MxMouseEvents
 
 struct MxTransform
 {
-    Rectangle bounds{};
-    Rectangle worldBounds{};
-    Vector2 anchor{};
+    MxRect bounds{};
+    MxRect worldBounds{};
+    MxVec2 anchor{};
 };
 
 struct MxText
 {
     std::string value{};
-    Vector2 size{};
+    MxVec2 size{};
 };
 
 
@@ -164,15 +163,15 @@ struct MxText
 
 struct CanvasComponent
 {
-    MxTransform transform{.bounds = Rectangle{0, 0, 100, 100}};
-    Color color{RED};
+    MxTransform transform{.bounds = MxRect{0, 0, 100, 100}};
+    MxColor color{MxColor::Red};
     MxMouseEvents mouseEvents{};
 };
 
 struct LabelComponent
 {
     MxTransform transform{};
-    Color color{BLACK};
+    MxColor color{MxColor::Black};
     std::string fontName{MX_DEFAULT_FONT};
     MxText text{};
 };
@@ -188,18 +187,18 @@ struct ButtonComponent
 {
     ButtonStyle style{ButtonStyle::MxContained};
     MxTransform transform{};
-    Color color{RED};
+    MxColor color{MxColor::Red};
     MxMouseEvents mouseEvents{};
 };
 
 struct ScrollPanelComponent
 {
     MxTransform transform{};
-    Color color{RED};
+    MxColor color{MxColor::Red};
     MxMouseEvents mouseEvents{};
     MxTransform transformCanvas{};
     float scrollTop{0.0f};
-    Rectangle scrollBarThumb{};
+    MxRect scrollBarThumb{};
 };
 
 //-----------------------------------------------------------------------------
@@ -222,41 +221,35 @@ namespace mxgui
     void createLabel(MxGuiContext* ctx, MxWidgetTag tagName, const std::string& newText);
     void createScrollPanel(MxGuiContext* ctx, MxWidgetTag tagName);
 
-    void guiCanvas(MxGuiContext* ctx, MxWidgetTag tag, Vector2 bounds = Vector2{0}, Vector2 anchor = Vector2{0}, bool enableDrag = false);
-    void guiButton(MxGuiContext* ctx, MxWidgetTag tag, Vector2 bounds = Vector2{0}, Vector2 anchor = Vector2{0});
-    void guiLabel(MxGuiContext* ctx, MxWidgetTag tag, Vector2 bounds = Vector2{0}, Vector2 anchor = Vector2{0});
-    void guiScrollPanelBegin(MxGuiContext* ctx, MxWidgetTag tag, Vector2 bounds = Vector2{0}, Vector2 anchor = Vector2{0});
+    void guiCanvas(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds = MxVec2{0}, MxVec2 anchor = MxVec2{0}, bool enableDrag = false);
+    void guiButton(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds = MxVec2{0}, MxVec2 anchor = MxVec2{0});
+    void guiLabel(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds = MxVec2{0}, MxVec2 anchor = MxVec2{0});
+    void guiScrollPanelBegin(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds = MxVec2{0}, MxVec2 anchor = MxVec2{0});
     void guiScrollPanelEnd(MxGuiContext* ctx, MxWidgetTag tag);
 
 } // namespace mxgui
 
-inline void fromRect(const MxRect& from, MxVec2& to)
+inline void fromMxRect(const MxRect& from, MxVec2& to)
 {
     to.x = from.x;
     to.y = from.y;
 }
 
-inline void fromVec2(const MxVec2& from, MxRect& to)
+inline void fromMxVec2(const MxVec2& from, MxRect& to)
 {
     to.x = from.x;
     to.y = from.y;
 }
 
-inline MxColor fade(const MxColor& color, float alpha)
+inline MxVec2 MxRectToMxVec2(const MxRect& rec)
 {
-    MxColor result = color;
-
-    if (alpha < 0.0f)
-    {
-        alpha = 0.0f;
-    }
-    else if (alpha > 1.0f)
-    {
-        alpha = 1.0f;
-    }
-
-    result.a = (MxUChar8)(255.0f * alpha);
-    return result;
+    return MxVec2{rec.x, rec.y};
 }
+
+inline MxRect MxVec2ToMxRect(const MxVec2& vec)
+{
+    return MxRect{vec.x, vec.y, 0, 0};
+}
+
 
 #endif // MXGUI_HPP

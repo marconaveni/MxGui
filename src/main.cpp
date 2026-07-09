@@ -43,15 +43,15 @@ int main(int argc, const char** argv)
         BeginDrawing();
         ClearBackground(WHITE);
 
-        mxgui::guiButton(ctx, "ButtonClick1", Vector2{250, 100}, Vector2{transform.bounds.x, transform.bounds.y});
-        mxgui::guiScrollPanelBegin(ctx, "ScrollPanel", Vector2{300, 200}, Vector2{100, 100});
+        mxgui::guiButton(ctx, "ButtonClick1", MxVec2{250, 100}, MxRectToMxVec2(transform.bounds));
+        mxgui::guiScrollPanelBegin(ctx, "ScrollPanel", MxVec2{300, 200}, MxVec2{100, 100});
 
-        mxgui::guiCanvas(ctx, "Canvas1", Vector2{transform.bounds.x, transform.bounds.y}, transform.anchor, true);
+        mxgui::guiCanvas(ctx, "Canvas1", MxRectToMxVec2(transform.bounds), transform.anchor, true);
         transform = mxgui::getCurrentTransform(ctx);
 
-        mxgui::guiCanvas(ctx, "Canvas2", Vector2{0, 0}, Vector2{transform.bounds.x, transform.bounds.y}, false);
-        mxgui::guiLabel(ctx, "Label1", Vector2{100, 0}, Vector2{transform.bounds.x, transform.bounds.y});
-        mxgui::guiLabel(ctx, "Label2", Vector2{0, 0});
+        mxgui::guiCanvas(ctx, "Canvas2", MxVec2{0, 0}, MxRectToMxVec2(transform.bounds), false);
+        mxgui::guiLabel(ctx, "Label1", MxVec2{100, 0}, MxRectToMxVec2(transform.bounds));
+        mxgui::guiLabel(ctx, "Label2", MxVec2{0, 0});
         mxgui::guiScrollPanelEnd(ctx, "ScrollPanel");
 
         DrawFPS(10, 10);
