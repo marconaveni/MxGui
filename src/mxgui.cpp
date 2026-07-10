@@ -10,7 +10,7 @@
 
 // mxGui
 
-void beginTransformWorld(MxGuiContext* ctx, MxTransform& transform);
+void updateTransformWorld(MxGuiContext* ctx, MxTransform& transform, MxVec2 bounds, MxVec2 anchor);
 
 
 // MxType to Raylib type helper
@@ -28,6 +28,7 @@ inline Color toColor(MxColor color)
 {
     return Color{color.r, color.g, color.b, color.a};
 }
+
 
 inline MxVec2 toMxVec2(Vector2 vec)
 {
@@ -51,7 +52,7 @@ struct FontSpecs
     int size{20};
 };
 
-
+ 
 class FontManager
 {
 public:
@@ -59,8 +60,7 @@ public:
 
     void init()
     {
-        auto it = m_fonts.find(MX_DEFAULT_FONT);
-        if (it != m_fonts.end())
+        if (m_fonts.size() > 0)
         {
             return;
         }
@@ -94,6 +94,73 @@ public:
 private:
 
     std::unordered_map<std::string, FontSpecs> m_fonts{};
+};
+
+
+class TextureManager
+{
+public:
+
+
+    void init()
+    {
+        if (m_textures.size() > 0)
+        {
+            return;
+        }
+        // Loading defaults icons
+        // todo: implement
+    }
+
+    void loadTexture(const std::filesystem::path& path, const std::string& name)
+    {
+        auto it = m_textures.find(name);
+        if (it != m_textures.end())
+        {
+            UnloadTexture(it->second);
+        }
+        Texture texture = LoadTexture(path.string().c_str());
+        m_textures.insert_or_assign(name, texture);
+    }
+
+    void loadTextureFromImageData(const std::string& name, void* data, int width, int height, int mipmaps, int format)
+    {
+        Image image{
+            .data = data,
+            .width = width,
+            .height = height,
+            .mipmaps = mipmaps,
+            .format = format,
+        };
+
+        Texture texture = LoadTextureFromImage(image);
+        m_textures.insert_or_assign(name, texture);
+    }
+
+    void unload()
+    {
+        for (auto& [id, texture] : m_textures)
+        {
+            UnloadTexture(texture);
+        }
+        m_textures.clear();
+    }
+
+    Texture getTexture(std::string name)
+    {
+        auto it = m_textures.find(name);
+        if (it != m_textures.end())
+        {
+            return it->second;
+        }
+
+        return Texture{};
+    }
+
+
+private:
+
+    std::unordered_map<std::string, Texture> m_textures{};
 };
 
 
@@ -133,12 +200,20 @@ struct MxGuiContext
     void close() { m_fontManager.unload(); }
 
     FontManager& getFontManager() { return m_fontManager; }
+    TextureManager& getTextureManager() { return m_textureManager; }
 
     COMPONENT(m_canvas, CanvasComponent);
     COMPONENT(m_labels, LabelComponent);
     COMPONENT(m_buttons, ButtonComponent);
     COMPONENT(m_scrollPanels, ScrollPanelComponent);
+    COMPONENT(m_imageComponents, ImageComponent);
 
+
+    void updateCurrents(MxTransform currentTransform, MxMouseEvents currentMouseEvents)
+    {
+        m_currentTransform = currentTransform;
+        m_currentMouseEvents = currentMouseEvents;
+    }
 
     MxTransform m_currentTransform{};
     MxMouseEvents m_currentMouseEvents{};
@@ -147,8 +222,10 @@ struct MxGuiContext
     std::unordered_map<MxWidgetTag, LabelComponent> m_labels;
     std::unordered_map<MxWidgetTag, ButtonComponent> m_buttons;
     std::unordered_map<MxWidgetTag, ScrollPanelComponent> m_scrollPanels;
+    std::unordered_map<MxWidgetTag, ImageComponent> m_imageComponents;
 
     FontManager m_fontManager;
+    TextureManager m_textureManager;
     MxVec2 m_anchor{};
     float m_scrollTop{};
 };
@@ -156,8 +233,12 @@ struct MxGuiContext
 static std::unique_ptr<MxGuiContext> g_context{nullptr};
 
 
-void beginTransformWorld(MxGuiContext* ctx, MxTransform& transform)
+void updateTransformWorld(MxGuiContext* ctx, MxTransform& transform, MxVec2 bounds, MxVec2 anchor)
 {
+    transform.bounds.x = bounds.x;
+    transform.bounds.y = bounds.y;
+    transform.anchor = anchor;
+
     transform.worldBounds = {
         .x = transform.bounds.x + transform.anchor.x + ctx->m_anchor.x,
         .y = transform.bounds.y + transform.anchor.y + ctx->m_anchor.y - ctx->m_scrollTop,
@@ -178,7 +259,7 @@ namespace mxgui
 
     void destroyContext(MxGuiContext* ctx)
     {
-        g_context->close();
+        ctx->close();
         g_context.reset();
     }
 
@@ -204,6 +285,13 @@ namespace mxgui
     {
         CanvasComponent canvas;
         ctx->insertCanvasComponent(tagName, canvas);
+    }
+
+    void createImage(MxGuiContext* ctx, MxWidgetTag tagName, const std::filesystem::path& path, const std::string& imageName)
+    {
+        ImageComponent imageComponent;
+        ctx->getTextureManager().loadTexture(path, imageName);
+        ctx->insertImageComponent(tagName, imageComponent);
     }
 
 #define TEXT_LABEL "button"
@@ -239,12 +327,7 @@ namespace mxgui
     {
 
         CanvasComponent& canvas = *ctx->getCanvasComponent(tag);
-        canvas.transform.bounds.x = bounds.x;
-        canvas.transform.bounds.y = bounds.y;
-        canvas.transform.anchor = anchor;
-
-
-        beginTransformWorld(ctx, canvas.transform);
+        updateTransformWorld(ctx, canvas.transform, bounds, anchor);
         MxRect rect = canvas.transform.worldBounds;
 
         canvas.mouseEvents.enable = enableDrag;
@@ -276,20 +359,31 @@ namespace mxgui
         }
 
         DrawRectanglePro(toRectangle(rect), Vector2{}, 0, Fade(toColor(canvas.color), 0.5f));
+        ctx->updateCurrents(canvas.transform, canvas.mouseEvents);
+    }
 
-        ctx->m_currentTransform = canvas.transform;
-        ctx->m_currentMouseEvents = canvas.mouseEvents;
+    void guiImage(MxGuiContext* ctx, MxWidgetTag tag, const std::string& imageName, MxVec2 bounds, MxVec2 anchor)
+    {
+        ImageComponent& imageComponent = *ctx->getImageComponent(tag);
+        updateTransformWorld(ctx, imageComponent.transform, bounds, anchor);
+        MxRect rect = imageComponent.transform.worldBounds;
+
+        const Texture texture = ctx->getTextureManager().getTexture(imageName);
+        if (IsTextureValid(texture))
+        {
+            Rectangle source = {0.0f, 0.0f, (float)texture.width, (float)texture.height};
+            Rectangle dest = {rect.x, rect.y, (float)texture.width, (float)texture.height};
+            DrawTexturePro(texture, source, dest, Vector2{0, 0}, 0, toColor(imageComponent.color));
+        }
+
+        ctx->updateCurrents(imageComponent.transform, MxMouseEvents{});
     }
 
     void guiLabel(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds, MxVec2 anchor)
     {
 
         LabelComponent& label = *ctx->getLabelComponent(tag);
-        label.transform.bounds.x = bounds.x;
-        label.transform.bounds.y = bounds.y;
-        label.transform.anchor = anchor;
-
-        beginTransformWorld(ctx, label.transform);
+        updateTransformWorld(ctx, label.transform, bounds, anchor);
         MxRect rect = label.transform.worldBounds;
 
 
@@ -300,19 +394,15 @@ namespace mxgui
         }
 
         DrawTextEx(font.font, label.text.value.c_str(), Vector2{rect.x, rect.y}, 20, 0, toColor(label.color));
+        ctx->updateCurrents(label.transform, MxMouseEvents{});
     }
 
 
-    void guiButton(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds, MxVec2 anchor)
+    bool guiButton(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds, MxVec2 anchor)
     {
         ButtonComponent& button = *ctx->getButtonComponent(tag);
-        button.transform.bounds.x = bounds.x;
-        button.transform.bounds.y = bounds.y;
-        button.transform.anchor = anchor;
-
-        beginTransformWorld(ctx, button.transform);
+        updateTransformWorld(ctx, button.transform, bounds, anchor);
         MxRect rect = button.transform.worldBounds;
-
 
         int paint = 0;
 
@@ -361,21 +451,20 @@ namespace mxgui
         textPosition.y -= ctx->m_anchor.y;
 
         guiLabel(ctx, TEXT_LABEL + tag, MxVec2{0}, textPosition);
+
+        ctx->updateCurrents(button.transform, MxMouseEvents{});
+
+        return button.mouseEvents.isMousePressed;
     }
 
     void guiScrollPanelBegin(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds, MxVec2 anchor)
     {
         ScrollPanelComponent& scrollPanel = *ctx->getScrollPanelComponent(tag);
-        scrollPanel.transform.bounds.x = bounds.x;
-        scrollPanel.transform.bounds.y = bounds.y;
-        scrollPanel.transform.anchor = anchor;
-
-
-        beginTransformWorld(ctx, scrollPanel.transform);
+        updateTransformWorld(ctx, scrollPanel.transform, bounds, anchor);
         MxRect rect = scrollPanel.transform.worldBounds;
         MxRect rectCanvas = rect;
 
-        DrawRectangleLinesEx( toRectangle(rect), 1, Fade(toColor(scrollPanel.color), 0.5f));
+        DrawRectangleLinesEx(toRectangle(rect), 1, Fade(toColor(scrollPanel.color), 0.5f));
         ctx->m_anchor = MxVec2{rect.x, rect.y};
 
 
@@ -392,16 +481,25 @@ namespace mxgui
             {
                 scrollPanel.scrollTop += GetMouseDelta().y;
             }
-            else
+            else if (CheckCollisionPointRec(GetMousePosition(), toRectangle(rect)))
             {
                 scrollPanel.mouseEvents.isDrag = false;
                 scrollPanel.scrollTop -= GetMouseWheelMove() * 10;
             }
+            else
+            {
+                scrollPanel.mouseEvents.isDrag = false;
+            }
 
-            scrollPanel.scrollTop = (scrollPanel.scrollTop < 0) ? previousScrollTop : scrollPanel.scrollTop;
+
+            scrollPanel.scrollTop = (scrollPanel.scrollTop < 0) ? 0 : scrollPanel.scrollTop;
             ctx->m_scrollTop = scrollPanel.scrollTop;
 
-            beginTransformWorld(ctx, scrollPanel.transformCanvas);
+
+            scrollPanel.transformCanvas.bounds.x = 0;
+            scrollPanel.transformCanvas.bounds.y = 0;
+            scrollPanel.transformCanvas.anchor = MxVec2{};
+            updateTransformWorld(ctx, scrollPanel.transformCanvas, MxVec2{0, 0}, MxVec2{0, 0});
             rectCanvas = scrollPanel.transformCanvas.worldBounds;
 
             scrollPanel.scrollTop = (rectCanvas.y + rectCanvas.height < rect.y + rect.height) ? previousScrollTop : scrollPanel.scrollTop;
@@ -411,15 +509,17 @@ namespace mxgui
             float progress = scrollPanel.scrollTop / (rectCanvas.height - rect.height);
 
             scrollPanel.scrollBarThumb = MxRect{
-                .x = rect.x + rect.width - 5,
+                .x = rect.x + rect.width - 5 - MX_DRAG_OFFSET,
                 .y = rect.y + (rect.height - rect.height * visibleProportion) * progress,
-                .width = 5,
+                .width = 5 + MX_DRAG_OFFSET * 2,
                 .height = rect.height * visibleProportion,
             };
         }
 
         BeginScissorMode(rect.x, rect.y, rect.width, rect.height);
         DrawRectanglePro(toRectangle(rectCanvas), Vector2{}, 0, Fade(GRAY, 0.5f));
+
+        ctx->updateCurrents(scrollPanel.transform, MxMouseEvents{});
     }
 
     void guiScrollPanelEnd(MxGuiContext* ctx, MxWidgetTag tag)
@@ -427,8 +527,12 @@ namespace mxgui
         ScrollPanelComponent& scrollPanel = *ctx->getScrollPanelComponent(tag);
         ctx->m_anchor = MxVec2{};
         ctx->m_scrollTop = 0.0f;
-        DrawRectangleRec(toRectangle(scrollPanel.scrollBarThumb), RED);
         EndScissorMode();
+        MxRect rect = scrollPanel.scrollBarThumb;
+        rect.x += MX_DRAG_OFFSET;
+        rect.width -= MX_DRAG_OFFSET * 2;
+        // DrawRectangleRec(toRectangle(scrollPanel.scrollBarThumb), BLUE); // debug offset
+        DrawRectangleRec(toRectangle(rect), RED);
     }
 
 

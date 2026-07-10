@@ -5,10 +5,12 @@
 // (SECTION) Header defines
 //-----------------------------------------------------------------------------
 
+#include <filesystem>
 #include <string>
 
 
 #define MX_DEFAULT_FONT "notosans20"
+#define MX_DRAG_OFFSET 3
 
 #ifdef _DEBUG
     #include <assert.h>
@@ -168,6 +170,12 @@ struct CanvasComponent
     MxMouseEvents mouseEvents{};
 };
 
+struct ImageComponent
+{
+    MxTransform transform{};
+    MxColor color{MxColor::White};
+};
+
 struct LabelComponent
 {
     MxTransform transform{};
@@ -217,12 +225,14 @@ namespace mxgui
     MxMouseEvents getCurrentMouseEvents(MxGuiContext* ctx);
 
     void createCanvas(MxGuiContext* ctx, MxWidgetTag tagName);
+    void createImage(MxGuiContext* ctx, MxWidgetTag tagName, const std::filesystem::path& path, const std::string& imageName);
     void createButton(MxGuiContext* ctx, MxWidgetTag tagName);
     void createLabel(MxGuiContext* ctx, MxWidgetTag tagName, const std::string& newText);
     void createScrollPanel(MxGuiContext* ctx, MxWidgetTag tagName);
 
     void guiCanvas(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds = MxVec2{0}, MxVec2 anchor = MxVec2{0}, bool enableDrag = false);
-    void guiButton(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds = MxVec2{0}, MxVec2 anchor = MxVec2{0});
+    void guiImage(MxGuiContext* ctx, MxWidgetTag tag, const std::string& imageName, MxVec2 bounds = MxVec2{0}, MxVec2 anchor = MxVec2{0});
+    bool guiButton(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds = MxVec2{0}, MxVec2 anchor = MxVec2{0});
     void guiLabel(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds = MxVec2{0}, MxVec2 anchor = MxVec2{0});
     void guiScrollPanelBegin(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds = MxVec2{0}, MxVec2 anchor = MxVec2{0});
     void guiScrollPanelEnd(MxGuiContext* ctx, MxWidgetTag tag);

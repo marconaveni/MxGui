@@ -1,25 +1,18 @@
 
 
-
-#include <algorithm>
-#include <iostream>
-#include <string>
-#include <unordered_map>
-#include <vector>
-
-#include "raylib.h"
 #include "mxgui.hpp"
+#include "raylib.h"
 
 // mxGui
 
 
-
-int main(int argc, const char** argv)
+int main()
 {
+    SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
 
     InitWindow(800, 600, "GUI");
     SetTextLineSpacing(0);
-
+    //SetTargetFPS(60);
 
     MxGuiContext* ctx = mxgui::createContext();
 
@@ -29,6 +22,7 @@ int main(int argc, const char** argv)
     mxgui::createLabel(ctx, "Label1", "hello world");
     mxgui::createLabel(ctx, "Label2", "testando");
     mxgui::createScrollPanel(ctx, "ScrollPanel");
+    mxgui::createImage(ctx, "Image", "/home/marco/Imagens/icons/nfsu2.png", "nfsu2");
 
 
     MxTransform transform;
@@ -43,7 +37,12 @@ int main(int argc, const char** argv)
         BeginDrawing();
         ClearBackground(WHITE);
 
-        mxgui::guiButton(ctx, "ButtonClick1", MxVec2{250, 100}, MxRectToMxVec2(transform.bounds));
+        mxgui::guiImage(ctx, "Image", "nfsu2", MxVec2{50, 50});
+        if (mxgui::guiButton(ctx, "ButtonClick1", MxVec2{250, 100}, MxRectToMxVec2(transform.bounds)))
+        {
+            TraceLog(LOG_INFO, "clicked");
+        }
+
         mxgui::guiScrollPanelBegin(ctx, "ScrollPanel", MxVec2{300, 200}, MxVec2{100, 100});
 
         mxgui::guiCanvas(ctx, "Canvas1", MxRectToMxVec2(transform.bounds), transform.anchor, true);
@@ -56,7 +55,7 @@ int main(int argc, const char** argv)
 
         DrawFPS(10, 10);
 
-        //DrawText(TextFormat("cor: %zu", sizeof(MxColor)), 30, 30, 20, BLACK);
+        // DrawText(TextFormat("cor: %zu", sizeof(MxColor)), 30, 30, 20, BLACK);
         EndDrawing();
     }
 

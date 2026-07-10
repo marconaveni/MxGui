@@ -58,6 +58,12 @@ add_executable(${PROJECT_NAME}
     "src/mxgui.cpp"
 )
 
+if(MSVC)
+    target_compile_options(${PROJECT_NAME}  PRIVATE /W4)
+else()
+    target_compile_options(${PROJECT_NAME}  PRIVATE -Wall -Wextra -Wempty-body)
+endif()
+
 set_target_properties(${PROJECT_NAME} 
     PROPERTIES
     CMAKE_CXX_STANDARD 23
