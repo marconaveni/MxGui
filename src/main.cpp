@@ -43,7 +43,7 @@ int main()
             TraceLog(LOG_INFO, "clicked");
         }
 
-        mxgui::guiScrollPanelBegin(ctx, "ScrollPanel", MxVec2{300, 200}, MxVec2{100, 100});
+        mxgui::guiScrollPanelBegin(ctx, "ScrollPanel", MxVec2{300, 200}, MxVec2{100, 100}, true);
 
         mxgui::guiCanvas(ctx, "Canvas1", MxRectToMxVec2(transform.bounds), transform.anchor, true);
         transform = mxgui::getCurrentTransform(ctx);

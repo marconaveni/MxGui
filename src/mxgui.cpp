@@ -52,7 +52,7 @@ struct FontSpecs
     int size{20};
 };
 
- 
+
 class FontManager
 {
 public:
@@ -164,7 +164,9 @@ private:
 };
 
 
-///////////////////////
+//-----------------------------------------------------------------------------
+// macros getters and setters to MxGuiContext
+//-----------------------------------------------------------------------------
 
 #define INSERT_COMPONENT(componentsList, type)                                            \
     inline type* insert##type(MxWidgetTag tag, type component)                            \
@@ -193,6 +195,7 @@ private:
     INSERT_COMPONENT(componentsList, type) \
     GET_COMPONENT(componentsList, type)
 
+
 struct MxGuiContext
 {
 
@@ -208,7 +211,9 @@ struct MxGuiContext
     COMPONENT(m_scrollPanels, ScrollPanelComponent);
     COMPONENT(m_imageComponents, ImageComponent);
 
-
+    //-----------------------------------------------------------------------------
+    // Store the values ​​of the common types from the last invoked component
+    //-----------------------------------------------------------------------------
     void updateCurrents(MxTransform currentTransform, MxMouseEvents currentMouseEvents)
     {
         m_currentTransform = currentTransform;
@@ -218,16 +223,30 @@ struct MxGuiContext
     MxTransform m_currentTransform{};
     MxMouseEvents m_currentMouseEvents{};
 
+    //-----------------------------------------------------------------------------
+    // Components pools memory
+    //-----------------------------------------------------------------------------
+
     std::unordered_map<MxWidgetTag, CanvasComponent> m_canvas;
     std::unordered_map<MxWidgetTag, LabelComponent> m_labels;
     std::unordered_map<MxWidgetTag, ButtonComponent> m_buttons;
     std::unordered_map<MxWidgetTag, ScrollPanelComponent> m_scrollPanels;
     std::unordered_map<MxWidgetTag, ImageComponent> m_imageComponents;
 
+    //-----------------------------------------------------------------------------
+    // Managers
+    //-----------------------------------------------------------------------------
+
     FontManager m_fontManager;
     TextureManager m_textureManager;
-    MxVec2 m_anchor{};
-    float m_scrollTop{};
+
+    //-----------------------------------------------------------------------------
+    // Shareds positions
+    //-----------------------------------------------------------------------------
+
+    MxVec2 m_anchor{0, 0};
+    float m_scrollTop{0.0f};
+    MxInt32 m_layerMouseEvents{0};
 };
 
 static std::unique_ptr<MxGuiContext> g_context{nullptr};
@@ -301,7 +320,6 @@ namespace mxgui
         ButtonComponent button;
         button.transform.bounds = MxRect{0, 0, 80, 40};
         button.style = ButtonStyle::MxOutLine;
-        button.mouseEvents.enable = true;
         createLabel(ctx, TEXT_LABEL + tagName, "button");
         ctx->insertButtonComponent(tagName, button);
     }
@@ -316,7 +334,6 @@ namespace mxgui
     void createScrollPanel(MxGuiContext* ctx, MxWidgetTag tagName)
     {
         ScrollPanelComponent panel;
-        panel.mouseEvents.enable = true;
         panel.transform.bounds = MxRect{0, 0, 100, 200};
         panel.transformCanvas.bounds = MxRect{0, 0, panel.transform.bounds.width, panel.transform.bounds.height + 50};
         ctx->insertScrollPanelComponent(tagName, panel);
@@ -330,36 +347,36 @@ namespace mxgui
         updateTransformWorld(ctx, canvas.transform, bounds, anchor);
         MxRect rect = canvas.transform.worldBounds;
 
-        canvas.mouseEvents.enable = enableDrag;
+        MxMouseEvents mouseEvents{};
 
-        if (canvas.mouseEvents.enable)
+        if (enableDrag)
         {
-            canvas.mouseEvents.isMouseHover = (CheckCollisionPointRec(GetMousePosition(), toRectangle(rect)));
-            canvas.mouseEvents.isMouseRelease = canvas.mouseEvents.isMouseHover && IsMouseButtonReleased(MOUSE_BUTTON_LEFT);
-            canvas.mouseEvents.isMouseDown = canvas.mouseEvents.isMouseHover && IsMouseButtonDown(MOUSE_BUTTON_LEFT);
-            canvas.mouseEvents.isMousePressed = canvas.mouseEvents.isMouseHover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+            mouseEvents.isMouseHover = (CheckCollisionPointRec(GetMousePosition(), toRectangle(rect)));
+            mouseEvents.isMouseRelease = mouseEvents.isMouseHover && IsMouseButtonReleased(MOUSE_BUTTON_LEFT);
+            mouseEvents.isMouseDown = mouseEvents.isMouseHover && IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+            mouseEvents.isMousePressed = mouseEvents.isMouseHover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 
-            if (canvas.mouseEvents.isMousePressed)
+            if (mouseEvents.isMousePressed)
             {
                 Vector2 mousePosition = GetMousePosition();
-                canvas.mouseEvents.mouseOffset.x = canvas.transform.anchor.x + mousePosition.x - rect.x;
-                canvas.mouseEvents.mouseOffset.y = canvas.transform.anchor.y + mousePosition.y - rect.y;
-                canvas.mouseEvents.isDrag = true;
+                canvas.Offset.x = canvas.transform.anchor.x + mousePosition.x - rect.x;
+                canvas.Offset.y = canvas.transform.anchor.y + mousePosition.y - rect.y;
+                canvas.isDrag = true;
             }
-            if (canvas.mouseEvents.isDrag && IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+            if (canvas.isDrag && IsMouseButtonDown(MOUSE_BUTTON_LEFT))
             {
                 Vector2 mousePosition = GetMousePosition();
-                canvas.transform.bounds.x = mousePosition.x - canvas.mouseEvents.mouseOffset.x - ctx->m_anchor.x;
-                canvas.transform.bounds.y = mousePosition.y - canvas.mouseEvents.mouseOffset.y - ctx->m_anchor.y + ctx->m_scrollTop;
+                canvas.transform.bounds.x = mousePosition.x - canvas.Offset.x - ctx->m_anchor.x;
+                canvas.transform.bounds.y = mousePosition.y - canvas.Offset.y - ctx->m_anchor.y + ctx->m_scrollTop;
             }
             else
             {
-                canvas.mouseEvents.isDrag = false;
+                canvas.isDrag = false;
             }
         }
 
         DrawRectanglePro(toRectangle(rect), Vector2{}, 0, Fade(toColor(canvas.color), 0.5f));
-        ctx->updateCurrents(canvas.transform, canvas.mouseEvents);
+        ctx->updateCurrents(canvas.transform, mouseEvents);
     }
 
     void guiImage(MxGuiContext* ctx, MxWidgetTag tag, const std::string& imageName, MxVec2 bounds, MxVec2 anchor)
@@ -398,30 +415,33 @@ namespace mxgui
     }
 
 
-    bool guiButton(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds, MxVec2 anchor)
+    bool guiButton(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds, MxVec2 anchor, bool isEnable)
     {
         ButtonComponent& button = *ctx->getButtonComponent(tag);
         updateTransformWorld(ctx, button.transform, bounds, anchor);
+
         MxRect rect = button.transform.worldBounds;
+        MxMouseEvents mouseEvents{};
 
         int paint = 0;
 
-        if (button.mouseEvents.enable)
+        if (isEnable)
         {
-            button.mouseEvents.isMouseHover = (CheckCollisionPointRec(GetMousePosition(), toRectangle(rect)));
-            button.mouseEvents.isMouseRelease = button.mouseEvents.isMouseHover && IsMouseButtonReleased(MOUSE_BUTTON_LEFT);
-            button.mouseEvents.isMouseDown = button.mouseEvents.isMouseHover && IsMouseButtonDown(MOUSE_BUTTON_LEFT);
-            button.mouseEvents.isMousePressed = button.mouseEvents.isMouseHover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+            mouseEvents.isMouseHover = (CheckCollisionPointRec(GetMousePosition(), toRectangle(rect)));
+            mouseEvents.isMouseRelease = mouseEvents.isMouseHover && IsMouseButtonReleased(MOUSE_BUTTON_LEFT);
+            mouseEvents.isMouseDown = mouseEvents.isMouseHover && IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+            mouseEvents.isMousePressed = mouseEvents.isMouseHover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 
-            if (button.mouseEvents.isMouseHover)
+            if (mouseEvents.isMouseHover)
             {
                 paint = 50;
             }
-            if (button.mouseEvents.isMouseDown)
+            if (mouseEvents.isMouseDown)
             {
                 paint = 90;
             }
         }
+
 
         const int r = std::clamp(button.color.r - paint, 0, 255);
         const int g = std::clamp(button.color.g - paint, 0, 255);
@@ -452,12 +472,12 @@ namespace mxgui
 
         guiLabel(ctx, TEXT_LABEL + tag, MxVec2{0}, textPosition);
 
-        ctx->updateCurrents(button.transform, MxMouseEvents{});
+        ctx->updateCurrents(button.transform, mouseEvents);
 
-        return button.mouseEvents.isMousePressed;
+        return mouseEvents.isMousePressed;
     }
 
-    void guiScrollPanelBegin(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds, MxVec2 anchor)
+    void guiScrollPanelBegin(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds, MxVec2 anchor, bool isEnable)
     {
         ScrollPanelComponent& scrollPanel = *ctx->getScrollPanelComponent(tag);
         updateTransformWorld(ctx, scrollPanel.transform, bounds, anchor);
@@ -468,27 +488,27 @@ namespace mxgui
         ctx->m_anchor = MxVec2{rect.x, rect.y};
 
 
-        if (scrollPanel.transformCanvas.bounds.height > rect.height)
+        if (scrollPanel.transformCanvas.bounds.height > rect.height && isEnable)
         {
             const float previousScrollTop = scrollPanel.scrollTop;
 
             if (CheckCollisionPointRec(GetMousePosition(), toRectangle(scrollPanel.scrollBarThumb)) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
             {
-                scrollPanel.mouseEvents.isDrag = true;
+                scrollPanel.isDrag = true;
             }
 
-            if (scrollPanel.mouseEvents.isDrag && IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+            if (scrollPanel.isDrag && IsMouseButtonDown(MOUSE_BUTTON_LEFT))
             {
                 scrollPanel.scrollTop += GetMouseDelta().y;
             }
             else if (CheckCollisionPointRec(GetMousePosition(), toRectangle(rect)))
             {
-                scrollPanel.mouseEvents.isDrag = false;
+                scrollPanel.isDrag = false;
                 scrollPanel.scrollTop -= GetMouseWheelMove() * 10;
             }
             else
             {
-                scrollPanel.mouseEvents.isDrag = false;
+                scrollPanel.isDrag = false;
             }
 
 

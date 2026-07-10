@@ -136,13 +136,10 @@ inline MxColor MxColor::Transparent{0, 0, 0, 255};     // Transparent (no color)
 
 struct MxMouseEvents
 {
-    MxVec2 mouseOffset{};
     bool isMouseHover{false};
     bool isMousePressed{false};
     bool isMouseRelease{false};
     bool isMouseDown{false};
-    bool isDrag{false};
-    bool enable{false};
 };
 
 struct MxTransform
@@ -167,7 +164,8 @@ struct CanvasComponent
 {
     MxTransform transform{.bounds = MxRect{0, 0, 100, 100}};
     MxColor color{MxColor::Red};
-    MxMouseEvents mouseEvents{};
+    MxVec2 Offset{};
+    bool isDrag{false};
 };
 
 struct ImageComponent
@@ -196,14 +194,13 @@ struct ButtonComponent
     ButtonStyle style{ButtonStyle::MxContained};
     MxTransform transform{};
     MxColor color{MxColor::Red};
-    MxMouseEvents mouseEvents{};
 };
 
 struct ScrollPanelComponent
 {
     MxTransform transform{};
     MxColor color{MxColor::Red};
-    MxMouseEvents mouseEvents{};
+    bool isDrag{false};
     MxTransform transformCanvas{};
     float scrollTop{0.0f};
     MxRect scrollBarThumb{};
@@ -232,9 +229,9 @@ namespace mxgui
 
     void guiCanvas(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds = MxVec2{0}, MxVec2 anchor = MxVec2{0}, bool enableDrag = false);
     void guiImage(MxGuiContext* ctx, MxWidgetTag tag, const std::string& imageName, MxVec2 bounds = MxVec2{0}, MxVec2 anchor = MxVec2{0});
-    bool guiButton(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds = MxVec2{0}, MxVec2 anchor = MxVec2{0});
+    bool guiButton(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds = MxVec2{0}, MxVec2 anchor = MxVec2{0}, bool isEnable = true);
     void guiLabel(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds = MxVec2{0}, MxVec2 anchor = MxVec2{0});
-    void guiScrollPanelBegin(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds = MxVec2{0}, MxVec2 anchor = MxVec2{0});
+    void guiScrollPanelBegin(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds = MxVec2{0}, MxVec2 anchor = MxVec2{0}, bool isEnable = true);
     void guiScrollPanelEnd(MxGuiContext* ctx, MxWidgetTag tag);
 
 } // namespace mxgui
