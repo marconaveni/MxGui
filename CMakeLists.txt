@@ -56,6 +56,7 @@ FetchContent_MakeAvailable(
 add_executable(${PROJECT_NAME} 
     "src/main.cpp"
     "src/mxgui.cpp"
+    "src/mxgui_render.cpp"
 )
 
 if(MSVC)

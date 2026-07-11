@@ -1,18 +1,20 @@
 
 
 #include "mxgui.hpp"
+#include "mxgui_render.hpp"
 #include "raylib.h"
 
-// mxGui
-
+void testScissor();
 
 int main()
 {
+
+
     SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
 
     InitWindow(800, 600, "GUI");
     SetTextLineSpacing(0);
-    //SetTargetFPS(60);
+    // SetTargetFPS(60);
 
     MxGuiContext* ctx = mxgui::createContext();
 
@@ -28,8 +30,10 @@ int main()
     MxTransform transform;
     transform.bounds.x = 10;
     transform.bounds.y = 10;
-    transform.anchor.x = 100;
-    transform.anchor.y = 100;
+    transform.bounds.width = 400;
+    transform.bounds.height = 10;
+    transform.anchor.x = 0;
+    transform.anchor.y = 0;
 
 
     while (!WindowShouldClose())
@@ -43,11 +47,11 @@ int main()
             TraceLog(LOG_INFO, "clicked");
         }
 
-        mxgui::guiScrollPanelBegin(ctx, "ScrollPanel", MxVec2{300, 200}, MxVec2{100, 100}, true);
-
+        
         mxgui::guiCanvas(ctx, "Canvas1", MxRectToMxVec2(transform.bounds), transform.anchor, true);
         transform = mxgui::getCurrentTransform(ctx);
-
+        
+        mxgui::guiScrollPanelBegin(ctx, "ScrollPanel", MxVec2{300, 200}, MxVec2{100, 100}, true);
         mxgui::guiCanvas(ctx, "Canvas2", MxVec2{0, 0}, MxRectToMxVec2(transform.bounds), false);
         mxgui::guiLabel(ctx, "Label1", MxVec2{100, 0}, MxRectToMxVec2(transform.bounds));
         mxgui::guiLabel(ctx, "Label2", MxVec2{0, 0});
@@ -63,4 +67,46 @@ int main()
     CloseWindow();
 
     return 0;
+}
+
+
+void testScissor()
+{
+    InitWindow(800, 450, "Raylib - Scissor Stack");
+    Rectangle rect = {10, 10, 400, 300};
+    Rectangle root = {};
+    Rectangle child = {250, 100, 250, 200};
+
+    while (!WindowShouldClose())
+    {
+        BeginDrawing();
+        ClearBackground(RAYWHITE);
+
+        Vector2 mousepos = GetMousePosition();
+        root.x = mousepos.x - 300 / 2;
+        root.y = mousepos.y - 300 / 2;
+        root.width = 300;
+        root.height = 300;
+
+        // root scissor
+        pushScissor(root.x, root.y, root.width, root.height);
+        DrawRectangleRec(rect, RED);
+
+        // child scissor
+        pushScissor(250, 100, 250, 200);
+        DrawRectangleRec(child, GRAY);
+        DrawText("Text in scissor child!", 240, 150, 20, WHITE);
+
+        // end child scissor
+        popScissor();
+
+        DrawText("Text in scissor root!", 240, 170, 20, WHITE); // draw in root scissor
+
+        // end root scissor
+        popScissor();
+
+        DrawRectangleLines(root.x, root.y, root.width, root.height, BLACK);
+        EndDrawing();
+    }
+    CloseWindow();
 }

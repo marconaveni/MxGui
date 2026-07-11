@@ -7,6 +7,7 @@
 
 #include <filesystem>
 #include <string>
+#include <type_traits>
 
 
 #define MX_DEFAULT_FONT "notosans20"
@@ -256,6 +257,28 @@ inline MxVec2 MxRectToMxVec2(const MxRect& rec)
 inline MxRect MxVec2ToMxRect(const MxVec2& vec)
 {
     return MxRect{vec.x, vec.y, 0, 0};
+}
+
+
+template <typename T>
+inline constexpr T mxMax(T min, T max)
+{
+    return (max < min) ? min : max;
+}
+
+template <typename T>
+inline constexpr T mxMin(T min, T max)
+{
+    return (min < max) ? min : max;
+}
+
+template <typename T, typename U, typename V>
+inline constexpr T mxClamp(T value, U min, V max)
+{
+    MX_ASSERT(std::is_signed_v<T> == std::is_signed_v<U> && std::is_signed_v<T> == std::is_signed_v<V>,
+              "Clamp arguments must all be of the same signedness to avoid errors.");
+
+    return (value < min) ? min : (value > max) ? max : value;
 }
 
 

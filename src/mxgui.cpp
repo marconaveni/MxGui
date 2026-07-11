@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "mxgui_notosans.hpp"
+#include "mxgui_render.hpp"
 #include "raylib.h"
 
 // mxGui
@@ -536,18 +537,21 @@ namespace mxgui
             };
         }
 
-        BeginScissorMode(rect.x, rect.y, rect.width, rect.height);
-        DrawRectanglePro(toRectangle(rectCanvas), Vector2{}, 0, Fade(GRAY, 0.5f));
+        // BeginScissorMode(rect.x, rect.y, rect.width, rect.height);
+        pushScissor(rect.x, rect.y, rect.width, rect.height);
 
+        DrawRectanglePro(toRectangle(rectCanvas), Vector2{}, 0, Fade(GRAY, 0.5f));
         ctx->updateCurrents(scrollPanel.transform, MxMouseEvents{});
     }
 
     void guiScrollPanelEnd(MxGuiContext* ctx, MxWidgetTag tag)
     {
+        // EndScissorMode();
+        popScissor();
+
         ScrollPanelComponent& scrollPanel = *ctx->getScrollPanelComponent(tag);
         ctx->m_anchor = MxVec2{};
         ctx->m_scrollTop = 0.0f;
-        EndScissorMode();
         MxRect rect = scrollPanel.scrollBarThumb;
         rect.x += MX_DRAG_OFFSET;
         rect.width -= MX_DRAG_OFFSET * 2;
