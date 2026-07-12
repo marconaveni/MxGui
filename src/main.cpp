@@ -31,7 +31,7 @@ int main()
     transform.bounds.x = 10;
     transform.bounds.y = 10;
     transform.bounds.width = 400;
-    transform.bounds.height = 10;
+    transform.bounds.height = 25;
     transform.anchor.x = 0;
     transform.anchor.y = 0;
 
@@ -41,18 +41,18 @@ int main()
         BeginDrawing();
         ClearBackground(WHITE);
 
-        mxgui::guiImage(ctx, "Image", "nfsu2", MxVec2{50, 50});
-        if (mxgui::guiButton(ctx, "ButtonClick1", MxVec2{250, 100}, MxRectToMxVec2(transform.bounds)))
+        
+        mxgui::guiImage(ctx, "Image", "nfsu2", MxRect{50, 50, 100, 100});
+        
+        mxgui::guiCanvas(ctx, "Canvas1", transform.bounds, transform.anchor, true);
+        transform = mxgui::getCurrentTransform(ctx);
+        mxgui::guiCanvas(ctx, "Canvas2", MxRect{0, 0, 400, 400}, MxRectToMxVec2(transform.bounds), false);
+        if (mxgui::guiButton(ctx, "ButtonClick1", MxRect{10, 35, 75, 35}, MxRectToMxVec2(transform.bounds)), true)
         {
             TraceLog(LOG_INFO, "clicked");
         }
-
         
-        mxgui::guiCanvas(ctx, "Canvas1", MxRectToMxVec2(transform.bounds), transform.anchor, true);
-        transform = mxgui::getCurrentTransform(ctx);
-        
-        mxgui::guiScrollPanelBegin(ctx, "ScrollPanel", MxVec2{300, 200}, MxVec2{100, 100}, true);
-        mxgui::guiCanvas(ctx, "Canvas2", MxVec2{0, 0}, MxRectToMxVec2(transform.bounds), false);
+        mxgui::guiScrollPanelBegin(ctx, "ScrollPanel", MxRect{300, 200, 100, 200}, MxRect{300, 200, 100, 250}, MxVec2{100, 100}, true);
         mxgui::guiLabel(ctx, "Label1", MxVec2{100, 0}, MxRectToMxVec2(transform.bounds));
         mxgui::guiLabel(ctx, "Label2", MxVec2{0, 0});
         mxgui::guiScrollPanelEnd(ctx, "ScrollPanel");

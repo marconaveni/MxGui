@@ -11,7 +11,7 @@
 
 // mxGui
 
-void updateTransformWorld(MxGuiContext* ctx, MxTransform& transform, MxVec2 bounds, MxVec2 anchor);
+void updateTransformWorld(MxGuiContext* ctx, MxTransform& transform, MxRect bounds, MxVec2 anchor);
 
 
 // MxType to Raylib type helper
@@ -253,10 +253,9 @@ struct MxGuiContext
 static std::unique_ptr<MxGuiContext> g_context{nullptr};
 
 
-void updateTransformWorld(MxGuiContext* ctx, MxTransform& transform, MxVec2 bounds, MxVec2 anchor)
+void updateTransformWorld(MxGuiContext* ctx, MxTransform& transform, MxRect bounds, MxVec2 anchor)
 {
-    transform.bounds.x = bounds.x;
-    transform.bounds.y = bounds.y;
+    transform.bounds = bounds;
     transform.anchor = anchor;
 
     transform.worldBounds = {
@@ -341,10 +340,11 @@ namespace mxgui
     }
 
 
-    void guiCanvas(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds, MxVec2 anchor, bool enableDrag)
+    void guiCanvas(MxGuiContext* ctx, MxWidgetTag tag, MxRect bounds, MxVec2 anchor, bool enableDrag)
     {
 
         CanvasComponent& canvas = *ctx->getCanvasComponent(tag);
+
         updateTransformWorld(ctx, canvas.transform, bounds, anchor);
         MxRect rect = canvas.transform.worldBounds;
 
@@ -380,7 +380,7 @@ namespace mxgui
         ctx->updateCurrents(canvas.transform, mouseEvents);
     }
 
-    void guiImage(MxGuiContext* ctx, MxWidgetTag tag, const std::string& imageName, MxVec2 bounds, MxVec2 anchor)
+    void guiImage(MxGuiContext* ctx, MxWidgetTag tag, const std::string& imageName, MxRect bounds, MxVec2 anchor)
     {
         ImageComponent& imageComponent = *ctx->getImageComponent(tag);
         updateTransformWorld(ctx, imageComponent.transform, bounds, anchor);
@@ -401,7 +401,7 @@ namespace mxgui
     {
 
         LabelComponent& label = *ctx->getLabelComponent(tag);
-        updateTransformWorld(ctx, label.transform, bounds, anchor);
+        updateTransformWorld(ctx, label.transform, MxVec2ToMxRect(bounds), anchor);
         MxRect rect = label.transform.worldBounds;
 
 
@@ -416,7 +416,7 @@ namespace mxgui
     }
 
 
-    bool guiButton(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds, MxVec2 anchor, bool isEnable)
+    bool guiButton(MxGuiContext* ctx, MxWidgetTag tag, MxRect bounds, MxVec2 anchor, bool isEnable)
     {
         ButtonComponent& button = *ctx->getButtonComponent(tag);
         updateTransformWorld(ctx, button.transform, bounds, anchor);
@@ -478,7 +478,7 @@ namespace mxgui
         return mouseEvents.isMousePressed;
     }
 
-    void guiScrollPanelBegin(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds, MxVec2 anchor, bool isEnable)
+    void guiScrollPanelBegin(MxGuiContext* ctx, MxWidgetTag tag, MxRect bounds, MxRect scrollBounds, MxVec2 anchor, bool isEnable)
     {
         ScrollPanelComponent& scrollPanel = *ctx->getScrollPanelComponent(tag);
         updateTransformWorld(ctx, scrollPanel.transform, bounds, anchor);
@@ -488,6 +488,7 @@ namespace mxgui
         DrawRectangleLinesEx(toRectangle(rect), 1, Fade(toColor(scrollPanel.color), 0.5f));
         ctx->m_anchor = MxVec2{rect.x, rect.y};
 
+        scrollPanel.transformCanvas.bounds = scrollBounds;
 
         if (scrollPanel.transformCanvas.bounds.height > rect.height && isEnable)
         {
@@ -520,7 +521,7 @@ namespace mxgui
             scrollPanel.transformCanvas.bounds.x = 0;
             scrollPanel.transformCanvas.bounds.y = 0;
             scrollPanel.transformCanvas.anchor = MxVec2{};
-            updateTransformWorld(ctx, scrollPanel.transformCanvas, MxVec2{0, 0}, MxVec2{0, 0});
+            updateTransformWorld(ctx, scrollPanel.transformCanvas, scrollPanel.transformCanvas.bounds, MxVec2{0, 0});
             rectCanvas = scrollPanel.transformCanvas.worldBounds;
 
             scrollPanel.scrollTop = (rectCanvas.y + rectCanvas.height < rect.y + rect.height) ? previousScrollTop : scrollPanel.scrollTop;

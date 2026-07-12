@@ -228,11 +228,11 @@ namespace mxgui
     void createLabel(MxGuiContext* ctx, MxWidgetTag tagName, const std::string& newText);
     void createScrollPanel(MxGuiContext* ctx, MxWidgetTag tagName);
 
-    void guiCanvas(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds = MxVec2{0}, MxVec2 anchor = MxVec2{0}, bool enableDrag = false);
-    void guiImage(MxGuiContext* ctx, MxWidgetTag tag, const std::string& imageName, MxVec2 bounds = MxVec2{0}, MxVec2 anchor = MxVec2{0});
-    bool guiButton(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds = MxVec2{0}, MxVec2 anchor = MxVec2{0}, bool isEnable = true);
+    void guiCanvas(MxGuiContext* ctx, MxWidgetTag tag, MxRect bounds = MxRect{0}, MxVec2 anchor = MxVec2{0}, bool enableDrag = false);
+    void guiImage(MxGuiContext* ctx, MxWidgetTag tag, const std::string& imageName, MxRect bounds = MxRect{0}, MxVec2 anchor = MxVec2{0});
+    bool guiButton(MxGuiContext* ctx, MxWidgetTag tag, MxRect bounds = MxRect{0}, MxVec2 anchor = MxVec2{0}, bool isEnable = true);
     void guiLabel(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds = MxVec2{0}, MxVec2 anchor = MxVec2{0});
-    void guiScrollPanelBegin(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds = MxVec2{0}, MxVec2 anchor = MxVec2{0}, bool isEnable = true);
+    void guiScrollPanelBegin(MxGuiContext* ctx, MxWidgetTag tag, MxRect bounds = MxRect{0}, MxRect scrollBounds = MxRect{0}, MxVec2 anchor = MxVec2{0}, bool isEnable = true);
     void guiScrollPanelEnd(MxGuiContext* ctx, MxWidgetTag tag);
 
 } // namespace mxgui
