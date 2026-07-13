@@ -21,8 +21,8 @@ int main()
     mxgui::createCanvas(ctx, "Canvas1");
     mxgui::createCanvas(ctx, "Canvas2");
     mxgui::createButton(ctx, "ButtonClick1");
-    mxgui::createLabel(ctx, "Label1", "hello world");
-    mxgui::createLabel(ctx, "Label2", "testando");
+    mxgui::createLabel(ctx, "Label1");
+    mxgui::createLabel(ctx, "Label2");
     mxgui::createScrollPanel(ctx, "ScrollPanel");
     mxgui::createImage(ctx, "Image", "/home/marco/Imagens/icons/nfsu2.png", "nfsu2");
 
@@ -47,14 +47,14 @@ int main()
         mxgui::guiCanvas(ctx, "Canvas1", transform.bounds, transform.anchor, true);
         transform = mxgui::getCurrentTransform(ctx);
         mxgui::guiCanvas(ctx, "Canvas2", MxRect{0, (transform.bounds.height - 1), 400, 400}, MxRectToMxVec2(transform.bounds), false);
-        if (mxgui::guiButton(ctx, "ButtonClick1", MxRect{10, 35, 75, 35}, MxRectToMxVec2(transform.bounds), ButtonStyle::MxOutLine, true ))
+        if (mxgui::guiButton(ctx, "ButtonClick1", "Click", MxRect{10, 35, 75, 35}, MxRectToMxVec2(transform.bounds), ButtonStyle::MxOutLine, true ))
         {
             TraceLog(LOG_INFO, "clicked");
         }
         
         mxgui::guiScrollPanelBegin(ctx, "ScrollPanel", MxRect{300, 200, 100, 200}, MxRect{300, 200, 100, 250}, MxVec2{100, 100}, true);
-        mxgui::guiLabel(ctx, "Label1", MxVec2{100, 0}, MxRectToMxVec2(transform.bounds));
-        mxgui::guiLabel(ctx, "Label2", MxVec2{0, 0});
+        mxgui::guiLabel(ctx, "Label1", "hello world", MxVec2{100, 0}, MxRectToMxVec2(transform.bounds));
+        mxgui::guiLabel(ctx, "Label2", "hello world 2", MxVec2{0, 0});
         mxgui::guiScrollPanelEnd(ctx, "ScrollPanel");
 
         DrawFPS(10, 10);

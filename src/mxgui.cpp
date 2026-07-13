@@ -47,58 +47,58 @@ inline MxColor toMxColor(Color color)
 }
 
 
-struct FontSpecs
-{
-    Font font{};
-    int size{20};
-};
+// struct FontSpecs
+// {
+//     Font font{};
+//     int size{20};
+// };
 
 
-class FontManager
-{
-public:
+// class FontManager
+// {
+// public:
 
 
-    void init()
-    {
-        if (m_fonts.size() > 0)
-        {
-            return;
-        }
+//     void init()
+//     {
+//         if (m_fonts.size() > 0)
+//         {
+//             return;
+//         }
 
-        m_fonts[MX_DEFAULT_FONT] = FontSpecs{// Default font
-                                             .font = LoadFontFromMemory(".ttf", notosans::data, notosans::size, 20, NULL, 255),
-                                             .size = 20};
-    }
+//         m_fonts[MX_DEFAULT_FONT] = FontSpecs{// Default font
+//                                              .font = LoadFontFromMemory(".ttf", notosans::data, notosans::size, 20, NULL, 255),
+//                                              .size = 20};
+//     }
 
-    void unload()
-    {
-        for (auto& [id, fontSpec] : m_fonts)
-        {
-            UnloadFont(fontSpec.font);
-        }
-        m_fonts.clear();
-    }
+//     void unload()
+//     {
+//         for (auto& [id, fontSpec] : m_fonts)
+//         {
+//             UnloadFont(fontSpec.font);
+//         }
+//         m_fonts.clear();
+//     }
 
-    FontSpecs getFont(std::string name)
-    {
-        auto it = m_fonts.find(name);
-        if (it != m_fonts.end())
-        {
-            return it->second;
-        }
+//     // FontSpecs getFont(std::string name)
+//     // {
+//     //     auto it = m_fonts.find(name);
+//     //     if (it != m_fonts.end())
+//     //     {
+//     //         return it->second;
+//     //     }
 
-        return FontSpecs{};
-    }
-
-
-private:
-
-    std::unordered_map<std::string, FontSpecs> m_fonts{};
-};
+//     //     return FontSpecs{};
+//     // }
 
 
-class TextureManager
+// private:
+
+//     std::unordered_map<std::string, FontSpecs> m_fonts{};
+// };
+
+
+class MxTextureManager
 {
 public:
 
@@ -202,18 +202,20 @@ struct MxGuiContext
 
     void init(MxStyle style = MxStyle{})
     {
-        m_fontManager.init();
+        // m_fontManager.init();
         m_textureManager.init();
         m_style = style;
+        initManagers();
     }
     void close()
     {
-        m_fontManager.unload();
+        // m_fontManager.unload();
         m_textureManager.unload();
+        closeManagers();
     }
 
-    FontManager& getFontManager() { return m_fontManager; }
-    TextureManager& getTextureManager() { return m_textureManager; }
+    // FontManager& getFontManager() { return m_fontManager; }
+    MxTextureManager& getTextureManager() { return m_textureManager; }
 
     COMPONENT(m_canvas, CanvasComponent);
     COMPONENT(m_labels, LabelComponent);
@@ -247,8 +249,8 @@ struct MxGuiContext
     // Managers
     //-----------------------------------------------------------------------------
 
-    FontManager m_fontManager;
-    TextureManager m_textureManager;
+    // FontManager m_fontManager;
+    MxTextureManager m_textureManager;
 
     //-----------------------------------------------------------------------------
     // Shareds positions
@@ -297,13 +299,6 @@ namespace mxgui
         g_context.reset();
     }
 
-    void setTextValue(MxGuiContext* ctx, MxWidgetTag tagName, const std::string& newText)
-    {
-        LabelComponent& label = *ctx->getLabelComponent(tagName);
-        Font font = ctx->getFontManager().getFont(label.fontName).font;
-        label.text.value = newText;
-        label.text.size = toMxVec2(MeasureTextEx(font, newText.c_str(), 20, 0));
-    }
 
     MxTransform getCurrentTransform(MxGuiContext* ctx)
     {
@@ -324,7 +319,7 @@ namespace mxgui
     void createImage(MxGuiContext* ctx, MxWidgetTag tagName, const std::filesystem::path& path, const std::string& imageName)
     {
         ImageComponent imageComponent;
-        ctx->getTextureManager().loadTexture(path, imageName);
+        loadTexture(path, imageName);
         ctx->insertImageComponent(tagName, imageComponent);
     }
 
@@ -334,15 +329,15 @@ namespace mxgui
     {
         ButtonComponent button;
         button.transform.bounds = MxRect{0, 0, 80, 40};
-        createLabel(ctx, TEXT_LABEL + tagName, "button");
+        createLabel(ctx, TEXT_LABEL + tagName);
         ctx->insertButtonComponent(tagName, button);
     }
 
-    void createLabel(MxGuiContext* ctx, MxWidgetTag tagName, const std::string& newText)
+    void createLabel(MxGuiContext* ctx, MxWidgetTag tagName)
     {
         LabelComponent label;
         ctx->insertLabelComponent(tagName, label);
-        setTextValue(ctx, tagName, newText);
+        //setTextValue(ctx, tagName, newText);
     }
 
     void createScrollPanel(MxGuiContext* ctx, MxWidgetTag tagName)
@@ -405,15 +400,22 @@ namespace mxgui
         const Texture texture = ctx->getTextureManager().getTexture(imageName);
         if (IsTextureValid(texture))
         {
-            Rectangle source = {0.0f, 0.0f, (float)texture.width, (float)texture.height};
-            Rectangle dest = {rect.x, rect.y, (float)texture.width, (float)texture.height};
-            DrawTexturePro(texture, source, dest, Vector2{0, 0}, 0, toColor(imageComponent.color));
+            const MxRect source = {0.0f, 0.0f, (float)texture.width, (float)texture.height};
+            const MxRect dest = {rect.x, rect.y, (float)texture.width, (float)texture.height};
+            drawTexturePro(imageName, source, dest, MxVec2{0, 0}, 0, imageComponent.color);
         }
+        // const Texture texture = ctx->getTextureManager().getTexture(imageName);
+        // if (IsTextureValid(texture))
+        // {
+        //     Rectangle source = {0.0f, 0.0f, (float)texture.width, (float)texture.height};
+        //     Rectangle dest = {rect.x, rect.y, (float)texture.width, (float)texture.height};
+        //     DrawTexturePro(texture, source, dest, Vector2{0, 0}, 0, toColor(imageComponent.color));
+        // }
 
         ctx->updateCurrents(imageComponent.transform, MxMouseEvents{});
     }
 
-    void guiLabel(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds, MxVec2 anchor)
+    void guiLabel(MxGuiContext* ctx, MxWidgetTag tag, const std::string& text, MxVec2 bounds, MxVec2 anchor)
     {
 
         LabelComponent& label = *ctx->getLabelComponent(tag);
@@ -421,18 +423,19 @@ namespace mxgui
         MxRect rect = label.transform.worldBounds;
 
 
-        FontSpecs font = ctx->getFontManager().getFont(label.fontName);
-        if (!IsFontValid(font.font))
-        {
-            font.font = GetFontDefault();
-        }
+        // FontSpecs font = ctx->getFontManager().getFont(label.fontName);
+        // if (!IsFontValid(font.font))
+        // {
+        //     font.font = GetFontDefault();
+        // }
 
-        DrawTextEx(font.font, label.text.value.c_str(), Vector2{rect.x, rect.y}, 20, 0, toColor(label.color));
+        // DrawTextEx(font.font, label.text.value.c_str(), Vector2{rect.x, rect.y}, 20, 0, toColor(label.color));
+        drawTextEx(label.fontName, text, MxVec2{rect.x, rect.y}, 20, 0, label.color);
         ctx->updateCurrents(label.transform, MxMouseEvents{});
     }
 
 
-    bool guiButton(MxGuiContext* ctx, MxWidgetTag tag, MxRect bounds, MxVec2 anchor, ButtonStyle buttonStyle, bool isEnable)
+    bool guiButton(MxGuiContext* ctx, MxWidgetTag tag, const std::string& text, MxRect bounds, MxVec2 anchor, ButtonStyle buttonStyle, bool isEnable)
     {
         ButtonComponent& button = *ctx->getButtonComponent(tag);
         updateTransformWorld(ctx, button.transform, bounds, anchor);
@@ -475,12 +478,12 @@ namespace mxgui
         }
 
         LabelComponent& label = *ctx->getLabelComponent(TEXT_LABEL + tag);
-        MxVec2 textSize = label.text.size;
+        MxVec2 textSize = measureText(label.fontName, text);
         MxVec2 textPosition = MxVec2{rect.x + (rect.width - textSize.x) / 2, rect.y + (rect.height - textSize.y) / 2};
         textPosition.x -= ctx->m_anchor.x;
         textPosition.y -= ctx->m_anchor.y;
 
-        guiLabel(ctx, TEXT_LABEL + tag, MxVec2{0}, textPosition);
+        guiLabel(ctx, TEXT_LABEL + tag, text, MxVec2{0}, textPosition);
 
         ctx->updateCurrents(button.transform, mouseEvents);
 
@@ -547,16 +550,16 @@ namespace mxgui
         }
 
         DrawRectangleLinesEx(toRectangle(rect), ctx->m_style.borderWidth, toColor(ctx->m_style.borderColor));
-        
+
         pushScissor(rect.x, rect.y, rect.width, rect.height); // call internal BeginScissorMode();
 
-        DrawRectanglePro(toRectangle(rectCanvas), Vector2{}, 0, Fade(GRAY, 0.5f)); // debug visual feedback 
+        DrawRectanglePro(toRectangle(rectCanvas), Vector2{}, 0, Fade(GRAY, 0.5f)); // debug visual feedback
         ctx->updateCurrents(scrollPanel.transform, MxMouseEvents{});
     }
 
     void guiScrollPanelEnd(MxGuiContext* ctx, MxWidgetTag tag)
     {
-        
+
         popScissor(); // call internal EndScissorMode();
 
         ScrollPanelComponent& scrollPanel = *ctx->getScrollPanelComponent(tag);

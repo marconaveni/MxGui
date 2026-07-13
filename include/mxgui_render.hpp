@@ -12,6 +12,8 @@ void popScissor();
 
 void initManagers();
 void closeManagers();
+void loadTexture(const std::filesystem::path& path, const std::string& name);
+MxVec2 measureText(const std::string& name, const std::string& text);
 
 
 void drawRectangleLinesEx(MxRect rec, float lineThick, MxColor color);

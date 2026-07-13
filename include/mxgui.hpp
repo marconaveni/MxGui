@@ -153,8 +153,9 @@ struct MxTransform
 
 struct MxText
 {
-    std::string value{};
-    MxVec2 size{};
+    std::string text{};
+    MxVec2 measuredText{};
+    int size{20};
 };
 
 struct MxStyle
@@ -201,7 +202,7 @@ struct LabelComponent
     MxTransform transform{};
     MxColor color{MxColor::Black};
     std::string fontName{MX_DEFAULT_FONT};
-    MxText text{};
+    //MxText text{};
 };
 
 enum class ButtonStyle
@@ -241,20 +242,20 @@ namespace mxgui
     MxGuiContext* createContext();
     void destroyContext(MxGuiContext* ctx = nullptr);
 
-    void setTextValue(MxGuiContext* ctx, MxWidgetTag tagName, const std::string& newText = "label");
+    //void setTextValue(MxGuiContext* ctx, MxWidgetTag tagName, const std::string& newText = "label");
     MxTransform getCurrentTransform(MxGuiContext* ctx);
     MxMouseEvents getCurrentMouseEvents(MxGuiContext* ctx);
 
     void createCanvas(MxGuiContext* ctx, MxWidgetTag tagName);
     void createImage(MxGuiContext* ctx, MxWidgetTag tagName, const std::filesystem::path& path, const std::string& imageName);
     void createButton(MxGuiContext* ctx, MxWidgetTag tagName);
-    void createLabel(MxGuiContext* ctx, MxWidgetTag tagName, const std::string& newText);
+    void createLabel(MxGuiContext* ctx, MxWidgetTag tagName);
     void createScrollPanel(MxGuiContext* ctx, MxWidgetTag tagName);
 
     void guiCanvas(MxGuiContext* ctx, MxWidgetTag tag, MxRect bounds, MxVec2 anchor = MxVec2{0}, bool enableDrag = false);
     void guiImage(MxGuiContext* ctx, MxWidgetTag tag, const std::string& imageName, MxRect bounds, MxVec2 anchor = MxVec2{0});
-    bool guiButton(MxGuiContext* ctx, MxWidgetTag tag, MxRect bounds, MxVec2 anchor = MxVec2{0}, ButtonStyle buttonStyle = ButtonStyle::MxContained, bool isEnable = true);
-    void guiLabel(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds, MxVec2 anchor = MxVec2{0});
+    bool guiButton(MxGuiContext* ctx, MxWidgetTag tag, const std::string& text, MxRect bounds, MxVec2 anchor = MxVec2{0}, ButtonStyle buttonStyle = ButtonStyle::MxContained, bool isEnable = true);
+    void guiLabel(MxGuiContext* ctx, MxWidgetTag tag, const std::string& text, MxVec2 bounds, MxVec2 anchor = MxVec2{0});
     void guiScrollPanelBegin(MxGuiContext* ctx, MxWidgetTag tag, MxRect bounds, MxRect scrollBounds, MxVec2 anchor = MxVec2{0}, bool isEnable = true);
     void guiScrollPanelEnd(MxGuiContext* ctx, MxWidgetTag tag);
 
