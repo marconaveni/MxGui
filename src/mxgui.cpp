@@ -200,8 +200,17 @@ private:
 struct MxGuiContext
 {
 
-    void init() { m_fontManager.init(); }
-    void close() { m_fontManager.unload(); }
+    void init(MxStyle style = MxStyle{})
+    {
+        m_fontManager.init();
+        m_textureManager.init();
+        m_style = style;
+    }
+    void close()
+    {
+        m_fontManager.unload();
+        m_textureManager.unload();
+    }
 
     FontManager& getFontManager() { return m_fontManager; }
     TextureManager& getTextureManager() { return m_textureManager; }
@@ -248,6 +257,12 @@ struct MxGuiContext
     MxVec2 m_anchor{0, 0};
     float m_scrollTop{0.0f};
     MxInt32 m_layerMouseEvents{0};
+
+    //-----------------------------------------------------------------------------
+    // Themes
+    //-----------------------------------------------------------------------------
+
+    MxStyle m_style{};
 };
 
 static std::unique_ptr<MxGuiContext> g_context{nullptr};
@@ -319,7 +334,6 @@ namespace mxgui
     {
         ButtonComponent button;
         button.transform.bounds = MxRect{0, 0, 80, 40};
-        button.style = ButtonStyle::MxOutLine;
         createLabel(ctx, TEXT_LABEL + tagName, "button");
         ctx->insertButtonComponent(tagName, button);
     }
@@ -376,7 +390,9 @@ namespace mxgui
             }
         }
 
-        DrawRectanglePro(toRectangle(rect), Vector2{}, 0, Fade(toColor(canvas.color), 0.5f));
+        canvas.color = ctx->m_style.backgroundColor;
+        DrawRectanglePro(toRectangle(rect), Vector2{}, 0, Fade(toColor(canvas.color), 1.0f));
+        DrawRectangleLinesEx(toRectangle(rect), ctx->m_style.borderWidth, toColor(ctx->m_style.borderColor));
         ctx->updateCurrents(canvas.transform, mouseEvents);
     }
 
@@ -416,7 +432,7 @@ namespace mxgui
     }
 
 
-    bool guiButton(MxGuiContext* ctx, MxWidgetTag tag, MxRect bounds, MxVec2 anchor, bool isEnable)
+    bool guiButton(MxGuiContext* ctx, MxWidgetTag tag, MxRect bounds, MxVec2 anchor, ButtonStyle buttonStyle, bool isEnable)
     {
         ButtonComponent& button = *ctx->getButtonComponent(tag);
         updateTransformWorld(ctx, button.transform, bounds, anchor);
@@ -439,30 +455,23 @@ namespace mxgui
             }
             if (mouseEvents.isMouseDown)
             {
-                paint = 90;
+                paint = 80;
             }
         }
 
+        MxColor color = ctx->m_style.primaryColor;
+        color.r = std::clamp(color.r - paint, 0, 255);
+        color.g = std::clamp(color.g - paint, 0, 255);
+        color.b = std::clamp(color.b - paint, 0, 255);
 
-        const int r = std::clamp(button.color.r - paint, 0, 255);
-        const int g = std::clamp(button.color.g - paint, 0, 255);
-        const int b = std::clamp(button.color.b - paint, 0, 255);
-
-        Color finalColor = Color{
-            .r = (unsigned char)r,
-            .g = (unsigned char)g,
-            .b = (unsigned char)b,
-            .a = button.color.a,
-        };
-
-        if (button.style == ButtonStyle::MxContained)
+        if (buttonStyle == ButtonStyle::MxContained)
         {
-            DrawRectangle(rect.x, rect.y, rect.width, rect.height, finalColor);
+            DrawRectangle(rect.x, rect.y, rect.width, rect.height, toColor(color));
         }
-        else if (button.style == ButtonStyle::MxOutLine)
+        else if (buttonStyle == ButtonStyle::MxOutLine)
         {
-            DrawRectangleLinesEx(Rectangle{rect.x, rect.y, rect.width, rect.height}, 1, finalColor);
-            DrawRectangle(rect.x, rect.y, rect.width, rect.height, Fade(finalColor, 0.1f));
+            DrawRectangleLinesEx(Rectangle{rect.x, rect.y, rect.width, rect.height}, 1, toColor(color));
+            DrawRectangle(rect.x, rect.y, rect.width, rect.height, Fade(toColor(color), 0.3f));
         }
 
         LabelComponent& label = *ctx->getLabelComponent(TEXT_LABEL + tag);
@@ -485,7 +494,6 @@ namespace mxgui
         MxRect rect = scrollPanel.transform.worldBounds;
         MxRect rectCanvas = rect;
 
-        DrawRectangleLinesEx(toRectangle(rect), 1, Fade(toColor(scrollPanel.color), 0.5f));
         ctx->m_anchor = MxVec2{rect.x, rect.y};
 
         scrollPanel.transformCanvas.bounds = scrollBounds;
@@ -538,17 +546,18 @@ namespace mxgui
             };
         }
 
-        // BeginScissorMode(rect.x, rect.y, rect.width, rect.height);
-        pushScissor(rect.x, rect.y, rect.width, rect.height);
+        DrawRectangleLinesEx(toRectangle(rect), ctx->m_style.borderWidth, toColor(ctx->m_style.borderColor));
+        
+        pushScissor(rect.x, rect.y, rect.width, rect.height); // call internal BeginScissorMode();
 
-        DrawRectanglePro(toRectangle(rectCanvas), Vector2{}, 0, Fade(GRAY, 0.5f));
+        DrawRectanglePro(toRectangle(rectCanvas), Vector2{}, 0, Fade(GRAY, 0.5f)); // debug visual feedback 
         ctx->updateCurrents(scrollPanel.transform, MxMouseEvents{});
     }
 
     void guiScrollPanelEnd(MxGuiContext* ctx, MxWidgetTag tag)
     {
-        // EndScissorMode();
-        popScissor();
+        
+        popScissor(); // call internal EndScissorMode();
 
         ScrollPanelComponent& scrollPanel = *ctx->getScrollPanelComponent(tag);
         ctx->m_anchor = MxVec2{};
@@ -557,7 +566,7 @@ namespace mxgui
         rect.x += MX_DRAG_OFFSET;
         rect.width -= MX_DRAG_OFFSET * 2;
         // DrawRectangleRec(toRectangle(scrollPanel.scrollBarThumb), BLUE); // debug offset
-        DrawRectangleRec(toRectangle(rect), RED);
+        DrawRectangleRec(toRectangle(rect), toColor(ctx->m_style.borderColor));
     }
 
 

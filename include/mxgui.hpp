@@ -7,6 +7,7 @@
 
 #include <filesystem>
 #include <string>
+#include <optional>
 #include <type_traits>
 
 
@@ -156,6 +157,26 @@ struct MxText
     MxVec2 size{};
 };
 
+struct MxStyle
+{
+    MxColor primaryColor{MxColor::Gray};
+    MxInt32 borderWidth{1};
+    MxColor borderColor{MxColor::DarkGray};
+    MxColor backgroundColor{MxColor::LightGray};
+    MxColor textColor{MxColor::DarkGray};
+    MxInt32 textSize{20};
+};
+
+//-----------------------------------------------------------------------------
+// (SECTION) optionals types alias
+//-----------------------------------------------------------------------------
+typedef std::optional<MxVec2> OptMxVec2;
+typedef std::optional<MxRect> OptMxRect;
+typedef std::optional<MxColor> OptMxColor;
+typedef std::optional<MxMouseEvents> OptMxMouseEvents;
+typedef std::optional<MxTransform> OptMxTransform;
+typedef std::optional<MxText> OptMxText;
+typedef std::optional<MxStyle> OptMxStyle;
 
 //-----------------------------------------------------------------------------
 // (SECTION) Structs components
@@ -192,9 +213,9 @@ enum class ButtonStyle
 
 struct ButtonComponent
 {
-    ButtonStyle style{ButtonStyle::MxContained};
+    // ButtonStyle style{ButtonStyle::MxContained};
     MxTransform transform{};
-    MxColor color{MxColor::Red};
+    //MxColor color{MxColor::Red};
 };
 
 struct ScrollPanelComponent
@@ -206,6 +227,8 @@ struct ScrollPanelComponent
     float scrollTop{0.0f};
     MxRect scrollBarThumb{};
 };
+
+
 
 //-----------------------------------------------------------------------------
 // (SECTION) public API functions
@@ -228,11 +251,11 @@ namespace mxgui
     void createLabel(MxGuiContext* ctx, MxWidgetTag tagName, const std::string& newText);
     void createScrollPanel(MxGuiContext* ctx, MxWidgetTag tagName);
 
-    void guiCanvas(MxGuiContext* ctx, MxWidgetTag tag, MxRect bounds = MxRect{0}, MxVec2 anchor = MxVec2{0}, bool enableDrag = false);
-    void guiImage(MxGuiContext* ctx, MxWidgetTag tag, const std::string& imageName, MxRect bounds = MxRect{0}, MxVec2 anchor = MxVec2{0});
-    bool guiButton(MxGuiContext* ctx, MxWidgetTag tag, MxRect bounds = MxRect{0}, MxVec2 anchor = MxVec2{0}, bool isEnable = true);
-    void guiLabel(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds = MxVec2{0}, MxVec2 anchor = MxVec2{0});
-    void guiScrollPanelBegin(MxGuiContext* ctx, MxWidgetTag tag, MxRect bounds = MxRect{0}, MxRect scrollBounds = MxRect{0}, MxVec2 anchor = MxVec2{0}, bool isEnable = true);
+    void guiCanvas(MxGuiContext* ctx, MxWidgetTag tag, MxRect bounds, MxVec2 anchor = MxVec2{0}, bool enableDrag = false);
+    void guiImage(MxGuiContext* ctx, MxWidgetTag tag, const std::string& imageName, MxRect bounds, MxVec2 anchor = MxVec2{0});
+    bool guiButton(MxGuiContext* ctx, MxWidgetTag tag, MxRect bounds, MxVec2 anchor = MxVec2{0}, ButtonStyle buttonStyle = ButtonStyle::MxContained, bool isEnable = true);
+    void guiLabel(MxGuiContext* ctx, MxWidgetTag tag, MxVec2 bounds, MxVec2 anchor = MxVec2{0});
+    void guiScrollPanelBegin(MxGuiContext* ctx, MxWidgetTag tag, MxRect bounds, MxRect scrollBounds, MxVec2 anchor = MxVec2{0}, bool isEnable = true);
     void guiScrollPanelEnd(MxGuiContext* ctx, MxWidgetTag tag);
 
 } // namespace mxgui

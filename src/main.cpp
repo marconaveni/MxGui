@@ -46,8 +46,8 @@ int main()
         
         mxgui::guiCanvas(ctx, "Canvas1", transform.bounds, transform.anchor, true);
         transform = mxgui::getCurrentTransform(ctx);
-        mxgui::guiCanvas(ctx, "Canvas2", MxRect{0, 0, 400, 400}, MxRectToMxVec2(transform.bounds), false);
-        if (mxgui::guiButton(ctx, "ButtonClick1", MxRect{10, 35, 75, 35}, MxRectToMxVec2(transform.bounds)), true)
+        mxgui::guiCanvas(ctx, "Canvas2", MxRect{0, (transform.bounds.height - 1), 400, 400}, MxRectToMxVec2(transform.bounds), false);
+        if (mxgui::guiButton(ctx, "ButtonClick1", MxRect{10, 35, 75, 35}, MxRectToMxVec2(transform.bounds), ButtonStyle::MxOutLine, true ))
         {
             TraceLog(LOG_INFO, "clicked");
         }
