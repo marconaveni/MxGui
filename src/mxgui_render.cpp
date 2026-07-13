@@ -6,7 +6,7 @@
 #include "mxgui_notosans.hpp"
 #include "raylib.h"
 
-
+// MxType to Raylib type helper
 inline Vector2 toVector(MxVec2 vec)
 {
     return Vector2{vec.x, vec.y};
@@ -27,6 +27,7 @@ inline MxVec2 toMxVec2(Vector2 vec)
     return MxVec2{vec.x, vec.y};
 }
 
+// Raylib to MxType type helper
 inline MxRect toMxRect(Rectangle rec)
 {
     return MxRect{rec.x, rec.y, rec.width, rec.height};
@@ -37,11 +38,12 @@ inline MxColor toMxColor(Color color)
     return MxColor{color.r, color.g, color.b, color.a};
 }
 
+
 struct MxFontSpecsInternal
 {
     Font font{};
     int size{20};
-    int spacing{20};
+    int spacing{0};
 };
 
 
@@ -142,6 +144,12 @@ public:
         m_textures.insert_or_assign(name, texture);
     }
 
+    MxVec2 getSize(const std::string& textureName)
+    {
+        Texture texture = getTexture(textureName);
+        return MxVec2{(float)texture.width, (float)texture.height};
+    }
+
     void unload()
     {
         for (auto& [id, texture] : m_textures)
@@ -151,9 +159,9 @@ public:
         m_textures.clear();
     }
 
-    Texture getTexture(std::string name)
+    Texture getTexture(const std::string& textureName)
     {
-        auto it = m_textures.find(name);
+        auto it = m_textures.find(textureName);
         if (it != m_textures.end())
         {
             return it->second;
@@ -230,17 +238,54 @@ void loadTexture(const std::filesystem::path& path, const std::string& name)
     s_textureManager.loadTexture(path, name);
 }
 
+MxVec2 getTextureSize(const std::string& textureName)
+{
+    return s_textureManager.getSize(textureName);
+}
+
 MxVec2 measureText(const std::string& name, const std::string& text)
 {
     return s_fontManager.measureText(name, text);
 }
 
+MxVec2 getMousePosition()
+{
+    return toMxVec2(GetMousePosition());
+}
+
+MxVec2 getMouseDelta()
+{
+    return toMxVec2(GetMouseDelta());
+}
+
+float getMouseWheelMove()
+{
+    return GetMouseWheelMove();
+}
+
+bool isMouseButtonPressed(int button)
+{
+    return IsMouseButtonPressed(button);
+}
+
+bool isMouseButtonDown(int button)
+{
+    return IsMouseButtonDown(button);
+}
+
+bool isMouseButtonReleased(int button)
+{
+    return IsMouseButtonReleased(button);
+}
+
 void drawRectangleLinesEx(MxRect rec, float lineThick, MxColor color)
 {
+    DrawRectangleLinesEx(toRectangle(rec), lineThick, toColor(color));
 }
 
 void drawRectanglePro(MxRect rec, MxVec2 origin, float rotation, MxColor color)
 {
+    DrawRectanglePro(toRectangle(rec), toVector(origin), rotation, toColor(color));
 }
 
 void drawTexturePro(const std::string& textureName, MxRect source, MxRect dest, MxVec2 origin, float rotation, MxColor tint)

@@ -6,8 +6,8 @@
 //-----------------------------------------------------------------------------
 
 #include <filesystem>
-#include <string>
 #include <optional>
+#include <string>
 #include <type_traits>
 
 
@@ -166,6 +166,7 @@ struct MxStyle
     MxColor backgroundColor{MxColor::LightGray};
     MxColor textColor{MxColor::DarkGray};
     MxInt32 textSize{20};
+    std::string fontName{MX_DEFAULT_FONT};
 };
 
 //-----------------------------------------------------------------------------
@@ -186,7 +187,7 @@ typedef std::optional<MxStyle> OptMxStyle;
 struct CanvasComponent
 {
     MxTransform transform{.bounds = MxRect{0, 0, 100, 100}};
-    MxColor color{MxColor::Red};
+    // MxColor color{MxColor::Red};
     MxVec2 Offset{};
     bool isDrag{false};
 };
@@ -194,29 +195,22 @@ struct CanvasComponent
 struct ImageComponent
 {
     MxTransform transform{};
-    MxColor color{MxColor::White};
+    // MxColor color{MxColor::White};
 };
 
 struct LabelComponent
 {
     MxTransform transform{};
-    MxColor color{MxColor::Black};
-    std::string fontName{MX_DEFAULT_FONT};
-    //MxText text{};
-};
-
-enum class ButtonStyle
-{
-    MxContained,
-    MxOutLine,
-    MxNone,
+    // MxColor color{MxColor::Black};
+    // std::string fontName{MX_DEFAULT_FONT};
+    // MxText text{};
 };
 
 struct ButtonComponent
 {
     // ButtonStyle style{ButtonStyle::MxContained};
     MxTransform transform{};
-    //MxColor color{MxColor::Red};
+    // MxColor color{MxColor::Red};
 };
 
 struct ScrollPanelComponent
@@ -229,7 +223,23 @@ struct ScrollPanelComponent
     MxRect scrollBarThumb{};
 };
 
+typedef enum
+{
+    MxNone = 0,
+    MxContained = 1,
+    MxOutLine = 2,
+} MxButtonStyle;
 
+typedef enum
+{
+    MX_MOUSE_BUTTON_LEFT = 0,    // Mouse button left
+    MX_MOUSE_BUTTON_RIGHT = 1,   // Mouse button right
+    MX_MOUSE_BUTTON_MIDDLE = 2,  // Mouse button middle (pressed wheel)
+    MX_MOUSE_BUTTON_SIDE = 3,    // Mouse button side (advanced mouse device)
+    MX_MOUSE_BUTTON_EXTRA = 4,   // Mouse button extra (advanced mouse device)
+    MX_MOUSE_BUTTON_FORWARD = 5, // Mouse button forward (advanced mouse device)
+    MX_MOUSE_BUTTON_BACK = 6,    // Mouse button back (advanced mouse device)
+} MxMouseButton;
 
 //-----------------------------------------------------------------------------
 // (SECTION) public API functions
@@ -242,7 +252,7 @@ namespace mxgui
     MxGuiContext* createContext();
     void destroyContext(MxGuiContext* ctx = nullptr);
 
-    //void setTextValue(MxGuiContext* ctx, MxWidgetTag tagName, const std::string& newText = "label");
+    // void setTextValue(MxGuiContext* ctx, MxWidgetTag tagName, const std::string& newText = "label");
     MxTransform getCurrentTransform(MxGuiContext* ctx);
     MxMouseEvents getCurrentMouseEvents(MxGuiContext* ctx);
 
@@ -253,8 +263,8 @@ namespace mxgui
     void createScrollPanel(MxGuiContext* ctx, MxWidgetTag tagName);
 
     void guiCanvas(MxGuiContext* ctx, MxWidgetTag tag, MxRect bounds, MxVec2 anchor = MxVec2{0}, bool enableDrag = false);
-    void guiImage(MxGuiContext* ctx, MxWidgetTag tag, const std::string& imageName, MxRect bounds, MxVec2 anchor = MxVec2{0});
-    bool guiButton(MxGuiContext* ctx, MxWidgetTag tag, const std::string& text, MxRect bounds, MxVec2 anchor = MxVec2{0}, ButtonStyle buttonStyle = ButtonStyle::MxContained, bool isEnable = true);
+    void guiImage(MxGuiContext* ctx, MxWidgetTag tag, const std::string& imageName, MxRect bounds, MxVec2 anchor = MxVec2{0}, MxColor color = MxColor::White);
+    bool guiButton(MxGuiContext* ctx, MxWidgetTag tag, const std::string& text, MxRect bounds, MxVec2 anchor = MxVec2{0}, int buttonStyle = MxContained, bool isEnable = true);
     void guiLabel(MxGuiContext* ctx, MxWidgetTag tag, const std::string& text, MxVec2 bounds, MxVec2 anchor = MxVec2{0});
     void guiScrollPanelBegin(MxGuiContext* ctx, MxWidgetTag tag, MxRect bounds, MxRect scrollBounds, MxVec2 anchor = MxVec2{0}, bool isEnable = true);
     void guiScrollPanelEnd(MxGuiContext* ctx, MxWidgetTag tag);
@@ -273,12 +283,12 @@ inline void fromMxVec2(const MxVec2& from, MxRect& to)
     to.y = from.y;
 }
 
-inline MxVec2 MxRectToMxVec2(const MxRect& rec)
+inline constexpr MxVec2 MxRectToMxVec2(const MxRect& rec)
 {
     return MxVec2{rec.x, rec.y};
 }
 
-inline MxRect MxVec2ToMxRect(const MxVec2& vec)
+inline constexpr MxRect MxVec2ToMxRect(const MxVec2& vec)
 {
     return MxRect{vec.x, vec.y, 0, 0};
 }
@@ -299,10 +309,33 @@ inline constexpr T mxMin(T min, T max)
 template <typename T, typename U, typename V>
 inline constexpr T mxClamp(T value, U min, V max)
 {
-    MX_ASSERT(std::is_signed_v<T> == std::is_signed_v<U> && std::is_signed_v<T> == std::is_signed_v<V>,
-              "Clamp arguments must all be of the same signedness to avoid errors.");
+    MX_ASSERT(std::is_signed_v<T> == std::is_signed_v<U> && std::is_signed_v<T> == std::is_signed_v<V>, "Clamp arguments must all be of the same signedness to avoid errors.");
 
     return (value < min) ? min : (value > max) ? max : value;
+}
+
+inline bool checkCollisionPointRect(MxVec2 point, MxRect rec)
+{
+    const bool collision = ((point.x >= rec.x) && (point.x < (rec.x + rec.width)) && (point.y >= rec.y) && (point.y < (rec.y + rec.height)));
+    return collision;
+}
+
+inline MxColor fadeColor(MxColor color, float alpha)
+{
+    MxColor result = color;
+
+    if (alpha < 0.0f)
+    {
+        alpha = 0.0f;
+    }
+    else if (alpha > 1.0f)
+    {
+        alpha = 1.0f;
+    }
+
+    result.a = (MxUChar8)(255.0f * alpha);
+
+    return result;
 }
 
 

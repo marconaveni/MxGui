@@ -13,15 +13,21 @@ void popScissor();
 void initManagers();
 void closeManagers();
 void loadTexture(const std::filesystem::path& path, const std::string& name);
+MxVec2 getTextureSize(const std::string& textureName);
 MxVec2 measureText(const std::string& name, const std::string& text);
+
+MxVec2 getMousePosition();
+MxVec2 getMouseDelta();
+float getMouseWheelMove();
+bool isMouseButtonPressed(int button);
+bool isMouseButtonDown(int button);
+bool isMouseButtonReleased(int button);
 
 
 void drawRectangleLinesEx(MxRect rec, float lineThick, MxColor color);
 void drawRectanglePro(MxRect rec, MxVec2 origin, float rotation, MxColor color);
 void drawTexturePro(const std::string& textureName, MxRect source, MxRect dest, MxVec2 origin, float rotation, MxColor tint);
 void drawTextEx(const std::string& fontName, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint);
-
-
 
 
 #endif // MXGUI_RENDER_HPP

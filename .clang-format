@@ -1,6 +1,6 @@
 # Project
 Standard: c++20
-ColumnLimit: 160
+ColumnLimit: 280
 
 # Indentation
 AccessModifierOffset: -4
