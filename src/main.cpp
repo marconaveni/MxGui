@@ -16,50 +16,38 @@ int main()
     SetTextLineSpacing(0);
     // SetTargetFPS(60);
 
-    MxGuiContext* ctx = mxgui::createContext();
+    MxGuiContext* ctx = mxgui::createContext(MxStyle::Light);
 
-    mxgui::createCanvas(ctx, "Canvas1");
-    mxgui::createCanvas(ctx, "Canvas2");
-    mxgui::createButton(ctx, "ButtonClick1");
-    mxgui::createLabel(ctx, "Label1");
-    mxgui::createLabel(ctx, "Label2");
-    mxgui::createScrollPanel(ctx, "ScrollPanel");
-    mxgui::createImage(ctx, "Image", "/home/marco/Imagens/icons/nfsu2.png", "nfsu2");
+    mxgui::createImage("/home/marco/Imagens/icons/nfsu2.png", "nfsu2");
 
-
-    MxTransform transform;
-    transform.bounds.x = 10;
-    transform.bounds.y = 10;
-    transform.bounds.width = 400;
-    transform.bounds.height = 25;
-    transform.anchor.x = 0;
-    transform.anchor.y = 0;
+    const float width = 400;
+    const float height = 25;
+    MxVec2 anchor{10, 10};
 
 
     while (!WindowShouldClose())
     {
         BeginDrawing();
-        ClearBackground(WHITE);
+        ClearBackground((mxgui::getStyle(ctx).isDarkMode) ? BLACK : RAYWHITE);
 
-        
-        mxgui::guiImage(ctx, "Image", "nfsu2", MxRect{50, 50, 100, 100});
-        
-        mxgui::guiCanvas(ctx, "Canvas1", transform.bounds, transform.anchor, true);
-        transform = mxgui::getCurrentTransform(ctx);
-        mxgui::guiCanvas(ctx, "Canvas2", MxRect{0, (transform.bounds.height - 1), 400, 400}, MxRectToMxVec2(transform.bounds), false);
-        if (mxgui::guiButton(ctx, "ButtonClick1", "Click", MxRect{10, 35, 75, 35}, MxRectToMxVec2(transform.bounds), MxOutLine, true ))
+
+        mxgui::guiImage(ctx, "nfsu2", MxRect{50, 50, 100, 100});
+
+        anchor = mxgui::guiPanel(ctx, "Canvas1", toMxRect(anchor, MxVec2{width, height}), MxVec2{}, true);
+        mxgui::guiPanel(ctx, "Canvas2", MxRect{0, (height - 1), width, width}, anchor, false);
+        if (mxgui::guiButton(ctx, "Click", MxRect{10, 35, 75, 35}, anchor, MX_OUTLINE, true))
         {
             TraceLog(LOG_INFO, "clicked");
         }
-        
+
         mxgui::guiScrollPanelBegin(ctx, "ScrollPanel", MxRect{300, 200, 100, 200}, MxRect{300, 200, 100, 250}, MxVec2{100, 100}, true);
-        mxgui::guiLabel(ctx, "Label1", "hello world", MxVec2{100, 0}, MxRectToMxVec2(transform.bounds));
-        mxgui::guiLabel(ctx, "Label2", "hello world 2", MxVec2{0, 0});
+        mxgui::guiLabel(ctx, "hello world", MxVec2{100, 0}, anchor);
+        mxgui::guiLabel(ctx, "hello world 2", MxVec2{0, 80});
         mxgui::guiScrollPanelEnd(ctx, "ScrollPanel");
 
         DrawFPS(10, 10);
 
-        // DrawText(TextFormat("cor: %zu", sizeof(MxColor)), 30, 30, 20, BLACK);
+        // DrawText(TextFormat("cor: %zu", sizeof(Transform)), 30, 30, 20, BLACK);
         EndDrawing();
     }
 

@@ -1,8 +1,8 @@
 #ifndef MXGUI_RENDER_HPP
 #define MXGUI_RENDER_HPP
 
-#include <memory>
-#include <unordered_map>
+
+#include <filesystem>
 
 #include "mxgui.hpp"
 
@@ -27,7 +27,7 @@ bool isMouseButtonReleased(int button);
 void drawRectangleLinesEx(MxRect rec, float lineThick, MxColor color);
 void drawRectanglePro(MxRect rec, MxVec2 origin, float rotation, MxColor color);
 void drawTexturePro(const std::string& textureName, MxRect source, MxRect dest, MxVec2 origin, float rotation, MxColor tint);
-void drawTextEx(const std::string& fontName, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint);
+void drawTextPro(const std::string& fontName, const std::string& text, MxVec2 position, MxVec2 origin, float rotation, float fontSize, float spacing, MxColor tint);
 
 
 #endif // MXGUI_RENDER_HPP

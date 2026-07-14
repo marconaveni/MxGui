@@ -2,6 +2,16 @@
 #define MXGUI_HPP
 
 //-----------------------------------------------------------------------------
+//
+//  (Panel)                 | Component
+//  (Image)                 | Component
+//  (Button) -> (Label)     | Component
+//  (Label)                 | Component
+//  (ScrollPanel)           | Component Container 
+//
+//-----------------------------------------------------------------------------
+
+//-----------------------------------------------------------------------------
 // (SECTION) Header defines
 //-----------------------------------------------------------------------------
 
@@ -42,7 +52,7 @@ struct MxGuiContext;
 //-----------------------------------------------------------------------------
 // (SECTION) basic types
 //-----------------------------------------------------------------------------
-typedef std::string MxWidgetTag;
+typedef std::string MxTag;
 typedef signed char MxChar8;         // 8-bit signed integer
 typedef unsigned char MxUChar8;      // 8-bit unsigned integer
 typedef signed short MxShort16;      // 16-bit signed integer
@@ -56,6 +66,7 @@ typedef unsigned long long MxUInt64; // 64-bit unsigned integer
 // (SECTION) Structs types
 //-----------------------------------------------------------------------------
 
+struct MxRect;
 
 struct MxVec2
 {
@@ -70,6 +81,25 @@ struct MxRect
     float width{0.0f};
     float height{0.0f};
 };
+
+inline constexpr MxVec2 toMxVec2(const MxRect& rec)
+{
+    return MxVec2{rec.x, rec.y};
+}
+
+inline constexpr MxRect toMxRect(const MxVec2& vec)
+{
+    return MxRect{vec.x, vec.y, 0, 0};
+}
+
+inline constexpr MxRect toMxRect(const MxVec2& vec, const MxRect& rec)
+{
+    return MxRect{vec.x, vec.y, rec.width, rec.height};
+}
+inline constexpr MxRect toMxRect(const MxVec2& vec, const MxVec2& vec2)
+{
+    return MxRect{vec.x, vec.y, vec2.x, vec2.y};
+}
 
 
 struct MxColor
@@ -167,7 +197,21 @@ struct MxStyle
     MxColor textColor{MxColor::DarkGray};
     MxInt32 textSize{20};
     std::string fontName{MX_DEFAULT_FONT};
+    bool isDarkMode{false};
+
+    static MxStyle Light; // ThemeLight;
+    static MxStyle Dark;  // ThemeDark;
 };
+
+inline MxStyle MxStyle::Light{}; // Note: that the default parameters are light theme values.
+inline MxStyle MxStyle::Dark{.primaryColor{MxColor::WhiteGray},
+                             .borderWidth{1},
+                             .borderColor{MxColor::White},
+                             .backgroundColor{MxColor::DarkGray}, // Dark
+                             .textColor{MxColor::White},
+                             .textSize{20},
+                             .fontName{MX_DEFAULT_FONT},
+                             .isDarkMode{true}};
 
 //-----------------------------------------------------------------------------
 // (SECTION) optionals types alias
@@ -184,39 +228,14 @@ typedef std::optional<MxStyle> OptMxStyle;
 // (SECTION) Structs components
 //-----------------------------------------------------------------------------
 
-struct CanvasComponent
+struct PanelComponent
 {
-    MxTransform transform{.bounds = MxRect{0, 0, 100, 100}};
-    // MxColor color{MxColor::Red};
     MxVec2 Offset{};
     bool isDrag{false};
 };
 
-struct ImageComponent
-{
-    MxTransform transform{};
-    // MxColor color{MxColor::White};
-};
-
-struct LabelComponent
-{
-    MxTransform transform{};
-    // MxColor color{MxColor::Black};
-    // std::string fontName{MX_DEFAULT_FONT};
-    // MxText text{};
-};
-
-struct ButtonComponent
-{
-    // ButtonStyle style{ButtonStyle::MxContained};
-    MxTransform transform{};
-    // MxColor color{MxColor::Red};
-};
-
 struct ScrollPanelComponent
 {
-    MxTransform transform{};
-    MxColor color{MxColor::Red};
     bool isDrag{false};
     MxTransform transformCanvas{};
     float scrollTop{0.0f};
@@ -225,9 +244,9 @@ struct ScrollPanelComponent
 
 typedef enum
 {
-    MxNone = 0,
-    MxContained = 1,
-    MxOutLine = 2,
+    MX_NONE = 0,
+    MX_CONTAINED = 1,
+    MX_OUTLINE = 2,
 } MxButtonStyle;
 
 typedef enum
@@ -235,10 +254,6 @@ typedef enum
     MX_MOUSE_BUTTON_LEFT = 0,    // Mouse button left
     MX_MOUSE_BUTTON_RIGHT = 1,   // Mouse button right
     MX_MOUSE_BUTTON_MIDDLE = 2,  // Mouse button middle (pressed wheel)
-    MX_MOUSE_BUTTON_SIDE = 3,    // Mouse button side (advanced mouse device)
-    MX_MOUSE_BUTTON_EXTRA = 4,   // Mouse button extra (advanced mouse device)
-    MX_MOUSE_BUTTON_FORWARD = 5, // Mouse button forward (advanced mouse device)
-    MX_MOUSE_BUTTON_BACK = 6,    // Mouse button back (advanced mouse device)
 } MxMouseButton;
 
 //-----------------------------------------------------------------------------
@@ -248,50 +263,23 @@ typedef enum
 namespace mxgui
 {
 
+    MxGuiContext* createContext(MxStyle style = MxStyle{});
+    void destroyContext(MxGuiContext* ctx);
+    MxStyle getStyle(MxGuiContext* ctx);
 
-    MxGuiContext* createContext();
-    void destroyContext(MxGuiContext* ctx = nullptr);
-
-    // void setTextValue(MxGuiContext* ctx, MxWidgetTag tagName, const std::string& newText = "label");
     MxTransform getCurrentTransform(MxGuiContext* ctx);
     MxMouseEvents getCurrentMouseEvents(MxGuiContext* ctx);
 
-    void createCanvas(MxGuiContext* ctx, MxWidgetTag tagName);
-    void createImage(MxGuiContext* ctx, MxWidgetTag tagName, const std::filesystem::path& path, const std::string& imageName);
-    void createButton(MxGuiContext* ctx, MxWidgetTag tagName);
-    void createLabel(MxGuiContext* ctx, MxWidgetTag tagName);
-    void createScrollPanel(MxGuiContext* ctx, MxWidgetTag tagName);
+    void createImage(const std::filesystem::path& path, const std::string& imageName);
 
-    void guiCanvas(MxGuiContext* ctx, MxWidgetTag tag, MxRect bounds, MxVec2 anchor = MxVec2{0}, bool enableDrag = false);
-    void guiImage(MxGuiContext* ctx, MxWidgetTag tag, const std::string& imageName, MxRect bounds, MxVec2 anchor = MxVec2{0}, MxColor color = MxColor::White);
-    bool guiButton(MxGuiContext* ctx, MxWidgetTag tag, const std::string& text, MxRect bounds, MxVec2 anchor = MxVec2{0}, int buttonStyle = MxContained, bool isEnable = true);
-    void guiLabel(MxGuiContext* ctx, MxWidgetTag tag, const std::string& text, MxVec2 bounds, MxVec2 anchor = MxVec2{0});
-    void guiScrollPanelBegin(MxGuiContext* ctx, MxWidgetTag tag, MxRect bounds, MxRect scrollBounds, MxVec2 anchor = MxVec2{0}, bool isEnable = true);
-    void guiScrollPanelEnd(MxGuiContext* ctx, MxWidgetTag tag);
+    MxVec2 guiPanel(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor = MxVec2{0}, bool enableDrag = false);
+    void guiImage(MxGuiContext* ctx, const std::string& imageName, MxRect bounds, MxVec2 anchor = MxVec2{0}, MxColor color = MxColor::White);
+    bool guiButton(MxGuiContext* ctx, const std::string& text, MxRect bounds, MxVec2 anchor = MxVec2{0}, int buttonStyle = MX_CONTAINED, bool isEnable = true);
+    void guiLabel(MxGuiContext* ctx, const std::string& text, MxVec2 bounds, MxVec2 anchor = MxVec2{0});
+    void guiScrollPanelBegin(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxRect scrollBounds, MxVec2 anchor = MxVec2{0}, bool isEnable = true);
+    void guiScrollPanelEnd(MxGuiContext* ctx, MxTag tag);
 
 } // namespace mxgui
-
-inline void fromMxRect(const MxRect& from, MxVec2& to)
-{
-    to.x = from.x;
-    to.y = from.y;
-}
-
-inline void fromMxVec2(const MxVec2& from, MxRect& to)
-{
-    to.x = from.x;
-    to.y = from.y;
-}
-
-inline constexpr MxVec2 MxRectToMxVec2(const MxRect& rec)
-{
-    return MxVec2{rec.x, rec.y};
-}
-
-inline constexpr MxRect MxVec2ToMxRect(const MxVec2& vec)
-{
-    return MxRect{vec.x, vec.y, 0, 0};
-}
 
 
 template <typename T>

@@ -1,6 +1,7 @@
 #include "mxgui_render.hpp"
 
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "mxgui_notosans.hpp"
@@ -299,7 +300,7 @@ void drawTexturePro(const std::string& textureName, MxRect source, MxRect dest, 
     DrawTexturePro(texture, toRectangle(source), toRectangle(dest), toVector(origin), rotation, toColor(tint));
 }
 
-void drawTextEx(const std::string& fontName, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint)
+void drawTextPro(const std::string& fontName, const std::string& text, MxVec2 position, MxVec2 origin, float rotation, float fontSize, float spacing, MxColor tint)
 {
 
     MxFontSpecsInternal font = s_fontManager.getFont(fontName);
@@ -309,5 +310,5 @@ void drawTextEx(const std::string& fontName, const std::string& text, MxVec2 pos
         font.font = GetFontDefault();
     }
 
-    DrawTextEx(font.font, text.c_str(), toVector(position), fontSize, spacing, toColor(tint));
+    DrawTextPro(font.font, text.c_str(), toVector(position), toVector(origin), rotation, fontSize, spacing, toColor(tint));
 }
