@@ -8,6 +8,7 @@
 //  (Button) -> (Label)     | Component
 //  (Label)                 | Component
 //  (ScrollPanel)           | Component Container 
+//  (Slider)                | Component
 //
 //-----------------------------------------------------------------------------
 
@@ -23,6 +24,7 @@
 
 #define MX_DEFAULT_FONT "notosans20"
 #define MX_DRAG_OFFSET 3
+#define MX_BAR_SIZE 6
 
 #ifdef _DEBUG
     #include <assert.h>
@@ -39,7 +41,7 @@
 
 #else
 
-    #define MX_ASSERT(condition, msg)
+    #define MX_ASSERT(condition, msg) (void)
 
 #endif // _DEBUG
 
@@ -242,6 +244,16 @@ struct ScrollPanelComponent
     MxRect scrollBarThumb{};
 };
 
+struct SliderComponent
+{
+    bool isDrag{false};
+    float progress{0.5f};
+};
+
+//-----------------------------------------------------------------------------
+// (SECTION) enums
+//-----------------------------------------------------------------------------
+
 typedef enum
 {
     MX_NONE = 0,
@@ -274,10 +286,11 @@ namespace mxgui
 
     MxVec2 guiPanel(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor = MxVec2{0}, bool enableDrag = false);
     void guiImage(MxGuiContext* ctx, const std::string& imageName, MxRect bounds, MxVec2 anchor = MxVec2{0}, MxColor color = MxColor::White);
-    bool guiButton(MxGuiContext* ctx, const std::string& text, MxRect bounds, MxVec2 anchor = MxVec2{0}, int buttonStyle = MX_CONTAINED, bool isEnable = true);
+    bool guiButton(MxGuiContext* ctx, const std::string& text, MxRect bounds, MxVec2 anchor = MxVec2{0}, int buttonStyle = MX_CONTAINED, bool enable = true);
     void guiLabel(MxGuiContext* ctx, const std::string& text, MxVec2 bounds, MxVec2 anchor = MxVec2{0});
-    void guiScrollPanelBegin(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxRect scrollBounds, MxVec2 anchor = MxVec2{0}, bool isEnable = true);
+    void guiScrollPanelBegin(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxRect scrollBounds, MxVec2 anchor = MxVec2{0}, bool enable = true);
     void guiScrollPanelEnd(MxGuiContext* ctx, MxTag tag);
+    float guiSlider(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor, bool enable);
 
 } // namespace mxgui
 

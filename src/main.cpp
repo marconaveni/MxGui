@@ -45,6 +45,10 @@ int main()
         mxgui::guiLabel(ctx, "hello world 2", MxVec2{0, 80});
         mxgui::guiScrollPanelEnd(ctx, "ScrollPanel");
 
+
+        const float progress = mxgui::guiSlider(ctx, "Slider", MxRect{50, 530, 700, 6}, MxVec2{}, true);
+        mxgui::guiLabel(ctx, std::to_string(progress), MxVec2{10, 30});
+
         DrawFPS(10, 10);
 
         // DrawText(TextFormat("cor: %zu", sizeof(Transform)), 30, 30, 20, BLACK);

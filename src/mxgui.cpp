@@ -60,6 +60,7 @@ struct MxGuiContext
 
     COMPONENT(m_panels, PanelComponent);
     COMPONENT(m_scrollPanels, ScrollPanelComponent);
+    COMPONENT(m_sliderComponents, SliderComponent);
 
     //-----------------------------------------------------------------------------
     // Store the values ​​of the common types from the last invoked component
@@ -79,6 +80,7 @@ struct MxGuiContext
 
     std::unordered_map<MxTag, PanelComponent> m_panels;
     std::unordered_map<MxTag, ScrollPanelComponent> m_scrollPanels;
+    std::unordered_map<MxTag, SliderComponent> m_sliderComponents;
 
     //-----------------------------------------------------------------------------
     // Shareds positions
@@ -218,7 +220,7 @@ namespace mxgui
     }
 
 
-    bool guiButton(MxGuiContext* ctx, const std::string& text, MxRect bounds, MxVec2 anchor, int buttonStyle, bool isEnable)
+    bool guiButton(MxGuiContext* ctx, const std::string& text, MxRect bounds, MxVec2 anchor, int buttonStyle, bool enable)
     {
         MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
         MxRect rect = transform.worldBounds;
@@ -227,7 +229,7 @@ namespace mxgui
 
         int paint = 0;
 
-        if (isEnable)
+        if (enable)
         {
             mouseEvents.isMouseHover = (checkCollisionPointRect(getMousePosition(), rect));
             mouseEvents.isMouseRelease = mouseEvents.isMouseHover && isMouseButtonReleased(MX_MOUSE_BUTTON_LEFT);
@@ -277,7 +279,7 @@ namespace mxgui
         return mouseEvents.isMousePressed;
     }
 
-    void guiScrollPanelBegin(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxRect scrollBounds, MxVec2 anchor, bool isEnable)
+    void guiScrollPanelBegin(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxRect scrollBounds, MxVec2 anchor, bool enable)
     {
         ScrollPanelComponent& scrollPanel = *ctx->getScrollPanelComponent(tag);
         MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
@@ -288,7 +290,7 @@ namespace mxgui
 
         scrollPanel.transformCanvas.bounds = scrollBounds;
 
-        if (scrollPanel.transformCanvas.bounds.height > rect.height && isEnable)
+        if (scrollPanel.transformCanvas.bounds.height > rect.height && enable)
         {
             const float previousScrollTop = scrollPanel.scrollTop;
 
@@ -329,9 +331,9 @@ namespace mxgui
             float progress = scrollPanel.scrollTop / (rectCanvas.height - rect.height);
 
             scrollPanel.scrollBarThumb = MxRect{
-                .x = rect.x + rect.width - 5 - MX_DRAG_OFFSET,
+                .x = rect.x + rect.width - 6 - MX_DRAG_OFFSET,
                 .y = rect.y + (rect.height - rect.height * visibleProportion) * progress,
-                .width = 5 + MX_DRAG_OFFSET * 2,
+                .width = 6 + MX_DRAG_OFFSET * 2,
                 .height = rect.height * visibleProportion,
             };
         }
@@ -357,7 +359,53 @@ namespace mxgui
         rect.width -= MX_DRAG_OFFSET * 2;
 
         // drawRectanglePro(scrollPanel.scrollBarThumb, MxVec2{}, 0, MxColor::Blue); // debug offset
-        drawRectanglePro(rect, MxVec2{}, 0, ctx->m_style.borderColor);
+        drawRectanglePro(rect, MxVec2{}, 0, ctx->m_style.primaryColor);
+    }
+
+    float guiSlider(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor, bool enable)
+    {
+        SliderComponent& slider = *ctx->getSliderComponent(tag);
+
+        MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
+        MxTransform transformBar = transform;
+
+        MxMouseEvents mouseEvents{};
+
+        if (enable)
+        {
+            mouseEvents.isMouseHover = (checkCollisionPointRect(getMousePosition(), transform.worldBounds));
+            mouseEvents.isMouseRelease = mouseEvents.isMouseHover && isMouseButtonReleased(MX_MOUSE_BUTTON_LEFT);
+            mouseEvents.isMouseDown = mouseEvents.isMouseHover && isMouseButtonDown(MX_MOUSE_BUTTON_LEFT);
+            mouseEvents.isMousePressed = mouseEvents.isMouseHover && isMouseButtonPressed(MX_MOUSE_BUTTON_LEFT);
+
+            if (mouseEvents.isMousePressed)
+            {
+                slider.isDrag = true;
+            }
+            if (slider.isDrag && isMouseButtonDown(MX_MOUSE_BUTTON_LEFT))
+            {
+                const MxVec2 mousePosition = getMousePosition();
+                slider.progress = (mousePosition.x - transform.worldBounds.x) / transform.worldBounds.width;
+                slider.progress = mxClamp(slider.progress, 0.0f, 1.0f);
+            }
+            else
+            {
+                slider.isDrag = false;
+            }
+        }
+
+        MxColor color = ctx->m_style.primaryColor;
+
+        
+        transformBar.worldBounds.width = slider.progress * transformBar.worldBounds.width; 
+
+        // transform = updateTransformWorld(ctx, transform.bounds, anchor);
+        ctx->updateCurrents(transform, mouseEvents);
+
+        drawRectanglePro(transform.worldBounds, MxVec2{}, 0, fadeColor(color, 1.0f));
+        drawRectanglePro(transformBar.worldBounds, MxVec2{}, 0, fadeColor(MxColor::Red, 1.0f));
+        
+        return slider.progress;
     }
 
 
