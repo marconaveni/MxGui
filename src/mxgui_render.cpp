@@ -1,11 +1,16 @@
 #include "mxgui_render.hpp"
 
+
+#ifdef RAYLIB_BACKEND
+
+// clang-format off
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 #include "mxgui_notosans.hpp"
 #include "raylib.h"
+// clang-format on
 
 // MxType to Raylib type helper
 inline Vector2 toVector(MxVec2 vec)
@@ -312,3 +317,6 @@ void drawTextPro(const std::string& fontName, const std::string& text, MxVec2 po
 
     DrawTextPro(font.font, text.c_str(), toVector(position), toVector(origin), rotation, fontSize, spacing, toColor(tint));
 }
+
+
+#endif // RAYLIB_BACKEND

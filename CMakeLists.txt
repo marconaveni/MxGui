@@ -65,6 +65,10 @@ else()
     target_compile_options(${PROJECT_NAME}  PRIVATE -Wall -Wextra -Wempty-body)
 endif()
 
+target_compile_definitions(${PROJECT_NAME} PRIVATE 
+    $<$<CONFIG:Debug>:DEBUG_MODE>
+)
+
 set_target_properties(${PROJECT_NAME} 
     PROPERTIES
     CMAKE_CXX_STANDARD 23

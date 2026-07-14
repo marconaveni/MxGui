@@ -7,13 +7,26 @@
 //  (Image)                 | Component
 //  (Button) -> (Label)     | Component
 //  (Label)                 | Component
-//  (ScrollPanel)           | Component Container 
+//  (ScrollPanel)           | Component Container
 //  (Slider)                | Component
 //
 //-----------------------------------------------------------------------------
 
 //-----------------------------------------------------------------------------
-// (SECTION) Header defines
+// (SECTION) configs
+//-----------------------------------------------------------------------------
+
+#define FORCE_DEBUG 0
+#define MX_DEFAULT_FONT "notosans20"
+#define MX_DRAG_OFFSET 3
+#define MX_BAR_SIZE 6
+
+#define RAYLIB_BACKEND 1
+// #define CUSTOM_BACKEND 1
+// #define SFML_BACKEND 1
+
+//-----------------------------------------------------------------------------
+// (SECTION) Header and defines
 //-----------------------------------------------------------------------------
 
 #include <filesystem>
@@ -22,11 +35,23 @@
 #include <type_traits>
 
 
-#define MX_DEFAULT_FONT "notosans20"
-#define MX_DRAG_OFFSET 3
-#define MX_BAR_SIZE 6
+#ifdef CUSTOM_BACKEND
+    #undef RAYLIB_BACKEND 1
+    #undef SFML_BACKEND 1
+#else 
+#ifdef SFML_BACKEND
+    #undef RAYLIB_BACKEND 1
+    #undef CUSTOM_BACKEND 1
+#else
+    #define RAYLIB_BACKEND 1
+#endif // SFML_BACKEND
+#endif // CUSTOM_BACKEND
 
-#ifdef _DEBUG
+#if FORCE_DEBUG
+    #define DEBUG_MODE
+#endif // FORCE_DEBUG
+
+#ifdef DEBUG_MODE
     #include <assert.h>
 
     #ifdef _MSC_VER // MSVC
@@ -41,7 +66,7 @@
 
 #else
 
-    #define MX_ASSERT(condition, msg) (void)
+    #define MX_ASSERT(condition, msg)
 
 #endif // _DEBUG
 
@@ -263,9 +288,9 @@ typedef enum
 
 typedef enum
 {
-    MX_MOUSE_BUTTON_LEFT = 0,    // Mouse button left
-    MX_MOUSE_BUTTON_RIGHT = 1,   // Mouse button right
-    MX_MOUSE_BUTTON_MIDDLE = 2,  // Mouse button middle (pressed wheel)
+    MX_MOUSE_BUTTON_LEFT = 0,   // Mouse button left
+    MX_MOUSE_BUTTON_RIGHT = 1,  // Mouse button right
+    MX_MOUSE_BUTTON_MIDDLE = 2, // Mouse button middle (pressed wheel)
 } MxMouseButton;
 
 //-----------------------------------------------------------------------------
