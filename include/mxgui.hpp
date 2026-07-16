@@ -3,12 +3,13 @@
 
 //-----------------------------------------------------------------------------
 //
-//  (Panel)                 | Component
-//  (Image)                 | Component
-//  (Button) -> (Label)     | Component
-//  (Label)                 | Component
-//  (ScrollPanel)           | Component Container
-//  (Slider)                | Component
+//  (Panel)                 | Component | state     |
+//  (Image)                 | Component | stateless |
+//  (Button) -> (Label)     | Component | stateless |
+//  (Label)                 | Component | stateless |
+//  (ScrollPanel)           | Component | state     | Container(begin)(end)
+//  (Slider)                | Component | state     |
+//  (SliderProgress)        | Component | stateless |
 //
 //-----------------------------------------------------------------------------
 
@@ -18,7 +19,7 @@
 
 #define FORCE_DEBUG 0
 #define MX_DEFAULT_FONT "notosans20"
-#define MX_DRAG_OFFSET 3
+#define MX_DRAG_OFFSET 4
 #define MX_BAR_SIZE 6
 
 #define RAYLIB_BACKEND 1
@@ -38,14 +39,14 @@
 #ifdef CUSTOM_BACKEND
     #undef RAYLIB_BACKEND 1
     #undef SFML_BACKEND 1
-#else 
-#ifdef SFML_BACKEND
-    #undef RAYLIB_BACKEND 1
-    #undef CUSTOM_BACKEND 1
 #else
-    #define RAYLIB_BACKEND 1
-#endif // SFML_BACKEND
-#endif // CUSTOM_BACKEND
+    #ifdef SFML_BACKEND
+        #undef RAYLIB_BACKEND 1
+        #undef CUSTOM_BACKEND 1
+    #else
+        #define RAYLIB_BACKEND 1
+    #endif // SFML_BACKEND
+#endif     // CUSTOM_BACKEND
 
 #if FORCE_DEBUG
     #define DEBUG_MODE
@@ -128,6 +129,12 @@ inline constexpr MxRect toMxRect(const MxVec2& vec, const MxVec2& vec2)
     return MxRect{vec.x, vec.y, vec2.x, vec2.y};
 }
 
+struct MxImage
+{
+    void* data{nullptr}; // Image raw data
+    int width{0};        // Image base width
+    int height{0};       // Image base height
+};
 
 struct MxColor
 {
@@ -316,6 +323,7 @@ namespace mxgui
     void guiScrollPanelBegin(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxRect scrollBounds, MxVec2 anchor = MxVec2{0}, bool enable = true);
     void guiScrollPanelEnd(MxGuiContext* ctx, MxTag tag);
     float guiSlider(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor, bool enable);
+    void guiSliderProgress(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, float progress);
 
 } // namespace mxgui
 

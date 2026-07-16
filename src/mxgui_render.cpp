@@ -318,5 +318,10 @@ void drawTextPro(const std::string& fontName, const std::string& text, MxVec2 po
     DrawTextPro(font.font, text.c_str(), toVector(position), toVector(origin), rotation, fontSize, spacing, toColor(tint));
 }
 
+void drawCircle(MxVec2 center, float radius, MxColor color)
+{
+    DrawCircleV(toVector(center), radius, toColor(color));   
+}
+
 
 #endif // RAYLIB_BACKEND

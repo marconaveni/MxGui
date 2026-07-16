@@ -366,14 +366,20 @@ namespace mxgui
     {
         SliderComponent& slider = *ctx->getSliderComponent(tag);
 
+        const float radius = 8.0f;
         MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
         MxTransform transformBar = transform;
+        MxTransform transformBarCollision = transform;
+        transformBarCollision.worldBounds.x -= (MX_DRAG_OFFSET + radius) / 2;
+        transformBarCollision.worldBounds.y -= (MX_DRAG_OFFSET + radius) / 2;
+        transformBarCollision.worldBounds.width += (MX_DRAG_OFFSET + radius);
+        transformBarCollision.worldBounds.height += (MX_DRAG_OFFSET + radius);
 
         MxMouseEvents mouseEvents{};
 
         if (enable)
         {
-            mouseEvents.isMouseHover = (checkCollisionPointRect(getMousePosition(), transform.worldBounds));
+            mouseEvents.isMouseHover = (checkCollisionPointRect(getMousePosition(), transformBarCollision.worldBounds));
             mouseEvents.isMouseRelease = mouseEvents.isMouseHover && isMouseButtonReleased(MX_MOUSE_BUTTON_LEFT);
             mouseEvents.isMouseDown = mouseEvents.isMouseHover && isMouseButtonDown(MX_MOUSE_BUTTON_LEFT);
             mouseEvents.isMousePressed = mouseEvents.isMouseHover && isMouseButtonPressed(MX_MOUSE_BUTTON_LEFT);
@@ -395,17 +401,35 @@ namespace mxgui
         }
 
         MxColor color = ctx->m_style.primaryColor;
-
-        
-        transformBar.worldBounds.width = slider.progress * transformBar.worldBounds.width; 
-
-        // transform = updateTransformWorld(ctx, transform.bounds, anchor);
+        transformBar.worldBounds.width = slider.progress * transformBar.worldBounds.width;
         ctx->updateCurrents(transform, mouseEvents);
+
+        // drawRectanglePro(transformBarCollision.worldBounds, MxVec2{}, 0, fadeColor(MxColor::Blue, 1.0f)); // debug offset
+        drawRectanglePro(transform.worldBounds, MxVec2{}, 0, fadeColor(color, 1.0f));
+        drawRectanglePro(transformBar.worldBounds, MxVec2{}, 0, fadeColor(MxColor::Red, 1.0f));
+
+        MxVec2 point{.x = transformBar.worldBounds.x + transformBar.worldBounds.width, .y = transformBar.worldBounds.y + transformBar.worldBounds.height / 2};
+        drawCircle(point, radius, fadeColor(MxColor::Red, 1.0f));
+
+        return slider.progress;
+    }
+
+    void guiSliderProgress(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, float progress)
+    {
+        bounds.height = 12;
+
+        MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
+        MxTransform transformBar = transform;
+
+        MxColor color = ctx->m_style.primaryColor;
+
+
+        transformBar.worldBounds.width = progress * transformBar.worldBounds.width;
+
+        ctx->updateCurrents(transform, MxMouseEvents{});
 
         drawRectanglePro(transform.worldBounds, MxVec2{}, 0, fadeColor(color, 1.0f));
         drawRectanglePro(transformBar.worldBounds, MxVec2{}, 0, fadeColor(MxColor::Red, 1.0f));
-        
-        return slider.progress;
     }
 
 
