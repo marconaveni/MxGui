@@ -30,6 +30,7 @@
 // (SECTION) Header and defines
 //-----------------------------------------------------------------------------
 
+#include <array>
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -70,6 +71,25 @@
     #define MX_ASSERT(condition, msg)
 
 #endif // _DEBUG
+
+
+
+//-----------------------------------------------------------------------------
+// (SECTION) GuiIcons
+// Note: 
+//-----------------------------------------------------------------------------
+
+#define MX_ICONS_SIZE_ELEMENTS 32 + 32   // size array guiIcons 
+
+// cada icone estão codificados em binario (0 - transparent) (1 - solido) no tamanho 16x16
+//    
+
+inline unsigned int guiIcons[MX_ICONS_SIZE_ELEMENTS] = {
+    0x00000000, 0x00600000, 0x07f001f0, 0x7ff01ff0, 0xfff0fff0, 0xfff0fff0, 0xfff0fff0, 0xfff0fff0, // ICON_TLPLAY   ################  
+    0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00070001, 0x007f001f, 0x03ff01ff, 0x0fff07ff, // ICON_TRPLAY   #   IconPlay   #
+    0xfff0fff0, 0xfff0fff0, 0xfff0fff0, 0xfff0fff0, 0x1ff07ff0, 0x01f007f0, 0x00000060, 0x00000000, // ICON_DLPLAY   #              #
+    0x07ff0fff, 0x01ff03ff, 0x001f007f, 0x00010007, 0x00000000, 0x00000000, 0x00000000, 0x00000000, // ICON_DRPLAY   ################
+};
 
 //-----------------------------------------------------------------------------
 // (SECTION) Structs Forward declarations
@@ -299,6 +319,14 @@ typedef enum
     MX_MOUSE_BUTTON_RIGHT = 1,  // Mouse button right
     MX_MOUSE_BUTTON_MIDDLE = 2, // Mouse button middle (pressed wheel)
 } MxMouseButton;
+
+typedef enum 
+{
+    ICON_TLPLAY = 0,
+    ICON_TRPLAY = 1,
+    ICON_DLPLAY = 2,
+    ICON_DRPLAY = 3,
+} MxIconIndex;
 
 //-----------------------------------------------------------------------------
 // (SECTION) public API functions

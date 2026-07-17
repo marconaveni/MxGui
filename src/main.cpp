@@ -9,44 +9,8 @@
 void testScissor();
 
 
-#include <cstdio>
 
-void printBin(int num)
-{
-    // Iterates through all the bits of the integer, starting from the most significant bit down to bit 0.
-    for (int i = (sizeof(num) * 8) - 1; i >= 0; i--)
-    {
-        int bit = (num >> i) & 1;
-        printf("%d", bit);
-
-        // Note: Adds a space every 4 bits to improve readability
-        if (i > 0 && i % 4 == 0)
-        {
-            printf(" ");
-        }
-    }
-    printf("\n");
-}
-
-void printIcon(unsigned int* icons)
-{
-    for (size_t i = 0; i < 8; i++)
-    {
-        for (int j = 0; j < 32; j++)
-        {
-            int bit = (icons[i] >> j) & 1;
-            printf(bit ? "#" : "-");
-
-            if ((j + 1) % 16 == 0)
-            {
-                printf("\n"); // breaks every 16 bits (16 = one line)
-            }
-        }
-    }
-}
-
-
-Image GenIcon(unsigned int* guiIconsPtr, int index = 0)
+Image GenIcon(unsigned int* guiIconsPtr, int index)
 {
     unsigned char* pixels = (unsigned char*)malloc(16 * 16 * sizeof(Color));
 
@@ -77,23 +41,16 @@ Image GenIcon(unsigned int* guiIconsPtr, int index = 0)
 
 int main()
 {
-    std::array<unsigned int,32> guiIcons = {
-        0x00000000, 0x00600000, 0x07f001f0, 0x7ff01ff0, 0xfff0fff0, 0xfff0fff0, 0xfff0fff0, 0xfff0fff0, // ICON_TLPLAY
-        0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00070001, 0x007f001f, 0x03ff01ff, 0x0fff07ff, // ICON_TRPLAY
-        0xfff0fff0, 0xfff0fff0, 0xfff0fff0, 0xfff0fff0, 0x1ff07ff0, 0x01f007f0, 0x00000060, 0x00000000, // ICON_DLPLAY
-        0x07ff0fff, 0x01ff03ff, 0x001f007f, 0x00010007, 0x00000000, 0x00000000, 0x00000000, 0x00000000, // ICON_DRPLAY
-    };
 
-    printIcon(guiIcons.data());
 
 
     InitWindow(800, 600, "image");
     SetTargetFPS(60);
 
-    Image image = GenIcon(guiIcons.data(), 0);
-    Image image1 = GenIcon(guiIcons.data(), 1);
-    Image image2 = GenIcon(guiIcons.data(), 2);
-    Image image3 = GenIcon(guiIcons.data(), 3);
+    Image image = GenIcon(guiIcons, 0);
+    Image image1 = GenIcon(guiIcons, 1);
+    Image image2 = GenIcon(guiIcons, 2);
+    Image image3 = GenIcon(guiIcons, 3);
     Texture texture = LoadTextureFromImage(image);
     Texture texture1 = LoadTextureFromImage(image1);
     Texture texture2 = LoadTextureFromImage(image2);
