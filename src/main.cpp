@@ -9,78 +9,48 @@
 void testScissor();
 
 
-
-Image GenIcon(unsigned int* guiIconsPtr, int index)
-{
-    unsigned char* pixels = (unsigned char*)malloc(16 * 16 * sizeof(Color));
-
-    int count = 0;
-    index *= 8;
-    for (int i = index; i < 8 + index; i++)
-    {
-        for (int j = 0; j < 32; j++)
-        {
-            int bit = (guiIconsPtr[i] >> j) & 1;
-            pixels[count] = 255;
-            pixels[count + 1] = 255;
-            pixels[count + 2] = 255;
-            pixels[count + 3] = bit ? 255 : 0;
-            count += 4;
-        }
-    }
-
-    Image image = Image{
-        .data = pixels,                             // Image raw data
-        .width = 16,                                // Image base width
-        .height = 16,                               // Image base height
-        .mipmaps = 1,                               // Mipmap levels, 1 by default
-        .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 // Data format (PixelFormat type)
-    };
-    return image;
-}
-
 int main()
 {
 
 
 
-    InitWindow(800, 600, "image");
-    SetTargetFPS(60);
+    // InitWindow(800, 600, "image");
+    // SetTargetFPS(60);
 
-    Image image = GenIcon(guiIcons, 0);
-    Image image1 = GenIcon(guiIcons, 1);
-    Image image2 = GenIcon(guiIcons, 2);
-    Image image3 = GenIcon(guiIcons, 3);
-    Texture texture = LoadTextureFromImage(image);
-    Texture texture1 = LoadTextureFromImage(image1);
-    Texture texture2 = LoadTextureFromImage(image2);
-    Texture texture3 = LoadTextureFromImage(image3);
+    // Image image = genIcon(guiIcons, 0);
+    // Image image1 = genIcon(guiIcons, 1);
+    // Image image2 = genIcon(guiIcons, 2);
+    // Image image3 = genIcon(guiIcons, 3);
+    // Texture texture = LoadTextureFromImage(image);
+    // Texture texture1 = LoadTextureFromImage(image1);
+    // Texture texture2 = LoadTextureFromImage(image2);
+    // Texture texture3 = LoadTextureFromImage(image3);
 
-    //SetTextureFilter(texture1, TEXTURE_FILTER_BILINEAR);
-
-
-    while (!WindowShouldClose())
-    {
-        BeginDrawing();
-        ClearBackground(RAYWHITE);
-        // DrawRectangle(10,10,16,16, GRAY);
-        DrawTexture(texture, 10, 10, DARKGRAY);
-        DrawTexture(texture1, 10 + 16, 10, DARKGRAY);
-        DrawTexture(texture2, 10, 10 + 16, DARKGRAY);
-        DrawTexture(texture3, 10 + 16, 10 + 16, DARKGRAY);
-        EndDrawing();
-    }
-    CloseWindow();
+    // //SetTextureFilter(texture1, TEXTURE_FILTER_BILINEAR);
 
 
+    // while (!WindowShouldClose())
+    // {
+    //     BeginDrawing();
+    //     ClearBackground(RAYWHITE);
+    //     // DrawRectangle(10,10,16,16, GRAY);
+    //     DrawTexture(texture, 10, 10, DARKGRAY);
+    //     DrawTexture(texture1, 10 + 16, 10, DARKGRAY);
+    //     DrawTexture(texture2, 10, 10 + 16, DARKGRAY);
+    //     DrawTexture(texture3, 10 + 16, 10 + 16, DARKGRAY);
+    //     EndDrawing();
+    // }
+    // CloseWindow();
 
 
 
 
-    /////////////////////////////////////
 
 
-    return 0;
+    // /////////////////////////////////////
+
+
+    // //return 0;
 
     SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
 

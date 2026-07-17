@@ -10,6 +10,9 @@
 // mxGui
 
 MxTransform updateTransformWorld(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor);
+MxImage genIcon(unsigned int* guiIconsPtr, int index);
+void printIcon(unsigned int* icons);
+void printBin(int num);
 
 struct MxGuiContext;
 
@@ -98,6 +101,11 @@ struct MxGuiContext
 };
 
 
+
+//-----------------------------------------------------------------------------
+// Internal functions
+//-----------------------------------------------------------------------------
+
 MxTransform updateTransformWorld(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor)
 {
     MxTransform transform{};
@@ -112,6 +120,71 @@ MxTransform updateTransformWorld(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor
 
     return transform;
 }
+
+MxImage genIcon(unsigned int* guiIconsPtr, int index)
+{
+    unsigned char* pixels = (unsigned char*)malloc(16 * 16 * sizeof(MxColor));
+
+    int count = 0;
+    index *= 8;
+    for (int i = index; i < 8 + index; i++)
+    {
+        for (int j = 0; j < 32; j++)
+        {
+            int bit = (guiIconsPtr[i] >> j) & 1;
+            pixels[count] = 255;
+            pixels[count + 1] = 255;
+            pixels[count + 2] = 255;
+            pixels[count + 3] = bit ? 255 : 0;
+            count += 4;
+        }
+    }
+
+    MxImage image = MxImage{
+        .data = pixels,
+        .width = 16,
+        .height = 16,
+    };
+    return image;
+}
+
+void printIcon(unsigned int* icons)
+{
+    for (size_t i = 0; i < 8; i++)
+    {
+        for (int j = 0; j < 32; j++)
+        {
+            int bit = (icons[i] >> j) & 1;
+            printf(bit ? "#" : "-");
+
+            if ((j + 1) % 16 == 0)
+            {
+                printf("\n"); // breaks every 16 bits (16 = one line)
+            }
+        }
+    }
+}
+
+void printBin(int num)
+{
+    // Iterates through all the bits of the integer, starting from the most significant bit down to bit 0.
+    for (int i = (sizeof(num) * 8) - 1; i >= 0; i--)
+    {
+        int bit = (num >> i) & 1;
+        printf("%d", bit);
+
+        // Note: Adds a space every 4 bits to improve readability
+        if (i > 0 && i % 4 == 0)
+        {
+            printf(" ");
+        }
+    }
+    printf("\n");
+}
+
+//-----------------------------------------------------------------------------
+// APIS functions
+//-----------------------------------------------------------------------------
 
 namespace mxgui
 {

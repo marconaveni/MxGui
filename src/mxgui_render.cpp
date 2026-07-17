@@ -7,6 +7,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <cstdio>
 
 #include "mxgui_notosans.hpp"
 #include "raylib.h"
@@ -65,9 +66,16 @@ public:
             return;
         }
 
+        int codepoints[95];
+        for (int i = 0; i < 95; i++)
+        {
+            codepoints[i] = 32 + i; // ASCII: espaço (32) até ~ (126)
+        }
+        Font font = LoadFontFromMemory(".ttf", notosans::data, notosans::size, 20, codepoints, 95);
+
         // Default font
         m_fonts[MX_DEFAULT_FONT] = MxFontSpecsInternal{
-            .font = LoadFontFromMemory(".ttf", notosans::data, notosans::size, 20, NULL, 255),
+            .font = font,
             .size = 20,
             .spacing = 0,
         };
@@ -320,8 +328,7 @@ void drawTextPro(const std::string& fontName, const std::string& text, MxVec2 po
 
 void drawCircle(MxVec2 center, float radius, MxColor color)
 {
-    DrawCircleV(toVector(center), radius, toColor(color));   
+    DrawCircleV(toVector(center), radius, toColor(color));
 }
-
 
 #endif // RAYLIB_BACKEND
