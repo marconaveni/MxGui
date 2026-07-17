@@ -1,9 +1,8 @@
 
 
 #include <array>
-
+#define MX_GUI_IMPLEMENTATION
 #include "mxgui.hpp"
-#include "mxgui_render.hpp"
 #include "raylib.h"
 
 void testScissor();
@@ -13,11 +12,10 @@ int main()
 {
 
 
-
     // InitWindow(800, 600, "image");
     // SetTargetFPS(60);
 
-    // Image image = genIcon(guiIcons, 0);
+    //MxImage image = genIcon(guiIcons, 0);
     // Image image1 = genIcon(guiIcons, 1);
     // Image image2 = genIcon(guiIcons, 2);
     // Image image3 = genIcon(guiIcons, 3);
@@ -41,10 +39,6 @@ int main()
     //     EndDrawing();
     // }
     // CloseWindow();
-
-
-
-
 
 
     // /////////////////////////////////////
