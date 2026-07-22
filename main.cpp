@@ -5,12 +5,59 @@
 #include "mxgui.hpp"
 #include "raylib.h"
 
+
+
+#include  "font4.h"
+
+
 void testScissor();
 
 
 int main()
 {
 
+
+        InitWindow(800, 450, "Font Awesome + raylib");
+
+    // Lista de codepoints que você quer usar (ícones + ASCII básico se quiser texto junto)
+    int codepoints[] = {
+        0xf004, // heart
+        0xf015, // home
+        0xf013, // gear/cog
+        0xf007  // user
+    };
+
+
+    int tamanhoOriginal = 414704; 
+    unsigned char* dadosFinaisOTF = (unsigned char*)malloc(tamanhoOriginal);
+    
+    // 2. Descompacta DIRETO do array gerado (Sem precisar decodificar nada antes!)
+    stb_decompress(dadosFinaisOTF, Font_compressed_data, Font_compressed_size);
+    
+
+    // f015  
+    int count = sizeof(codepoints) / sizeof(codepoints[0]);
+
+    //Font faFont = LoadFontEx("/home/marco/Downloads/fontawesome-free-7.3.1-desktop/otfs/Font Awesome 7 Free-Solid-900.otf", 64, codepoints, count);
+    Font faFont = LoadFontFromMemory(  ".otf", dadosFinaisOTF,  tamanhoOriginal, 64, codepoints, count);
+    SetTextureFilter(faFont.texture, TEXTURE_FILTER_BILINEAR);
+
+    while (!WindowShouldClose()) {
+        BeginDrawing();
+        ClearBackground(RAYWHITE);
+
+        // Converte o codepoint pra UTF-8 antes de desenhar
+        int byteCount = 0;
+        const char *icon = CodepointToUTF8(0xf007, &byteCount);
+
+        DrawTextEx(faFont, icon, Vector2{ 100, 180 }, 64, 0, BLACK);
+
+        EndDrawing();
+    }
+
+    UnloadFont(faFont);
+    CloseWindow();
+    return 0;
 
     // InitWindow(800, 600, "image");
     // SetTargetFPS(60);
