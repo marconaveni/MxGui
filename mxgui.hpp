@@ -1,6 +1,8 @@
 #ifndef MXGUI_HPP
 #define MXGUI_HPP
 
+// Mini XPerience Gui
+
 //--------------------------------MXGUI----------------------------------------
 //
 //  (Panel)                 | Component | state     |
@@ -11,6 +13,7 @@
 //  (Slider)                | Component | state     |
 //  (SliderProgress)        | Component | stateless |
 //  (Icon)                  | Component | stateless |
+//  (ButtonIcon)            | Component | stateless |
 //
 //-----------------------------------------------------------------------------
 
@@ -250,6 +253,7 @@ struct MxStyle
     MxColor backgroundColor{MxColor::LightGray};
     MxColor textColor{MxColor::DarkGray};
     MxInt32 textSize{20};
+    MxInt32 iconSize{20};
     std::string fontName{MX_DEFAULT_FONT_ID};
     bool isDarkMode{false};
 
@@ -264,6 +268,7 @@ inline MxStyle MxStyle::Dark{.primaryColor{MxColor::WhiteGray},
                              .backgroundColor{MxColor::DarkGray}, // Dark
                              .textColor{MxColor::White},
                              .textSize{20},
+                             .iconSize{20},
                              .fontName{MX_DEFAULT_FONT_ID},
                              .isDarkMode{true}};
 
@@ -342,7 +347,8 @@ namespace mxgui
     void guiScrollPanelEnd(MxGuiContext* ctx, MxTag tag);
     float guiSlider(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor, bool enable);
     void guiSliderProgress(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, float progress);
-    void guiIcon(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint);
+    void guiIcon(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size = -1);
+    bool guiIconButton(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size = -1, bool enable = true);
 
 } // namespace mxgui
 
@@ -402,7 +408,7 @@ void pushScissor(int x, int y, int width, int height);
 void popScissor();
 
 // managers
-void initManagers();
+void initManagers(MxStyle style);
 void closeManagers();
 
 // misc
@@ -424,7 +430,7 @@ void drawRectanglePro(MxRect rec, MxVec2 origin, float rotation, MxColor color);
 void drawTexturePro(const std::string& textureName, MxRect source, MxRect dest, MxVec2 origin, float rotation, MxColor tint);
 void drawTextPro(const std::string& fontName, const std::string& text, MxVec2 position, MxVec2 origin, float rotation, float fontSize, float spacing, MxColor tint);
 void drawCircle(MxVec2 center, float radius, MxColor color);
-void drawIconEx(int codepoint, MxVec2 position, MxColor color);
+void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size = -1);
 
 //-----------------------------------------------------------------------------
 // (SECTION) internal functions
@@ -489,7 +495,7 @@ struct MxGuiContext
     void init(MxStyle style)
     {
         m_style = style;
-        initManagers();
+        initManagers(m_style);
     }
     void close() { closeManagers(); }
 
@@ -785,7 +791,7 @@ namespace mxgui
         MxTransform transform = updateTransformWorld(ctx, toMxRect(bounds), anchor);
         MxRect rect = transform.worldBounds;
 
-        drawTextPro(ctx->m_style.fontName, text, MxVec2{rect.x, rect.y}, MxVec2{}, 0, 20, 0, ctx->m_style.textColor);
+        drawTextPro(ctx->m_style.fontName, text, MxVec2{rect.x, rect.y}, MxVec2{}, 0, ctx->m_style.textSize, 0, ctx->m_style.textColor);
         ctx->updateCurrents(transform, MxMouseEvents{});
     }
 
@@ -1002,12 +1008,57 @@ namespace mxgui
         drawRectanglePro(transformBar.worldBounds, MxVec2{}, 0, fadeColor(MxColor::Red, 1.0f));
     }
 
-    void guiIcon(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint)
+    void guiIcon(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size)
     {
+        const int iconSize = (size < 0) ? ctx->m_style.iconSize : size; 
+        bounds.width = iconSize;
+        bounds.height = iconSize;
         MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
         MxColor color = ctx->m_style.primaryColor;
 
-        drawIconEx(codepoint, toMxVec2(transform.worldBounds), color);
+        drawIconEx(codepoint, toMxVec2(transform.worldBounds), color, size);
+    }
+
+    bool guiIconButton(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size, bool enable)
+    {
+        const int iconSize = (size < 0) ? ctx->m_style.iconSize : size; 
+        bounds.width = iconSize;
+        bounds.height = iconSize;
+        MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
+        MxRect rect = transform.worldBounds;
+
+        MxMouseEvents mouseEvents{};
+
+        int paint = 0;
+
+        if (enable)
+        {
+            mouseEvents.isMouseHover = (checkCollisionPointRect(getMousePosition(), rect));
+            mouseEvents.isMouseRelease = mouseEvents.isMouseHover && isMouseButtonReleased(MX_MOUSE_BUTTON_LEFT);
+            mouseEvents.isMouseDown = mouseEvents.isMouseHover && isMouseButtonDown(MX_MOUSE_BUTTON_LEFT);
+            mouseEvents.isMousePressed = mouseEvents.isMouseHover && isMouseButtonPressed(MX_MOUSE_BUTTON_LEFT);
+
+            if (mouseEvents.isMouseHover)
+            {
+                paint = 50;
+            }
+            if (mouseEvents.isMouseDown)
+            {
+                paint = 80;
+            }
+        }
+
+        MxColor color = ctx->m_style.primaryColor;
+        color.r = mxClamp(color.r - paint, 0, 255);
+        color.g = mxClamp(color.g - paint, 0, 255);
+        color.b = mxClamp(color.b - paint, 0, 255);
+
+
+        drawIconEx(codepoint, toMxVec2(transform.worldBounds), color, size);
+
+        ctx->updateCurrents(transform, mouseEvents);
+
+        return mouseEvents.isMousePressed;
     }
 
 
@@ -1067,24 +1118,25 @@ class MxFontManager
 {
 public:
 
-    void setupDefaultFont()
+    void setupDefaultFont(int textSize)
     {
         int codepoints[95];
         for (int i = 0; i < 95; i++)
         {
             codepoints[i] = 32 + i; // ASCII: espaço (32) até ~ (126)
         }
-        Font font = LoadFontFromMemory(".ttf", notosans::data, notosans::size, 20, codepoints, 95);
+        Font font = LoadFontFromMemory(".ttf", notosans::data, notosans::size, textSize, codepoints, 95);
 
         // Default font
         m_fonts[MX_DEFAULT_FONT_ID] = MxFontSpecsInternal{
             .font = font,
-            .size = 20,
+            .size = textSize,
             .spacing = 0,
         };
+        SetTextureFilter(font.texture, TEXTURE_FILTER_BILINEAR);
     }
 
-    void setupFontAwesome()
+    void setupFontAwesome(int iconSize)
     {
         #if FONT_AWESOME
         int arrayOriginalSize = 414704;
@@ -1092,26 +1144,26 @@ public:
         stb_decompress(fontAwesomeData, fa_compressed_data, fa_compressed_size);
 
         int count = sizeof(codepointsFontAwesome) / sizeof(codepointsFontAwesome[0]);
-        Font faFont = LoadFontFromMemory(".otf", fontAwesomeData, arrayOriginalSize, 20, codepointsFontAwesome, count);
+        Font faFont = LoadFontFromMemory(".otf", fontAwesomeData, arrayOriginalSize, iconSize, codepointsFontAwesome, count);
 
         m_fonts[MX_FONT_AWESOME_ID] = MxFontSpecsInternal{
             .font = faFont,
-            .size = 20,
+            .size = iconSize,
             .spacing = 0,
         };
         SetTextureFilter(faFont.texture, TEXTURE_FILTER_BILINEAR);
         #endif
     }
 
-    void init()
+    void init(MxStyle style)
     {
         if (m_fonts.size() > 0)
         {
             return;
         }
 
-        setupDefaultFont();
-        setupFontAwesome();
+        setupDefaultFont(style.textSize);
+        setupFontAwesome(style.iconSize);
     }
 
     void unload()
@@ -1162,8 +1214,6 @@ public:
         {
             return;
         }
-        // Loading defaults icons
-        // todo: implement
     }
 
     void loadTexture(const std::filesystem::path& path, const std::string& name)
@@ -1268,9 +1318,9 @@ void popScissor()
     }
 }
 
-void initManagers()
+void initManagers(MxStyle style)
 {
-    s_fontManager.init();
+    s_fontManager.init(style);
     s_textureManager.init();
 }
 
@@ -1364,7 +1414,7 @@ void drawCircle(MxVec2 center, float radius, MxColor color)
     DrawCircleV(toVector(center), radius, toColor(color));
 }
 
-void drawIconEx(int codepoint, MxVec2 position, MxColor color)
+void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size)
 {
     // Converte o codepoint pra UTF-8 antes de desenhar
     int byteCount = 0;
@@ -1377,7 +1427,8 @@ void drawIconEx(int codepoint, MxVec2 position, MxColor color)
         return;
     }
 
-    DrawTextEx(font.font, icon, toVector(position), font.size, 0, toColor(color));
+    const int fontSize = (size < 0) ? font.size : size; 
+    DrawTextEx(font.font, icon, toVector(position), fontSize, 0, toColor(color));
 }
 
     #endif // RAYLIB_BACKEND

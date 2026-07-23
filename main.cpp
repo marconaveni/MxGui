@@ -22,7 +22,9 @@ int main()
     SetTextLineSpacing(0);
     // SetTargetFPS(60);
 
-    MxGuiContext* ctx = mxgui::createContext(MxStyle::Light);
+    MxStyle style = MxStyle::Light;
+    style.iconSize = 28;
+    MxGuiContext* ctx = mxgui::createContext(style);
 
     mxgui::createImage("/home/marco/Downloads/icones/playsolid.png", "nfsu2");
 
@@ -45,6 +47,10 @@ int main()
         }
         mxgui::guiImage(ctx, "nfsu2", MxRect{12, 35, 100, 100}, anchor);
         mxgui::guiIcon(ctx, MxRect{10, 80, 0, 0}, anchor, ICON_FA_CIRCLE_PLAY);
+        if(mxgui::guiIconButton(ctx, MxRect{10, 120, 20, 20}, anchor, ICON_FA_CIRCLE_PLAY, 28))
+        {
+            TraceLog(LOG_INFO, "clicked Icon");
+        }
 
         mxgui::guiScrollPanelBegin(ctx, "ScrollPanel", MxRect{300, 200, 100, 200}, MxRect{300, 200, 100, 250}, MxVec2{100, 100}, true);
         mxgui::guiLabel(ctx, "hello world", MxVec2{100, 0}, anchor);
