@@ -1,7 +1,7 @@
 // File: 'fa-solid-900.otf' (414704 bytes)
 // Exported using binary_to_compressed_c.exe -u8 "fa-solid-900.otf" Font
-static const unsigned int Font_compressed_size = 250430;
-static const unsigned char Font_compressed_data[250430] =
+static const unsigned int fa_compressed_size = 250430;
+static const unsigned char fa_compressed_data[250430] =
 {
     87,188,0,0,0,0,0,0,0,6,83,240,0,4,0,0,8,38,79,84,84,79,0,10,0,128,0,3,0,32,67,70,70,32,54,60,164,28,0,0,198,72,0,4,190,211,71,83,85,66,12,18,72,238,0,5,133,130,19,8,45,206,210,79,83,
     47,50,98,221,229,156,0,0,1,16,0,0,0,96,99,109,97,112,221,150,16,2,0,0,27,188,0,0,170,108,104,101,97,100,50,18,40,29,0,0,0,172,130,3,33,54,104,130,16,35,4,60,7,202,130,11,32,228,130,

@@ -10,11 +10,12 @@
 //  (ScrollPanel)           | Component | state     | Container(begin)(end)
 //  (Slider)                | Component | state     |
 //  (SliderProgress)        | Component | stateless |
+//  (Icon)                  | Component | stateless |
 //
 //-----------------------------------------------------------------------------
 
 //-----------------------------------------------------------------------------
-// esse arquivo esta organizado por sessões 
+// esse arquivo esta organizado por sessões
 // você pode buscar por (SECTION)
 //-----------------------------------------------------------------------------
 
@@ -25,6 +26,8 @@
 
 #define FORCE_DEBUG 0
 #define MX_DEFAULT_FONT "notosans20"
+#define MX_FONT_AWESOME "fontawesome"
+#define FONT_AWESOME 1
 #define MX_DRAG_OFFSET 4
 #define MX_BAR_SIZE 6
 
@@ -79,19 +82,39 @@
 #endif // _DEBUG
 
 
+#include "mxgui_fontawesome.h"
+
+typedef enum
+{
+    MX_HEART = 0xf004,
+    MX_HOME = 0xf015,
+    MX_GEAR = 0xf013,
+    MX_USER = 0xf007,
+    MX_PLUS = 0x2b,
+    MX_MINUS = 0xf068,
+} MxIconFontAwesomeIndex;
+
+static int codepointsFontAwesome[] = {
+    MX_HEART,
+    MX_HOME,
+    MX_GEAR,
+    MX_USER,
+    MX_PLUS,
+    MX_MINUS,
+};
 
 //-----------------------------------------------------------------------------
 // (SECTION) GuiIcons
-// Note: 
+// Note:
 //-----------------------------------------------------------------------------
 
-#define MX_ICONS_SIZE_ELEMENTS 32 + 32   // size array guiIcons 
+#define MX_ICONS_SIZE_ELEMENTS 32 + 32 // size array guiIcons
 
 // cada icone estão codificados em binario (0 - transparent) (1 - solido) no tamanho 16x16
-//    
+//
 
 inline unsigned int guiIcons[MX_ICONS_SIZE_ELEMENTS] = {
-    0x00000000, 0x00600000, 0x07f001f0, 0x7ff01ff0, 0xfff0fff0, 0xfff0fff0, 0xfff0fff0, 0xfff0fff0, // ICON_TLPLAY   ################  
+    0x00000000, 0x00600000, 0x07f001f0, 0x7ff01ff0, 0xfff0fff0, 0xfff0fff0, 0xfff0fff0, 0xfff0fff0, // ICON_TLPLAY   ################
     0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00070001, 0x007f001f, 0x03ff01ff, 0x0fff07ff, // ICON_TRPLAY   #   IconPlay   #
     0xfff0fff0, 0xfff0fff0, 0xfff0fff0, 0xfff0fff0, 0x1ff07ff0, 0x01f007f0, 0x00000060, 0x00000000, // ICON_DLPLAY   #              #
     0x07ff0fff, 0x01ff03ff, 0x001f007f, 0x00010007, 0x00000000, 0x00000000, 0x00000000, 0x00000000, // ICON_DRPLAY   ################
@@ -316,7 +339,7 @@ typedef enum
     MX_MOUSE_BUTTON_MIDDLE = 2, // Mouse button middle (pressed wheel)
 } MxMouseButton;
 
-typedef enum 
+typedef enum
 {
     ICON_TLPLAY = 0,
     ICON_TRPLAY = 1,
@@ -348,6 +371,7 @@ namespace mxgui
     void guiScrollPanelEnd(MxGuiContext* ctx, MxTag tag);
     float guiSlider(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor, bool enable);
     void guiSliderProgress(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, float progress);
+    void guiIcon(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint);
 
 } // namespace mxgui
 
@@ -398,7 +422,7 @@ inline MxColor fadeColor(MxColor color, float alpha)
 
 
 //-----------------------------------------------------------------------------
-// (SECTION) back-end functions 
+// (SECTION) back-end functions
 // Note: These functions need to be implemented if CUSTOM_BACKEND is used.
 //-----------------------------------------------------------------------------
 
@@ -423,12 +447,13 @@ bool isMouseButtonPressed(int button);
 bool isMouseButtonDown(int button);
 bool isMouseButtonReleased(int button);
 
-// draw 
+// draw
 void drawRectangleLinesEx(MxRect rec, float lineThick, MxColor color);
 void drawRectanglePro(MxRect rec, MxVec2 origin, float rotation, MxColor color);
 void drawTexturePro(const std::string& textureName, MxRect source, MxRect dest, MxVec2 origin, float rotation, MxColor tint);
 void drawTextPro(const std::string& fontName, const std::string& text, MxVec2 position, MxVec2 origin, float rotation, float fontSize, float spacing, MxColor tint);
-void drawCircle(MxVec2 center, float radius, MxColor color);   
+void drawCircle(MxVec2 center, float radius, MxColor color);
+void drawIconEx(int codepoint, MxVec2 position, MxColor color);
 
 //-----------------------------------------------------------------------------
 // (SECTION) internal functions
@@ -446,47 +471,47 @@ void printBin(int num);
 #ifdef MX_GUI_IMPLEMENTATION
 
 
-#include <memory>
-#include <unordered_map>
-#include <vector>
+    #include <memory>
+    #include <unordered_map>
+    #include <vector>
 
-#include "mxgui_notosans.hpp"
+    #include "mxgui_notosans.hpp"
 
 
 struct MxGuiContext;
 
 static std::unique_ptr<MxGuiContext> s_context{nullptr};
 
-//-----------------------------------------------------------------------------
-// macros getters and setters to MxGuiContext
-//-----------------------------------------------------------------------------
+    //-----------------------------------------------------------------------------
+    // macros getters and setters to MxGuiContext
+    //-----------------------------------------------------------------------------
 
-#define INSERT_COMPONENT(componentsList, type)                                            \
-    inline type* insert##type(MxTag tag, type component)                                  \
-    {                                                                                     \
-        const MxTag hash = "##" + tag;                                                    \
-        auto [insertedIt, isInserted] = componentsList.insert_or_assign(hash, component); \
-        return &insertedIt->second;                                                       \
-    }
+    #define INSERT_COMPONENT(componentsList, type)                                            \
+        inline type* insert##type(MxTag tag, type component)                                  \
+        {                                                                                     \
+            const MxTag hash = "##" + tag;                                                    \
+            auto [insertedIt, isInserted] = componentsList.insert_or_assign(hash, component); \
+            return &insertedIt->second;                                                       \
+        }
 
-#define GET_COMPONENT(componentsList, type)                                    \
-    inline type* get##type(MxTag tag)                                          \
-    {                                                                          \
-        const MxTag hash = "##" + tag;                                         \
-                                                                               \
-        auto it = componentsList.find(hash);                                   \
-        if (it != componentsList.end())                                        \
-        {                                                                      \
-            return &it->second;                                                \
-        }                                                                      \
-                                                                               \
-        auto [insertedIt, isInserted] = componentsList.insert({hash, type{}}); \
-        return &insertedIt->second;                                            \
-    }
+    #define GET_COMPONENT(componentsList, type)                                    \
+        inline type* get##type(MxTag tag)                                          \
+        {                                                                          \
+            const MxTag hash = "##" + tag;                                         \
+                                                                                   \
+            auto it = componentsList.find(hash);                                   \
+            if (it != componentsList.end())                                        \
+            {                                                                      \
+                return &it->second;                                                \
+            }                                                                      \
+                                                                                   \
+            auto [insertedIt, isInserted] = componentsList.insert({hash, type{}}); \
+            return &insertedIt->second;                                            \
+        }
 
-#define COMPONENT(componentsList, type)    \
-    INSERT_COMPONENT(componentsList, type) \
-    GET_COMPONENT(componentsList, type)
+    #define COMPONENT(componentsList, type)    \
+        INSERT_COMPONENT(componentsList, type) \
+        GET_COMPONENT(componentsList, type)
 
 
 struct MxGuiContext
@@ -540,15 +565,16 @@ struct MxGuiContext
 };
 
 
+    // clang-format off
+
 //-----------------------------------------------------------------------------
 // Internal functions
 //-----------------------------------------------------------------------------
 
-// clang-format off
 
 //-----------------------------------------------------------------------------
 // (SECTION) Decompression code
-//  algoritmo com um o unico objetivo compactar as matrizes para economizar tamanho do font 
+//  an algorithm with the sole objective of compressing the matrices to save font size
 //  Decompression from stb.h (public domain) by Sean Barrett https://github.com/nothings/stb/blob/master/deprecated/stb.h#L10437
 //-----------------------------------------------------------------------------
 
@@ -1068,13 +1094,21 @@ namespace mxgui
         drawRectanglePro(transformBar.worldBounds, MxVec2{}, 0, fadeColor(MxColor::Red, 1.0f));
     }
 
+    void guiIcon(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint)
+    {
+        MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
+        MxColor color = ctx->m_style.primaryColor;
+
+        drawIconEx(codepoint, toMxVec2(transform.worldBounds), color);
+    }
+
 
 } // namespace mxgui
 
 
+    // clang-format off
 #ifdef RAYLIB_BACKEND
 
-// clang-format off
 #include <cstdio>
 
 #include "raylib.h"
@@ -1125,6 +1159,23 @@ class MxFontManager
 {
 public:
 
+    void setupFontAwesome()
+    {
+
+        int arrayOriginalSize = 414704;
+        unsigned char* fontAwesomeData = (unsigned char*)malloc(arrayOriginalSize);
+        stb_decompress(fontAwesomeData, fa_compressed_data, fa_compressed_size);
+
+        int count = sizeof(codepointsFontAwesome) / sizeof(codepointsFontAwesome[0]);
+        Font faFont = LoadFontFromMemory(".otf", fontAwesomeData, arrayOriginalSize, 20, codepointsFontAwesome, count);
+
+        m_fonts[MX_FONT_AWESOME] = MxFontSpecsInternal{
+            .font = faFont,
+            .size = 20,
+            .spacing = 0,
+        };
+        SetTextureFilter(faFont.texture, TEXTURE_FILTER_BILINEAR);
+    }
 
     void init()
     {
@@ -1146,6 +1197,8 @@ public:
             .size = 20,
             .spacing = 0,
         };
+
+        setupFontAwesome();
     }
 
     void unload()
@@ -1398,9 +1451,23 @@ void drawCircle(MxVec2 center, float radius, MxColor color)
     DrawCircleV(toVector(center), radius, toColor(color));
 }
 
-#endif // RAYLIB_BACKEND
+void drawIconEx(int codepoint, MxVec2 position, MxColor color)
+{
+    // Converte o codepoint pra UTF-8 antes de desenhar
+    int byteCount = 0;
+    const char* icon = CodepointToUTF8(codepoint, &byteCount);
 
+    MxFontSpecsInternal font = s_fontManager.getFont(MX_FONT_AWESOME);
 
+    if (!IsFontValid(font.font))
+    {
+        return;
+    }
+
+    DrawTextEx(font.font, icon, toVector(position), font.size, 0, toColor(color));
+}
+
+    #endif // RAYLIB_BACKEND
 
 
 #endif // MX_GUI_IMPLEMENTATION

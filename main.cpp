@@ -7,7 +7,7 @@
 
 
 
-#include  "font4.h"
+
 
 
 void testScissor();
@@ -17,47 +17,41 @@ int main()
 {
 
 
-        InitWindow(800, 450, "Font Awesome + raylib");
-
-    // Lista de codepoints que você quer usar (ícones + ASCII básico se quiser texto junto)
-    int codepoints[] = {
-        0xf004, // heart
-        0xf015, // home
-        0xf013, // gear/cog
-        0xf007  // user
-    };
+    //     InitWindow(800, 450, "Font Awesome + raylib");
 
 
-    int tamanhoOriginal = 414704; 
-    unsigned char* dadosFinaisOTF = (unsigned char*)malloc(tamanhoOriginal);
+
+
+    // int tamanhoOriginal = 414704; 
+    // unsigned char* dadosFinaisOTF = (unsigned char*)malloc(tamanhoOriginal);
     
-    // 2. Descompacta DIRETO do array gerado (Sem precisar decodificar nada antes!)
-    stb_decompress(dadosFinaisOTF, Font_compressed_data, Font_compressed_size);
+    // // 2. Descompacta DIRETO do array gerado (Sem precisar decodificar nada antes!)
+    // stb_decompress(dadosFinaisOTF, Font_compressed_data, Font_compressed_size);
     
 
-    // f015  
-    int count = sizeof(codepoints) / sizeof(codepoints[0]);
+    // // f015  
+    // int count = sizeof(codepoints) / sizeof(codepoints[0]);
 
-    //Font faFont = LoadFontEx("/home/marco/Downloads/fontawesome-free-7.3.1-desktop/otfs/Font Awesome 7 Free-Solid-900.otf", 64, codepoints, count);
-    Font faFont = LoadFontFromMemory(  ".otf", dadosFinaisOTF,  tamanhoOriginal, 64, codepoints, count);
-    SetTextureFilter(faFont.texture, TEXTURE_FILTER_BILINEAR);
+    // //Font faFont = LoadFontEx("/home/marco/Downloads/fontawesome-free-7.3.1-desktop/otfs/Font Awesome 7 Free-Solid-900.otf", 64, codepoints, count);
+    // Font faFont = LoadFontFromMemory(  ".otf", dadosFinaisOTF,  tamanhoOriginal, 64, codepoints, count);
+    // SetTextureFilter(faFont.texture, TEXTURE_FILTER_BILINEAR);
 
-    while (!WindowShouldClose()) {
-        BeginDrawing();
-        ClearBackground(RAYWHITE);
+    // while (!WindowShouldClose()) {
+    //     BeginDrawing();
+    //     ClearBackground(RAYWHITE);
 
-        // Converte o codepoint pra UTF-8 antes de desenhar
-        int byteCount = 0;
-        const char *icon = CodepointToUTF8(0xf007, &byteCount);
+    //     // Converte o codepoint pra UTF-8 antes de desenhar
+    //     int byteCount = 0;
+    //     const char *icon = CodepointToUTF8(0xf007, &byteCount);
 
-        DrawTextEx(faFont, icon, Vector2{ 100, 180 }, 64, 0, BLACK);
+    //     DrawTextEx(faFont, icon, Vector2{ 100, 180 }, 64, 0, BLACK);
 
-        EndDrawing();
-    }
+    //     EndDrawing();
+    // }
 
-    UnloadFont(faFont);
-    CloseWindow();
-    return 0;
+    // UnloadFont(faFont);
+    // CloseWindow();
+    // return 0;
 
     // InitWindow(800, 600, "image");
     // SetTargetFPS(60);
@@ -121,6 +115,7 @@ int main()
             TraceLog(LOG_INFO, "clicked");
         }
         mxgui::guiImage(ctx, "nfsu2", MxRect{12, 35, 100, 100}, anchor);
+        mxgui::guiIcon(ctx, MxRect{10, 80, 0, 0}, anchor, MxIconFontAwesomeIndex::MX_PLUS);
 
         mxgui::guiScrollPanelBegin(ctx, "ScrollPanel", MxRect{300, 200, 100, 200}, MxRect{300, 200, 100, 250}, MxVec2{100, 100}, true);
         mxgui::guiLabel(ctx, "hello world", MxVec2{100, 0}, anchor);
@@ -131,8 +126,10 @@ int main()
         const float progress = mxgui::guiSlider(ctx, "Slider", MxRect{50, 530, 700, 6}, MxVec2{}, true);
         mxgui::guiLabel(ctx, std::to_string(progress), MxVec2{10, 30});
         mxgui::guiSliderProgress(ctx, MxRect{50, 560, 700, 6}, MxVec2{}, 0.8f);
-
+        
+        
         DrawFPS(10, 10);
+        
 
         // DrawText(TextFormat("cor: %zu", sizeof(Transform)), 30, 30, 20, BLACK);
         EndDrawing();
