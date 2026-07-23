@@ -16,77 +16,6 @@ void testScissor();
 int main()
 {
 
-
-    //     InitWindow(800, 450, "Font Awesome + raylib");
-
-
-
-
-    // int tamanhoOriginal = 414704; 
-    // unsigned char* dadosFinaisOTF = (unsigned char*)malloc(tamanhoOriginal);
-    
-    // // 2. Descompacta DIRETO do array gerado (Sem precisar decodificar nada antes!)
-    // stb_decompress(dadosFinaisOTF, Font_compressed_data, Font_compressed_size);
-    
-
-    // // f015  
-    // int count = sizeof(codepoints) / sizeof(codepoints[0]);
-
-    // //Font faFont = LoadFontEx("/home/marco/Downloads/fontawesome-free-7.3.1-desktop/otfs/Font Awesome 7 Free-Solid-900.otf", 64, codepoints, count);
-    // Font faFont = LoadFontFromMemory(  ".otf", dadosFinaisOTF,  tamanhoOriginal, 64, codepoints, count);
-    // SetTextureFilter(faFont.texture, TEXTURE_FILTER_BILINEAR);
-
-    // while (!WindowShouldClose()) {
-    //     BeginDrawing();
-    //     ClearBackground(RAYWHITE);
-
-    //     // Converte o codepoint pra UTF-8 antes de desenhar
-    //     int byteCount = 0;
-    //     const char *icon = CodepointToUTF8(0xf007, &byteCount);
-
-    //     DrawTextEx(faFont, icon, Vector2{ 100, 180 }, 64, 0, BLACK);
-
-    //     EndDrawing();
-    // }
-
-    // UnloadFont(faFont);
-    // CloseWindow();
-    // return 0;
-
-    // InitWindow(800, 600, "image");
-    // SetTargetFPS(60);
-
-    //MxImage image = genIcon(guiIcons, 0);
-    // Image image1 = genIcon(guiIcons, 1);
-    // Image image2 = genIcon(guiIcons, 2);
-    // Image image3 = genIcon(guiIcons, 3);
-    // Texture texture = LoadTextureFromImage(image);
-    // Texture texture1 = LoadTextureFromImage(image1);
-    // Texture texture2 = LoadTextureFromImage(image2);
-    // Texture texture3 = LoadTextureFromImage(image3);
-
-    // //SetTextureFilter(texture1, TEXTURE_FILTER_BILINEAR);
-
-
-    // while (!WindowShouldClose())
-    // {
-    //     BeginDrawing();
-    //     ClearBackground(RAYWHITE);
-    //     // DrawRectangle(10,10,16,16, GRAY);
-    //     DrawTexture(texture, 10, 10, DARKGRAY);
-    //     DrawTexture(texture1, 10 + 16, 10, DARKGRAY);
-    //     DrawTexture(texture2, 10, 10 + 16, DARKGRAY);
-    //     DrawTexture(texture3, 10 + 16, 10 + 16, DARKGRAY);
-    //     EndDrawing();
-    // }
-    // CloseWindow();
-
-
-    // /////////////////////////////////////
-
-
-    // //return 0;
-
     SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
 
     InitWindow(800, 600, "GUI");
@@ -115,7 +44,7 @@ int main()
             TraceLog(LOG_INFO, "clicked");
         }
         mxgui::guiImage(ctx, "nfsu2", MxRect{12, 35, 100, 100}, anchor);
-        mxgui::guiIcon(ctx, MxRect{10, 80, 0, 0}, anchor, MxIconFontAwesomeIndex::MX_PLUS);
+        mxgui::guiIcon(ctx, MxRect{10, 80, 0, 0}, anchor, ICON_FA_CIRCLE_PLAY);
 
         mxgui::guiScrollPanelBegin(ctx, "ScrollPanel", MxRect{300, 200, 100, 200}, MxRect{300, 200, 100, 250}, MxVec2{100, 100}, true);
         mxgui::guiLabel(ctx, "hello world", MxVec2{100, 0}, anchor);

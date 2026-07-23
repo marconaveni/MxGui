@@ -15,8 +15,8 @@
 //-----------------------------------------------------------------------------
 
 //-----------------------------------------------------------------------------
-// esse arquivo esta organizado por sessões
-// você pode buscar por (SECTION)
+// This file is organized by sections.
+// you can search for (SECTION)
 //-----------------------------------------------------------------------------
 
 
@@ -25,12 +25,12 @@
 //-----------------------------------------------------------------------------
 
 #define FORCE_DEBUG 0
-#define MX_DEFAULT_FONT "notosans20"
-#define MX_FONT_AWESOME "fontawesome"
-#define FONT_AWESOME 1
+#define MX_DEFAULT_FONT_ID "notosans20"
+#define MX_FONT_AWESOME_ID "fontawesome"
 #define MX_DRAG_OFFSET 4
 #define MX_BAR_SIZE 6
 
+#define FONT_AWESOME 1
 #define RAYLIB_BACKEND 1
 // #define CUSTOM_BACKEND 1
 // #define SFML_BACKEND 1
@@ -81,44 +81,15 @@
 
 #endif // _DEBUG
 
-
-#include "mxgui_fontawesome.h"
-
-typedef enum
-{
-    MX_HEART = 0xf004,
-    MX_HOME = 0xf015,
-    MX_GEAR = 0xf013,
-    MX_USER = 0xf007,
-    MX_PLUS = 0x2b,
-    MX_MINUS = 0xf068,
-} MxIconFontAwesomeIndex;
-
-static int codepointsFontAwesome[] = {
-    MX_HEART,
-    MX_HOME,
-    MX_GEAR,
-    MX_USER,
-    MX_PLUS,
-    MX_MINUS,
-};
-
 //-----------------------------------------------------------------------------
-// (SECTION) GuiIcons
+// (SECTION) GuiIcons FontAwesome
 // Note:
 //-----------------------------------------------------------------------------
 
-#define MX_ICONS_SIZE_ELEMENTS 32 + 32 // size array guiIcons
-
-// cada icone estão codificados em binario (0 - transparent) (1 - solido) no tamanho 16x16
-//
-
-inline unsigned int guiIcons[MX_ICONS_SIZE_ELEMENTS] = {
-    0x00000000, 0x00600000, 0x07f001f0, 0x7ff01ff0, 0xfff0fff0, 0xfff0fff0, 0xfff0fff0, 0xfff0fff0, // ICON_TLPLAY   ################
-    0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00070001, 0x007f001f, 0x03ff01ff, 0x0fff07ff, // ICON_TRPLAY   #   IconPlay   #
-    0xfff0fff0, 0xfff0fff0, 0xfff0fff0, 0xfff0fff0, 0x1ff07ff0, 0x01f007f0, 0x00000060, 0x00000000, // ICON_DLPLAY   #              #
-    0x07ff0fff, 0x01ff03ff, 0x001f007f, 0x00010007, 0x00000000, 0x00000000, 0x00000000, 0x00000000, // ICON_DRPLAY   ################
-};
+#if FONT_AWESOME
+    #include "mxgui_font_awesome.h"
+    #include "mxgui_icons_font_awesome7.hpp"
+#endif
 
 //-----------------------------------------------------------------------------
 // (SECTION) Structs Forward declarations
@@ -279,7 +250,7 @@ struct MxStyle
     MxColor backgroundColor{MxColor::LightGray};
     MxColor textColor{MxColor::DarkGray};
     MxInt32 textSize{20};
-    std::string fontName{MX_DEFAULT_FONT};
+    std::string fontName{MX_DEFAULT_FONT_ID};
     bool isDarkMode{false};
 
     static MxStyle Light; // ThemeLight;
@@ -293,7 +264,7 @@ inline MxStyle MxStyle::Dark{.primaryColor{MxColor::WhiteGray},
                              .backgroundColor{MxColor::DarkGray}, // Dark
                              .textColor{MxColor::White},
                              .textSize{20},
-                             .fontName{MX_DEFAULT_FONT},
+                             .fontName{MX_DEFAULT_FONT_ID},
                              .isDarkMode{true}};
 
 
@@ -460,9 +431,7 @@ void drawIconEx(int codepoint, MxVec2 position, MxColor color);
 //-----------------------------------------------------------------------------
 
 MxTransform updateTransformWorld(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor);
-MxImage genIcon(unsigned int* guiIconsPtr, int index);
-void printIcon(unsigned int* icons);
-void printBin(int num);
+
 
 /////////////////////////////////////////////////////
 //  implementations
@@ -693,67 +662,6 @@ static unsigned int stb_decompress(unsigned char *output, const unsigned char *i
 }
 
 // clang-format on
-
-MxImage genIcon(unsigned int* guiIconsPtr, int index)
-{
-    unsigned char* pixels = (unsigned char*)malloc(16 * 16 * sizeof(MxColor));
-
-    int count = 0;
-    index *= 8;
-    for (int i = index; i < 8 + index; i++)
-    {
-        for (int j = 0; j < 32; j++)
-        {
-            int bit = (guiIconsPtr[i] >> j) & 1;
-            pixels[count] = 255;
-            pixels[count + 1] = 255;
-            pixels[count + 2] = 255;
-            pixels[count + 3] = bit ? 255 : 0;
-            count += 4;
-        }
-    }
-
-    MxImage image = MxImage{
-        .data = pixels,
-        .width = 16,
-        .height = 16,
-    };
-    return image;
-}
-
-void printIcon(unsigned int* icons)
-{
-    for (size_t i = 0; i < 8; i++)
-    {
-        for (int j = 0; j < 32; j++)
-        {
-            int bit = (icons[i] >> j) & 1;
-            printf(bit ? "#" : "-");
-
-            if ((j + 1) % 16 == 0)
-            {
-                printf("\n"); // breaks every 16 bits (16 = one line)
-            }
-        }
-    }
-}
-
-void printBin(int num)
-{
-    // Iterates through all the bits of the integer, starting from the most significant bit down to bit 0.
-    for (int i = (sizeof(num) * 8) - 1; i >= 0; i--)
-    {
-        int bit = (num >> i) & 1;
-        printf("%d", bit);
-
-        // Note: Adds a space every 4 bits to improve readability
-        if (i > 0 && i % 4 == 0)
-        {
-            printf(" ");
-        }
-    }
-    printf("\n");
-}
 
 
 MxTransform updateTransformWorld(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor)
@@ -1159,9 +1067,26 @@ class MxFontManager
 {
 public:
 
+    void setupDefaultFont()
+    {
+        int codepoints[95];
+        for (int i = 0; i < 95; i++)
+        {
+            codepoints[i] = 32 + i; // ASCII: espaço (32) até ~ (126)
+        }
+        Font font = LoadFontFromMemory(".ttf", notosans::data, notosans::size, 20, codepoints, 95);
+
+        // Default font
+        m_fonts[MX_DEFAULT_FONT_ID] = MxFontSpecsInternal{
+            .font = font,
+            .size = 20,
+            .spacing = 0,
+        };
+    }
+
     void setupFontAwesome()
     {
-
+        #if FONT_AWESOME
         int arrayOriginalSize = 414704;
         unsigned char* fontAwesomeData = (unsigned char*)malloc(arrayOriginalSize);
         stb_decompress(fontAwesomeData, fa_compressed_data, fa_compressed_size);
@@ -1169,12 +1094,13 @@ public:
         int count = sizeof(codepointsFontAwesome) / sizeof(codepointsFontAwesome[0]);
         Font faFont = LoadFontFromMemory(".otf", fontAwesomeData, arrayOriginalSize, 20, codepointsFontAwesome, count);
 
-        m_fonts[MX_FONT_AWESOME] = MxFontSpecsInternal{
+        m_fonts[MX_FONT_AWESOME_ID] = MxFontSpecsInternal{
             .font = faFont,
             .size = 20,
             .spacing = 0,
         };
         SetTextureFilter(faFont.texture, TEXTURE_FILTER_BILINEAR);
+        #endif
     }
 
     void init()
@@ -1184,20 +1110,7 @@ public:
             return;
         }
 
-        int codepoints[95];
-        for (int i = 0; i < 95; i++)
-        {
-            codepoints[i] = 32 + i; // ASCII: espaço (32) até ~ (126)
-        }
-        Font font = LoadFontFromMemory(".ttf", notosans::data, notosans::size, 20, codepoints, 95);
-
-        // Default font
-        m_fonts[MX_DEFAULT_FONT] = MxFontSpecsInternal{
-            .font = font,
-            .size = 20,
-            .spacing = 0,
-        };
-
+        setupDefaultFont();
         setupFontAwesome();
     }
 
@@ -1457,7 +1370,7 @@ void drawIconEx(int codepoint, MxVec2 position, MxColor color)
     int byteCount = 0;
     const char* icon = CodepointToUTF8(codepoint, &byteCount);
 
-    MxFontSpecsInternal font = s_fontManager.getFont(MX_FONT_AWESOME);
+    MxFontSpecsInternal font = s_fontManager.getFont(MX_FONT_AWESOME_ID);
 
     if (!IsFontValid(font.font))
     {
