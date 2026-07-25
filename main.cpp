@@ -31,7 +31,8 @@ int main()
     const float width = 400;
     const float height = 25;
     MxVec2 anchor{10, 10};
-
+    bool checked = false;
+    bool toogle = false;
 
     while (!WindowShouldClose())
     {
@@ -56,6 +57,10 @@ int main()
         mxgui::guiLabel(ctx, "hello world", MxVec2{100, 0}, anchor);
         mxgui::guiLabel(ctx, "hello world 2", MxVec2{0, 80});
         mxgui::guiScrollPanelEnd(ctx, "ScrollPanel");
+
+        
+        mxgui::guiCheckBox(ctx, MxRect{100,100}, MxVec2{}, checked);
+        mxgui::guiToogle(ctx, MxRect{150,100}, MxVec2{}, toogle);
 
 
         const float progress = mxgui::guiSlider(ctx, "Slider", MxRect{50, 530, 700, 6}, MxVec2{}, true);

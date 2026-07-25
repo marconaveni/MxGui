@@ -5,15 +5,18 @@
 
 //--------------------------------MXGUI----------------------------------------
 //
-//  (Panel)                 | Component | state     |
-//  (Image)                 | Component | stateless |
-//  (Button) -> (Label)     | Component | stateless |
-//  (Label)                 | Component | stateless |
-//  (ScrollPanel)           | Component | state     | Container(begin)(end)
-//  (Slider)                | Component | state     |
-//  (SliderProgress)        | Component | stateless |
-//  (Icon)                  | Component | stateless |
-//  (ButtonIcon)            | Component | stateless |
+//  (Panel)                     | Component | state     |
+//  (Image)                     | Component | stateless |
+//  (Button) -> (Label)         | Component | stateless |
+//  (Label)                     | Component | stateless |
+//  (ScrollPanel)               | Component | state     | Container(begin)(end)
+//  (Slider)                    | Component | state     |
+//  (SliderProgress)            | Component | stateless |
+//  (Icon)                      | Component | stateless |
+//  (ButtonIcon)                | Component | stateless |
+//  (ToggleEx)                  | Component | stateless |
+//  (CheckBox) -> (ToggleEx)    | Component | stateless |
+//  (Toogle) -> (ToggleEx)      | Component | stateless |
 //
 //-----------------------------------------------------------------------------
 
@@ -349,6 +352,8 @@ namespace mxgui
     void guiSliderProgress(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, float progress);
     void guiIcon(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size = -1);
     bool guiIconButton(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size = -1, bool enable = true);
+    bool guiCheckBox(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked);
+    bool guiToogle(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked);
 
 } // namespace mxgui
 
@@ -1010,7 +1015,7 @@ namespace mxgui
 
     void guiIcon(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size)
     {
-        const int iconSize = (size < 0) ? ctx->m_style.iconSize : size; 
+        const int iconSize = (size < 0) ? ctx->m_style.iconSize : size;
         bounds.width = iconSize;
         bounds.height = iconSize;
         MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
@@ -1021,7 +1026,7 @@ namespace mxgui
 
     bool guiIconButton(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size, bool enable)
     {
-        const int iconSize = (size < 0) ? ctx->m_style.iconSize : size; 
+        const int iconSize = (size < 0) ? ctx->m_style.iconSize : size;
         bounds.width = iconSize;
         bounds.height = iconSize;
         MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
@@ -1059,6 +1064,45 @@ namespace mxgui
         ctx->updateCurrents(transform, mouseEvents);
 
         return mouseEvents.isMousePressed;
+    }
+
+
+    bool guiToogleEx(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked, int codeEnable, int codeDisable)
+    {
+        bounds.width = ctx->m_style.iconSize;
+        bounds.height = ctx->m_style.iconSize;
+        MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
+        MxRect rect = transform.worldBounds;
+
+        MxMouseEvents mouseEvents{};
+
+        mouseEvents.isMouseHover = (checkCollisionPointRect(getMousePosition(), rect));
+        mouseEvents.isMouseRelease = mouseEvents.isMouseHover && isMouseButtonReleased(MX_MOUSE_BUTTON_LEFT);
+        mouseEvents.isMouseDown = mouseEvents.isMouseHover && isMouseButtonDown(MX_MOUSE_BUTTON_LEFT);
+        mouseEvents.isMousePressed = mouseEvents.isMouseHover && isMouseButtonPressed(MX_MOUSE_BUTTON_LEFT);
+
+
+        if (mouseEvents.isMouseRelease)
+        {
+            checked = !checked;
+        }
+
+        int codepoint = checked ? codeEnable : codeDisable;
+
+        guiIcon(ctx, bounds, anchor, codepoint);
+
+        ctx->updateCurrents(transform, mouseEvents);
+        return mouseEvents.isMouseRelease;
+    }
+
+    bool guiCheckBox(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked)
+    {
+        return guiToogleEx(ctx, bounds, anchor, checked, ICON_FA_SQUARE_CHECK, ICON_FA_SQUARE);
+    }
+
+    bool guiToogle(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked)
+    {
+        return guiToogleEx(ctx, bounds, anchor, checked, ICON_FA_TOGGLE_ON, ICON_FA_TOGGLE_OFF);
     }
 
 
@@ -1427,7 +1471,7 @@ void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size)
         return;
     }
 
-    const int fontSize = (size < 0) ? font.size : size; 
+    const int fontSize = (size < 0) ? font.size : size;
     DrawTextEx(font.font, icon, toVector(position), fontSize, 0, toColor(color));
 }
 
