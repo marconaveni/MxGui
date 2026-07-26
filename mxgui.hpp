@@ -38,8 +38,8 @@
 
 #define FONT_AWESOME 1
 #define RAYLIB_BACKEND 1
+#define SFML_BACKEND 1
 // #define CUSTOM_BACKEND 1
-// #define SFML_BACKEND 1
 
 //-----------------------------------------------------------------------------
 // (SECTION) Header and defines
@@ -53,37 +53,37 @@
 
 
 #ifdef CUSTOM_BACKEND
-    #undef RAYLIB_BACKEND 1
-    #undef SFML_BACKEND 1
+#undef RAYLIB_BACKEND
+#undef SFML_BACKEND
 #else
-    #ifdef SFML_BACKEND
-        #undef RAYLIB_BACKEND 1
-        #undef CUSTOM_BACKEND 1
-    #else
-        #define RAYLIB_BACKEND 1
-    #endif // SFML_BACKEND
-#endif     // CUSTOM_BACKEND
+#ifdef SFML_BACKEND
+#undef RAYLIB_BACKEND
+#undef CUSTOM_BACKEND
+#else
+#define RAYLIB_BACKEND 1
+#endif // SFML_BACKEND
+#endif // CUSTOM_BACKEND
 
 #if FORCE_DEBUG
-    #define DEBUG_MODE
+#define DEBUG_MODE
 #endif // FORCE_DEBUG
 
 #ifdef DEBUG_MODE
-    #include <assert.h>
+#include <assert.h>
 
-    #ifdef _MSC_VER // MSVC
-        #define MX_ASSERT(condition, msg) \
-            if (!(condition))             \
-            __debugbreak()
-    #else // GCC/Clang
-        #define MX_ASSERT(condition, msg) \
-            if (!(condition))             \
-            __builtin_trap()
-    #endif // _MSC_VER
+#ifdef _MSC_VER // MSVC
+#define MX_ASSERT(condition, msg) \
+    if (!(condition))             \
+    __debugbreak()
+#else // GCC/Clang
+#define MX_ASSERT(condition, msg) \
+    if (!(condition))             \
+    __builtin_trap()
+#endif // _MSC_VER
 
 #else
 
-    #define MX_ASSERT(condition, msg)
+#define MX_ASSERT(condition, msg)
 
 #endif // _DEBUG
 
@@ -93,8 +93,8 @@
 //-----------------------------------------------------------------------------
 
 #if FONT_AWESOME
-    #include "mxgui_font_awesome.h"
-    #include "mxgui_icons_font_awesome7.hpp"
+#include "mxgui_font_awesome.h"
+#include "mxgui_icons_font_awesome7.hpp"
 #endif
 
 //-----------------------------------------------------------------------------
@@ -318,13 +318,6 @@ typedef enum
     MX_MOUSE_BUTTON_MIDDLE = 2, // Mouse button middle (pressed wheel)
 } MxMouseButton;
 
-typedef enum
-{
-    ICON_TLPLAY = 0,
-    ICON_TRPLAY = 1,
-    ICON_DLPLAY = 2,
-    ICON_DRPLAY = 3,
-} MxIconIndex;
 
 //-----------------------------------------------------------------------------
 // (SECTION) public API functions
@@ -382,6 +375,30 @@ inline bool checkCollisionPointRect(MxVec2 point, MxRect rec)
 {
     const bool collision = ((point.x >= rec.x) && (point.x < (rec.x + rec.width)) && (point.y >= rec.y) && (point.y < (rec.y + rec.height)));
     return collision;
+}
+
+inline MxRect getCollisionRec(MxRect rect1, MxRect rect2)
+{
+    MxRect overlap{};
+
+    float left = (rect1.x > rect2.x) ? rect1.x : rect2.x;
+    float right1 = rect1.x + rect1.width;
+    float right2 = rect2.x + rect2.width;
+    float right = (right1 < right2) ? right1 : right2;
+    float top = (rect1.y > rect2.y) ? rect1.y : rect2.y;
+    float bottom1 = rect1.y + rect1.height;
+    float bottom2 = rect2.y + rect2.height;
+    float bottom = (bottom1 < bottom2) ? bottom1 : bottom2;
+
+    if ((left < right) && (top < bottom))
+    {
+        overlap.x = left;
+        overlap.y = top;
+        overlap.width = right - left;
+        overlap.height = bottom - top;
+    }
+
+    return overlap;
 }
 
 inline MxColor fadeColor(MxColor color, float alpha)
@@ -451,47 +468,47 @@ MxTransform updateTransformWorld(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor
 #ifdef MX_GUI_IMPLEMENTATION
 
 
-    #include <memory>
-    #include <unordered_map>
-    #include <vector>
+#include <memory>
+#include <unordered_map>
+#include <vector>
 
-    #include "mxgui_notosans.hpp"
+#include "mxgui_notosans.hpp"
 
 
 struct MxGuiContext;
 
 static std::unique_ptr<MxGuiContext> s_context{nullptr};
 
-    //-----------------------------------------------------------------------------
-    // macros getters and setters to MxGuiContext
-    //-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// macros getters and setters to MxGuiContext
+//-----------------------------------------------------------------------------
 
-    #define INSERT_COMPONENT(componentsList, type)                                            \
-        inline type* insert##type(MxTag tag, type component)                                  \
-        {                                                                                     \
-            const MxTag hash = "##" + tag;                                                    \
-            auto [insertedIt, isInserted] = componentsList.insert_or_assign(hash, component); \
-            return &insertedIt->second;                                                       \
-        }
+#define INSERT_COMPONENT(componentsList, type)                                            \
+    inline type* insert##type(MxTag tag, type component)                                  \
+    {                                                                                     \
+        const MxTag hash = "##" + tag;                                                    \
+        auto [insertedIt, isInserted] = componentsList.insert_or_assign(hash, component); \
+        return &insertedIt->second;                                                       \
+    }
 
-    #define GET_COMPONENT(componentsList, type)                                    \
-        inline type* get##type(MxTag tag)                                          \
-        {                                                                          \
-            const MxTag hash = "##" + tag;                                         \
-                                                                                   \
-            auto it = componentsList.find(hash);                                   \
-            if (it != componentsList.end())                                        \
-            {                                                                      \
-                return &it->second;                                                \
-            }                                                                      \
-                                                                                   \
-            auto [insertedIt, isInserted] = componentsList.insert({hash, type{}}); \
-            return &insertedIt->second;                                            \
-        }
+#define GET_COMPONENT(componentsList, type)                                    \
+    inline type* get##type(MxTag tag)                                          \
+    {                                                                          \
+        const MxTag hash = "##" + tag;                                         \
+                                                                               \
+        auto it = componentsList.find(hash);                                   \
+        if (it != componentsList.end())                                        \
+        {                                                                      \
+            return &it->second;                                                \
+        }                                                                      \
+                                                                               \
+        auto [insertedIt, isInserted] = componentsList.insert({hash, type{}}); \
+        return &insertedIt->second;                                            \
+    }
 
-    #define COMPONENT(componentsList, type)    \
-        INSERT_COMPONENT(componentsList, type) \
-        GET_COMPONENT(componentsList, type)
+#define COMPONENT(componentsList, type)    \
+    INSERT_COMPONENT(componentsList, type) \
+    GET_COMPONENT(componentsList, type)
 
 
 struct MxGuiContext
@@ -545,8 +562,6 @@ struct MxGuiContext
 };
 
 
-    // clang-format off
-
 //-----------------------------------------------------------------------------
 // Internal functions
 //-----------------------------------------------------------------------------
@@ -561,63 +576,114 @@ struct MxGuiContext
 
 #include "string.h"
 
-#define stb__in2(x)   ((i[x] << 8) + i[(x)+1])
-#define stb__in3(x)   ((i[x] << 16) + stb__in2((x)+1))
-#define stb__in4(x)   ((i[x] << 24) + stb__in3((x)+1))
+#define stb__in2(x) ((i[x] << 8) + i[(x) + 1])
+#define stb__in3(x) ((i[x] << 16) + stb__in2((x) + 1))
+#define stb__in4(x) ((i[x] << 24) + stb__in3((x) + 1))
 
 static unsigned char *stb__barrier_out_e, *stb__barrier_out_b;
-static const unsigned char *stb__barrier_in_b;
-static unsigned char *stb__dout;
+static const unsigned char* stb__barrier_in_b;
+static unsigned char* stb__dout;
 
-static unsigned int stb_decompress_length(const unsigned char *input)
+static unsigned int stb_decompress_length(const unsigned char* input)
 {
     return (input[8] << 24) + (input[9] << 16) + (input[10] << 8) + input[11];
 }
 
-static void stb__match(const unsigned char *data, unsigned int length)
+static void stb__match(const unsigned char* data, unsigned int length)
 {
     // INVERSE of memmove... write each byte before copying the next...
     MX_ASSERT(stb__dout + length <= stb__barrier_out_e, "");
-    if (stb__dout + length > stb__barrier_out_e) { stb__dout += length; return; }
-    if (data < stb__barrier_out_b) { stb__dout = stb__barrier_out_e+1; return; }
-    while (length--) *stb__dout++ = *data++;
+    if (stb__dout + length > stb__barrier_out_e)
+    {
+        stb__dout += length;
+        return;
+    }
+    if (data < stb__barrier_out_b)
+    {
+        stb__dout = stb__barrier_out_e + 1;
+        return;
+    }
+    while (length--)
+    {
+        *stb__dout++ = *data++;
+    }
 }
 
-static void stb__lit(const unsigned char *data, unsigned int length)
+static void stb__lit(const unsigned char* data, unsigned int length)
 {
     MX_ASSERT(stb__dout + length <= stb__barrier_out_e, "");
-    if (stb__dout + length > stb__barrier_out_e) { stb__dout += length; return; }
-    if (data < stb__barrier_in_b) { stb__dout = stb__barrier_out_e+1; return; }
+    if (stb__dout + length > stb__barrier_out_e)
+    {
+        stb__dout += length;
+        return;
+    }
+    if (data < stb__barrier_in_b)
+    {
+        stb__dout = stb__barrier_out_e + 1;
+        return;
+    }
     memcpy(stb__dout, data, length);
     stb__dout += length;
 }
 
-static const unsigned char *stb_decompress_token(const unsigned char *i)
+static const unsigned char* stb_decompress_token(const unsigned char* i)
 {
-    if (*i >= 0x20) { // use fewer if's for cases that expand small
-        if (*i >= 0x80)       stb__match(stb__dout-i[1]-1, i[0] - 0x80 + 1), i += 2;
-        else if (*i >= 0x40)  stb__match(stb__dout-(stb__in2(0) - 0x4000 + 1), i[2]+1), i += 3;
-        else /* *i >= 0x20 */ stb__lit(i+1, i[0] - 0x20 + 1), i += 1 + (i[0] - 0x20 + 1);
-    } else { // more ifs for cases that expand large, since overhead is amortized
-        if (*i >= 0x18)       stb__match(stb__dout-(stb__in3(0) - 0x180000 + 1), i[3]+1), i += 4;
-        else if (*i >= 0x10)  stb__match(stb__dout-(stb__in3(0) - 0x100000 + 1), stb__in2(3)+1), i += 5;
-        else if (*i >= 0x08)  stb__lit(i+2, stb__in2(0) - 0x0800 + 1), i += 2 + (stb__in2(0) - 0x0800 + 1);
-        else if (*i == 0x07)  stb__lit(i+3, stb__in2(1) + 1), i += 3 + (stb__in2(1) + 1);
-        else if (*i == 0x06)  stb__match(stb__dout-(stb__in3(1)+1), i[4]+1), i += 5;
-        else if (*i == 0x04)  stb__match(stb__dout-(stb__in3(1)+1), stb__in2(4)+1), i += 6;
+    if (*i >= 0x20)
+    { // use fewer if's for cases that expand small
+        if (*i >= 0x80)
+        {
+            stb__match(stb__dout - i[1] - 1, i[0] - 0x80 + 1), i += 2;
+        }
+        else if (*i >= 0x40)
+        {
+            stb__match(stb__dout - (stb__in2(0) - 0x4000 + 1), i[2] + 1), i += 3;
+        }
+        else /* *i >= 0x20 */
+        {
+            stb__lit(i + 1, i[0] - 0x20 + 1), i += 1 + (i[0] - 0x20 + 1);
+        }
+    }
+    else
+    { // more ifs for cases that expand large, since overhead is amortized
+        if (*i >= 0x18)
+        {
+            stb__match(stb__dout - (stb__in3(0) - 0x180000 + 1), i[3] + 1), i += 4;
+        }
+        else if (*i >= 0x10)
+        {
+            stb__match(stb__dout - (stb__in3(0) - 0x100000 + 1), stb__in2(3) + 1), i += 5;
+        }
+        else if (*i >= 0x08)
+        {
+            stb__lit(i + 2, stb__in2(0) - 0x0800 + 1), i += 2 + (stb__in2(0) - 0x0800 + 1);
+        }
+        else if (*i == 0x07)
+        {
+            stb__lit(i + 3, stb__in2(1) + 1), i += 3 + (stb__in2(1) + 1);
+        }
+        else if (*i == 0x06)
+        {
+            stb__match(stb__dout - (stb__in3(1) + 1), i[4] + 1), i += 5;
+        }
+        else if (*i == 0x04)
+        {
+            stb__match(stb__dout - (stb__in3(1) + 1), stb__in2(4) + 1), i += 6;
+        }
     }
     return i;
 }
 
-static unsigned int stb_adler32(unsigned int adler32, unsigned char *buffer, unsigned int buflen)
+static unsigned int stb_adler32(unsigned int adler32, unsigned char* buffer, unsigned int buflen)
 {
     const unsigned long ADLER_MOD = 65521;
     unsigned long s1 = adler32 & 0xffff, s2 = adler32 >> 16;
     unsigned long blocklen = buflen % 5552;
 
     unsigned long i;
-    while (buflen) {
-        for (i=0; i + 7 < blocklen; i += 8) {
+    while (buflen)
+    {
+        for (i = 0; i + 7 < blocklen; i += 8)
+        {
             s1 += buffer[0], s2 += s1;
             s1 += buffer[1], s2 += s1;
             s1 += buffer[2], s2 += s1;
@@ -631,7 +697,9 @@ static unsigned int stb_adler32(unsigned int adler32, unsigned char *buffer, uns
         }
 
         for (; i < blocklen; ++i)
+        {
             s1 += *buffer++, s2 += s1;
+        }
 
         s1 %= ADLER_MOD, s2 %= ADLER_MOD;
         buflen -= blocklen;
@@ -640,10 +708,16 @@ static unsigned int stb_adler32(unsigned int adler32, unsigned char *buffer, uns
     return (unsigned int)(s2 << 16) + (unsigned int)s1;
 }
 
-static unsigned int stb_decompress(unsigned char *output, const unsigned char *i, unsigned int /*length*/)
+static unsigned int stb_decompress(unsigned char* output, const unsigned char* i, unsigned int /*length*/)
 {
-    if (stb__in4(0) != 0x57bC0000) return 0;
-    if (stb__in4(4) != 0)          return 0; // error! stream is > 4GB
+    if (stb__in4(0) != 0x57bC0000)
+    {
+        return 0;
+    }
+    if (stb__in4(4) != 0)
+    {
+        return 0; // error! stream is > 4GB
+    }
     const unsigned int olen = stb_decompress_length(i);
     stb__barrier_in_b = i;
     stb__barrier_out_e = output + olen;
@@ -651,24 +725,36 @@ static unsigned int stb_decompress(unsigned char *output, const unsigned char *i
     i += 16;
 
     stb__dout = output;
-    while (true) {
-        const unsigned char *old_i = i;
+    while (true)
+    {
+        const unsigned char* old_i = i;
         i = stb_decompress_token(i);
-        if (i == old_i) {
-            if (*i == 0x05 && i[1] == 0xfa) {
+        if (i == old_i)
+        {
+            if (*i == 0x05 && i[1] == 0xfa)
+            {
                 MX_ASSERT(stb__dout == output + olen, "");
-                if (stb__dout != output + olen) return 0;
-                if (stb_adler32(1, output, olen) != (unsigned int) stb__in4(2))
+                if (stb__dout != output + olen)
+                {
                     return 0;
+                }
+                if (stb_adler32(1, output, olen) != (unsigned int)stb__in4(2))
+                {
+                    return 0;
+                }
                 return olen;
-            } else {
+            }
+            else
+            {
                 MX_ASSERT(0, "NOTREACHED"); /* NOTREACHED */
                 return 0;
             }
         }
         MX_ASSERT(stb__dout <= output + olen, "");
         if (stb__dout > output + olen)
+        {
             return 0;
+        }
     }
 }
 
@@ -1109,13 +1195,11 @@ namespace mxgui
 } // namespace mxgui
 
 
-    // clang-format off
 #ifdef RAYLIB_BACKEND
 
 #include <cstdio>
 
 #include "raylib.h"
-// clang-format on
 
 // MxType to Raylib type helper
 inline Vector2 toVector(MxVec2 vec)
@@ -1182,7 +1266,7 @@ public:
 
     void setupFontAwesome(int iconSize)
     {
-        #if FONT_AWESOME
+#if FONT_AWESOME
         int arrayOriginalSize = 414704;
         unsigned char* fontAwesomeData = (unsigned char*)malloc(arrayOriginalSize);
         stb_decompress(fontAwesomeData, fa_compressed_data, fa_compressed_size);
@@ -1196,7 +1280,7 @@ public:
             .spacing = 0,
         };
         SetTextureFilter(faFont.texture, TEXTURE_FILTER_BILINEAR);
-        #endif
+#endif
     }
 
     void init(MxStyle style)
@@ -1475,10 +1559,619 @@ void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size)
     DrawTextEx(font.font, icon, toVector(position), fontSize, 0, toColor(color));
 }
 
-    #endif // RAYLIB_BACKEND
+#endif // RAYLIB_BACKEND
 
+#ifdef SFML_BACKEND
+
+#include <SFML/Graphics.hpp>
+#include <SFML/OpenGL.hpp>
+#include <iostream>
+
+
+// void windowPollEvent(const std::optional<sf::Event> event);
+
+static float computeSfmlSizeScale(const sf::Font& font)
+{
+    constexpr unsigned int reference = 1000;
+    const float lineSpacing = font.getLineSpacing(reference);
+    return (float)reference / lineSpacing;
+}
+
+
+struct MxFontSpecsInternal
+{
+    sf::Font font{};
+    float sizeScale{1.0f};
+    float size{20};
+};
+
+static std::unique_ptr<sf::Text> s_text;
+static std::unique_ptr<sf::Sprite> s_sprite;
+
+class MxFontManager
+{
+public:
+
+    void setupDefaultFont(int textSize)
+    {
+        sf::Font font;
+        if (!font.openFromMemory(notosans::data, notosans::size))
+        {
+            return;
+        }
+
+
+        font.setSmooth(true);
+
+        // Default font
+        m_fonts[MX_DEFAULT_FONT_ID] = MxFontSpecsInternal{
+            .font = font,
+            .sizeScale = computeSfmlSizeScale(font),
+            .size = (float)textSize,
+        };
+
+        s_text = std::make_unique<sf::Text>(font, "Texto da GUI", 50);
+    }
+
+    void setupFontAwesome(int iconSize)
+    {
+#if FONT_AWESOME
+
+        int arrayOriginalSize = 414704;
+        unsigned char* fontAwesomeData = (unsigned char*)malloc(arrayOriginalSize);
+        stb_decompress(fontAwesomeData, fa_compressed_data, fa_compressed_size);
+
+        // int count = sizeof(codepointsFontAwesome) / sizeof(codepointsFontAwesome[0]);
+
+        sf::Font faFont;
+
+        if (!faFont.openFromMemory(fontAwesomeData, arrayOriginalSize))
+        {
+            return;
+        }
+
+        faFont.setSmooth(true);
+
+        m_fonts[MX_FONT_AWESOME_ID] = MxFontSpecsInternal{
+            .font = faFont,
+            .sizeScale = computeSfmlSizeScale(faFont),
+            .size = (float)iconSize,
+        };
+
+#endif
+    }
+
+    void init(MxStyle style)
+    {
+        if (m_fonts.size() > 0)
+        {
+            return;
+        }
+
+        setupDefaultFont(style.textSize);
+        setupFontAwesome(style.iconSize);
+    }
+
+    void unload() { m_fonts.clear(); }
+
+    MxVec2 measureText(const std::string& name, const std::string& text)
+    {
+        MxFontSpecsInternal font = getFont(name);
+        if (!s_text)
+        {
+            MX_ASSERT(s_text, "s_text is not valid");
+            return MxVec2{};
+        }
+
+        s_text->setFont(font.font);
+        s_text->setString(text);
+        s_text->setCharacterSize((MxUInt32)(font.size * font.sizeScale));
+
+        sf::FloatRect bounds = s_text->getLocalBounds();
+
+        return MxVec2{.x = bounds.size.x, .y = bounds.size.y};
+    }
+
+    MxFontSpecsInternal getFont(const std::string& name)
+    {
+        auto it = m_fonts.find(name);
+        if (it != m_fonts.end())
+        {
+            return it->second;
+        }
+
+        return MxFontSpecsInternal{};
+    }
+
+
+private:
+
+    std::unordered_map<std::string, MxFontSpecsInternal> m_fonts{};
+};
+
+class MxTextureManager
+{
+public:
+
+
+    void init()
+    {
+        if (m_textures.size() > 0)
+        {
+            return;
+        }
+        sf::Texture texture;
+        s_sprite = std::make_unique<sf::Sprite>(texture);
+    }
+
+    void loadTexture(const std::filesystem::path& path, const std::string& name)
+    {
+        sf::Texture texture;
+        if (texture.loadFromFile(path))
+        {
+            m_textures.insert_or_assign(name, texture);
+        }
+    }
+
+    void loadTextureFromImageData(const std::string& name, void* data, int width, int height, int mipmaps, int format)
+    {
+        sf::Texture texture;
+        if (texture.loadFromMemory(data, width * height))
+        {
+            if (mipmaps > 1)
+            {
+                if (!texture.generateMipmap()) {}
+            }
+            m_textures.insert_or_assign(name, texture);
+        }
+    }
+
+    MxVec2 getSize(const std::string& textureName)
+    {
+        sf::Texture texture = getTexture(textureName);
+        return MxVec2{(float)texture.getSize().x, (float)texture.getSize().y};
+    }
+
+    void unload() { m_textures.clear(); }
+
+    sf::Texture getTexture(const std::string& textureName)
+    {
+        auto it = m_textures.find(textureName);
+        if (it != m_textures.end())
+        {
+            return it->second;
+        }
+
+        return sf::Texture{};
+    }
+
+
+private:
+
+    std::unordered_map<std::string, sf::Texture> m_textures{};
+};
+
+
+struct MxMousePolling
+{
+    bool pressed{false};
+    bool down{false};
+    bool release{false};
+};
+
+
+static sf::RectangleShape s_rectShape;
+static sf::CircleShape s_circleShape;
+static sf::RenderWindow* s_windowRef = nullptr;
+static MxVec2 s_mousePosition{};
+static MxVec2 s_mouseDelta{};
+static float s_mouseWheelScrolled{0.0f};
+static MxMousePolling s_mousePolling[5]{
+    MxMousePolling{},
+    MxMousePolling{},
+    MxMousePolling{},
+};
+static MxFontManager s_fontManager;
+static MxTextureManager s_textureManager;
+static std::vector<MxRect> s_stackScissors{};
+
+
+inline sf::Vector2f toVectorF(MxVec2 vec)
+{
+    return sf::Vector2f{vec.x, vec.y};
+}
+
+inline sf::Vector2i toVectorI(MxVec2 vec)
+{
+    return sf::Vector2i{(int)vec.x, (int)vec.y};
+}
+
+inline sf::Color toColor(MxColor color)
+{
+    return sf::Color{color.r, color.g, color.b, color.a};
+}
+
+inline MxVec2 toMxVec2(sf::Vector2f vec)
+{
+    return MxVec2{vec.x, vec.y};
+}
+inline MxVec2 toMxVec2(sf::Vector2i vec)
+{
+    return MxVec2{(float)vec.x, (float)vec.y};
+}
+
+void windowDisplay(sf::RenderWindow* window)
+{
+    window->display();
+    for (auto& mouse : s_mousePolling)
+    {
+        mouse.pressed = false;
+        mouse.release = false;
+    }
+    s_mouseDelta = MxVec2{};
+    s_mouseWheelScrolled = 0.0f;
+}
+
+std::optional<sf::Event> windowPollEvent(sf::RenderWindow* window)
+{
+
+    const std::optional event = window->pollEvent();
+
+    if (!s_windowRef)
+    {
+        s_windowRef = window;
+    }
+
+    if (!event.has_value())
+    {
+        return event;
+    }
+
+    if (const auto* resized = event->getIf<sf::Event::Resized>())
+    {
+        sf::Vector2f newSize((float)resized->size.x, (float)resized->size.y);
+        window->setView(sf::View(newSize / 2.0f, newSize));
+    }
+
+    if (const auto* mouseMove = event->getIf<sf::Event::MouseMoved>())
+    {
+        s_mouseDelta.x = mouseMove->position.x - s_mousePosition.x;
+        s_mouseDelta.y = mouseMove->position.y - s_mousePosition.y;
+        s_mousePosition = toMxVec2(mouseMove->position);
+    }
+
+    if (const auto* mouseWheelScrolled = event->getIf<sf::Event::MouseWheelScrolled>())
+    {
+        s_mouseWheelScrolled = mouseWheelScrolled->delta;
+    }
+
+    if (const auto* mousePressed = event->getIf<sf::Event::MouseButtonPressed>())
+    {
+        int button = (int)mousePressed->button;
+        s_mousePolling[button].pressed = true;
+        s_mousePolling[button].down = true;
+    }
+
+    if (const auto* mouseReleased = event->getIf<sf::Event::MouseButtonReleased>())
+    {
+
+        int button = (int)mouseReleased->button;
+        s_mousePolling[button].pressed = false;
+        s_mousePolling[button].down = false;
+        s_mousePolling[button].release = true;
+    }
+
+    return event;
+}
+
+
+MxRect intersectionArea(const MxRect& rect2)
+{
+    if (!s_stackScissors.empty())
+    {
+        return getCollisionRec(s_stackScissors.back(), rect2);
+    }
+
+    return rect2;
+}
+
+void beginScissorMode(int x, int y, int width, int height)
+{
+    MX_ASSERT(s_windowRef, "window not reference");
+
+    const sf::Vector2u winSize = s_windowRef->getSize();
+
+    glEnable(GL_SCISSOR_TEST);
+    glScissor(x, (GLint)((float)winSize.y - y - height), width, height);
+}
+
+void endScissorMode()
+{
+    glDisable(GL_SCISSOR_TEST);
+}
+
+void pushScissor(int x, int y, int width, int height)
+{
+    if (!s_stackScissors.empty())
+    {
+        endScissorMode();
+    }
+
+    MxRect rect{(float)x, (float)y, (float)width, (float)height};
+    rect = intersectionArea(rect);
+
+    s_stackScissors.push_back(rect);
+    beginScissorMode((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height);
+}
+
+void popScissor()
+{
+    endScissorMode();
+
+    if (!s_stackScissors.empty())
+    {
+        s_stackScissors.pop_back();
+    }
+
+    if (!s_stackScissors.empty())
+    {
+        MxRect rect = s_stackScissors.back();
+        beginScissorMode((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height);
+    }
+}
+
+void initManagers(MxStyle style)
+{
+    s_fontManager.init(style);
+    s_textureManager.init();
+}
+
+void closeManagers()
+{
+    s_fontManager.unload();
+    s_textureManager.unload();
+}
+
+void loadTexture(const std::filesystem::path& path, const std::string& name)
+{
+    s_textureManager.loadTexture(path, name);
+}
+
+MxVec2 getTextureSize(const std::string& textureName)
+{
+    return s_textureManager.getSize(textureName);
+}
+
+MxVec2 measureText(const std::string& name, const std::string& text)
+{
+    return s_fontManager.measureText(name, text);
+}
+
+MxVec2 getMousePosition()
+{
+    return s_mousePosition;
+}
+
+MxVec2 getMouseDelta()
+{
+    return s_mouseDelta;
+}
+
+float getMouseWheelMove()
+{
+    return s_mouseWheelScrolled;
+}
+
+bool isMouseButtonPressed(int button)
+{
+    return s_mousePolling[button].pressed;
+}
+
+bool isMouseButtonDown(int button)
+{
+    return s_mousePolling[button].down;
+}
+
+bool isMouseButtonReleased(int button)
+{
+    return s_mousePolling[button].release;
+}
+
+void drawRectangleLinesEx(MxRect rec, float lineThick, MxColor color)
+{
+    s_rectShape.setOutlineThickness(lineThick);
+    s_rectShape.setPosition({rec.x + lineThick, rec.y + lineThick});
+    s_rectShape.setSize({rec.width - lineThick * 2, rec.height - lineThick * 2});
+    s_rectShape.setFillColor(sf::Color::Transparent);
+    s_rectShape.setOutlineColor(toColor(color));
+
+    MX_ASSERT(s_windowRef, "window not reference");
+    s_windowRef->draw(s_rectShape);
+}
+
+void drawRectanglePro(MxRect rec, MxVec2 origin, float rotation, MxColor color)
+{
+    s_rectShape.setOutlineThickness(0);
+    s_rectShape.setPosition({rec.x, rec.y});
+    s_rectShape.setOrigin({origin.x, origin.y});
+    s_rectShape.setRotation(sf::degrees(rotation));
+    s_rectShape.setSize({rec.width, rec.height});
+    s_rectShape.setFillColor(toColor(color));
+
+    MX_ASSERT(s_windowRef, "window not reference");
+    s_windowRef->draw(s_rectShape);
+}
+
+void drawTexturePro(const std::string& textureName, MxRect source, MxRect dest, MxVec2 origin, float rotation, MxColor tint)
+{
+
+    if (!s_sprite)
+    {
+        MX_ASSERT(s_sprite, "s_sprite is not valid");
+        return;
+    }
+
+    const sf::Texture texture = s_textureManager.getTexture(textureName);
+    const sf::IntRect rect({(int)source.x, (int)source.y}, {(int)source.width, (int)source.height});
+    s_sprite->setTexture(texture);
+    s_sprite->setTextureRect(rect);
+    s_sprite->setPosition({dest.x, dest.y});
+    s_sprite->setOrigin({origin.x, origin.y});
+    s_sprite->setRotation(sf::degrees(rotation));
+    s_sprite->setColor(toColor(tint));
+
+    MX_ASSERT(s_windowRef, "window not reference");
+    s_windowRef->draw(*s_sprite);
+}
+
+void drawTextPro(const std::string& fontName, const std::string& text, MxVec2 position, MxVec2 origin, float rotation, float fontSize, float spacing, MxColor tint)
+{
+    if (!s_text)
+    {
+        MX_ASSERT(s_text, "s_text is not valid");
+        return;
+    }
+    // sf::Text text(font, "Hello SFML", 20);
+    MxFontSpecsInternal font = s_fontManager.getFont(fontName);
+    s_text->setFont(font.font);
+    s_text->setString(text);
+    s_text->setPosition(toVectorF(position));
+    s_text->setOrigin({origin.x, origin.y});
+    s_text->setRotation(sf::degrees(rotation));
+    s_text->setCharacterSize((MxUInt32)(fontSize * font.sizeScale));
+    s_text->setLetterSpacing((spacing + 0.5f));
+    s_text->setFillColor(toColor(tint));
+
+    MX_ASSERT(s_windowRef, "window not reference");
+    s_windowRef->draw(*s_text);
+}
+
+void drawCircle(MxVec2 center, float radius, MxColor color)
+{
+    s_circleShape.setRadius(radius);
+    s_circleShape.setPosition(sf::Vector2f{center.x - radius, center.y - radius});
+    s_circleShape.setFillColor(toColor(color));
+
+
+    MX_ASSERT(s_windowRef, "window not reference");
+    s_windowRef->draw(s_circleShape);
+}
+
+void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size)
+{
+    if (!s_text)
+    {
+        MX_ASSERT(s_text, "s_text is not valid");
+        return;
+    }
+
+    MxFontSpecsInternal font = s_fontManager.getFont(MX_FONT_AWESOME_ID);
+
+    const float fontSize = (size < 0) ? font.size : (float)size;
+
+    s_text->setFont(font.font);
+    s_text->setString(sf::String(static_cast<char32_t>(codepoint)));
+    s_text->setPosition(toVectorF(position));
+    s_text->setOrigin({0.f, 0.f});
+    s_text->setRotation(sf::degrees(0.f));
+    s_text->setCharacterSize((MxUInt32)(fontSize * font.sizeScale));
+    s_text->setLetterSpacing(0.5f);
+    s_text->setFillColor(toColor(color));
+
+    MX_ASSERT(s_windowRef, "window not reference");
+    s_windowRef->draw(*s_text);
+}
+
+
+#endif // SFML_BACKEND
+#ifdef CUSTOM_BACKEND
+
+void pushScissor(int x, int y, int width, int height)
+{
+}
+
+void popScissor()
+{
+}
+
+void initManagers(MxStyle style)
+{
+}
+
+void closeManagers()
+{
+}
+
+void loadTexture(const std::filesystem::path& path, const std::string& name)
+{
+}
+
+MxVec2 getTextureSize(const std::string& textureName)
+{
+    return MxVec2{};
+}
+
+MxVec2 measureText(const std::string& name, const std::string& text)
+{
+    return MxVec2{};
+}
+
+MxVec2 getMousePosition()
+{
+    return MxVec2{};
+}
+
+MxVec2 getMouseDelta()
+{
+    return MxVec2{};
+}
+
+float getMouseWheelMove()
+{
+    return 0.0f;
+}
+
+bool isMouseButtonPressed(int button)
+{
+    return false;
+}
+
+bool isMouseButtonDown(int button)
+{
+    return false;
+}
+
+bool isMouseButtonReleased(int button)
+{
+    return false;
+}
+
+void drawRectangleLinesEx(MxRect rec, float lineThick, MxColor color)
+{
+}
+
+void drawRectanglePro(MxRect rec, MxVec2 origin, float rotation, MxColor color)
+{
+}
+
+void drawTexturePro(const std::string& textureName, MxRect source, MxRect dest, MxVec2 origin, float rotation, MxColor tint)
+{
+}
+
+void drawTextPro(const std::string& fontName, const std::string& text, MxVec2 position, MxVec2 origin, float rotation, float fontSize, float spacing, MxColor tint)
+{
+}
+
+void drawCircle(MxVec2 center, float radius, MxColor color)
+{
+}
+
+void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size)
+{
+}
+
+
+#endif // CUSTOM_BACKEND
 
 #endif // MX_GUI_IMPLEMENTATION
-
-
 #endif // MXGUI_HPP

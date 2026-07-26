@@ -45,8 +45,19 @@ FetchContent_Declare(
     GIT_SHALLOW    TRUE
     )
 
+# sfml 
+FetchContent_Declare(SFML
+    GIT_REPOSITORY https://github.com/SFML/SFML.git
+    GIT_TAG 3.1.0
+    GIT_SHALLOW ON
+    EXCLUDE_FROM_ALL
+    SYSTEM
+)
+
+
 
 FetchContent_MakeAvailable(
+    SFML
     sdl
     raylib
     freetype
@@ -83,6 +94,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     raylib
     freetype
     m
+    SFML::Graphics
 )
 
 

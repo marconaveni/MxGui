@@ -9,7 +9,7 @@ ContinuationIndentWidth: 4
 IndentCaseLabels: true
 IndentCaseBlocks: true
 IndentExternBlock: Indent
-IndentPPDirectives: BeforeHash
+IndentPPDirectives: None
 IndentRequires: true
 IndentWidth: 4  
 IndentWrappedFunctionNames: true
@@ -75,7 +75,7 @@ ConstructorInitializerIndentWidth: 4
 BreakConstructorInitializers: BeforeComma 
 Cpp11BracedListStyle: true
 
-#templates
+# templates
 BreakTemplateDeclarations: Yes
 
 # Pointer alignment
@@ -91,7 +91,7 @@ IncludeBlocks: Regroup
 # macros
 AlignEscapedNewlines: Left
 StatementMacros:
-  - CLASSIC_ASSERT
+  - MX_ASSERT
 
 IncludeCategories:
   - Regex: '^<.*>'
