@@ -1,12 +1,15 @@
 
 
+#define SFML_BACKEND 1
+
 #include <array>
+#include <iostream>
+
 #define MX_GUI_IMPLEMENTATION
+#include <SFML/Graphics.hpp>
+#include <raylib.h>
+
 #include "mxgui.hpp"
-
-
-#if RAYLIB_BACKEND
-#include "raylib.h"
 
 
 void testScissor();
@@ -15,11 +18,16 @@ void testScissor();
 int main()
 {
 
-    SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
 
+#if RAYLIB_BACKEND
+    SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
     InitWindow(800, 600, "GUI");
     SetTextLineSpacing(0);
     // SetTargetFPS(60);
+#elif SFML_BACKEND
+    sf::RenderWindow window(sf::VideoMode({800, 600}), "GUI");
+    s_windowRef = &window;
+#endif
 
     MxStyle style = MxStyle::Light;
     style.iconSize = 28;
@@ -33,23 +41,37 @@ int main()
     bool checked = false;
     bool toogle = false;
 
+#if RAYLIB_BACKEND
     while (!WindowShouldClose())
     {
+
         BeginDrawing();
         ClearBackground((mxgui::getStyle(ctx).isDarkMode) ? BLACK : RAYWHITE);
+#elif SFML_BACKEND
+    while (window.isOpen())
+    {
+        while (const std::optional event = windowPollEvent(&window))
+        {
+            if (event->is<sf::Event::Closed>())
+            {
+                window.close();
+            }
+        }
+        window.clear(sf::Color::White);
+#endif
 
 
         anchor = mxgui::guiPanel(ctx, "Canvas1", toMxRect(anchor, MxVec2{width, height}), MxVec2{}, true);
         mxgui::guiPanel(ctx, "Canvas2", MxRect{0, (height - 1), width, width}, anchor, false);
         if (mxgui::guiButton(ctx, "Click", MxRect{10, 35, 75, 35}, anchor, MX_OUTLINE, true))
         {
-            TraceLog(LOG_INFO, "clicked");
+            std::cout << "clicked" << '\n';
         }
         mxgui::guiImage(ctx, "nfsu2", MxRect{220, 35, 100, 100}, anchor);
         mxgui::guiIcon(ctx, MxRect{10, 80, 0, 0}, anchor, ICON_FA_CIRCLE_PLAY);
         if (mxgui::guiIconButton(ctx, MxRect{10, 120, 20, 20}, anchor, ICON_FA_CIRCLE_PLAY, 28))
         {
-            TraceLog(LOG_INFO, "clicked Icon");
+            std::cout << "clicked Icon" << '\n';
         }
 
         mxgui::guiScrollPanelBegin(ctx, "ScrollPanel", MxRect{300, 200, 100, 200}, MxRect{300, 200, 100, 250}, MxVec2{100, 100}, true);
@@ -66,19 +88,26 @@ int main()
         mxgui::guiLabel(ctx, std::to_string(progress), MxVec2{10, 30});
         mxgui::guiSliderProgress(ctx, MxRect{50, 560, 700, 6}, MxVec2{}, 0.8f);
 
-
+#if RAYLIB_BACKEND
         DrawFPS(10, 10);
-
-
         // DrawText(TextFormat("cor: %zu", sizeof(Transform)), 30, 30, 20, BLACK);
         EndDrawing();
+#elif SFML_BACKEND
+        windowDisplay(&window);
+#endif
     }
 
+
     mxgui::destroyContext(ctx);
+
+#if RAYLIB_BACKEND
     CloseWindow();
+#endif
 
     return 0;
 }
+
+#if RAYLIB_BACKEND
 
 
 void testScissor()
@@ -122,77 +151,73 @@ void testScissor()
     CloseWindow();
 }
 
-
 #endif
 #if SFML_BACKEND
 
 
-#include <SFML/Graphics.hpp>
-#include <iostream>
+// int main()
+// {
+//     sf::RenderWindow window(sf::VideoMode({800, 600}), "SFML works!");
+//     s_windowRef = &window;
 
-int main()
-{
-    sf::RenderWindow window(sf::VideoMode({800, 600}), "SFML works!");
-    s_windowRef = &window;
+//     MxStyle style = MxStyle::Light;
+//     style.iconSize = 28;
+//     MxGuiContext* ctx = mxgui::createContext(style);
 
-    MxStyle style = MxStyle::Light;
-    style.iconSize = 28;
-    MxGuiContext* ctx = mxgui::createContext(style);
+//     mxgui::createImage("/home/marco/Imagens/icons/nfsu2.png", "nfsu2");
 
-    mxgui::createImage("/home/marco/Imagens/icons/nfsu2.png", "nfsu2");
-
-    const float width = 400;
-    const float height = 25;
-    MxVec2 anchor{10, 10};
-    bool checked = false;
-    bool toogle = false;
+//     const float width = 400;
+//     const float height = 25;
+//     MxVec2 anchor{10, 10};
+//     bool checked = false;
+//     bool toogle = false;
 
 
-    while (window.isOpen())
-    {
-        while (const std::optional event = windowPollEvent(&window))
-        {
-            if (event->is<sf::Event::Closed>())
-            {
-                window.close();
-            }
-        }
+//     while (window.isOpen())
+//     {
+//         while (const std::optional event = windowPollEvent(&window))
+//         {
+//             if (event->is<sf::Event::Closed>())
+//             {
+//                 window.close();
+//             }
+//         }
 
 
-        window.clear(sf::Color::White);
+//         window.clear(sf::Color::White);
 
-        anchor = mxgui::guiPanel(ctx, "Canvas1", toMxRect(anchor, MxVec2{width, height}), MxVec2{}, true);
-        mxgui::guiPanel(ctx, "Canvas2", MxRect{0, (height - 1), width, width}, anchor, false);
-        if (mxgui::guiButton(ctx, "Click", MxRect{10, 35, 75, 35}, anchor, MX_OUTLINE, true))
-        {
-            std::cout << "clicked" << '\n';
-        }
-        mxgui::guiImage(ctx, "nfsu2", MxRect{220, 35, 100, 100}, anchor);
-        mxgui::guiIcon(ctx, MxRect{10, 80, 0, 0}, anchor, ICON_FA_CIRCLE_PLAY);
-        if (mxgui::guiIconButton(ctx, MxRect{10, 120, 20, 20}, anchor, ICON_FA_CIRCLE_PLAY, 28))
-        {
-            std::cout << "clicked Icon" << '\n';           
-        }
+//         anchor = mxgui::guiPanel(ctx, "Canvas1", toMxRect(anchor, MxVec2{width, height}), MxVec2{}, true);
+//         mxgui::guiPanel(ctx, "Canvas2", MxRect{0, (height - 1), width, width}, anchor, false);
+//         if (mxgui::guiButton(ctx, "Click", MxRect{10, 35, 75, 35}, anchor, MX_OUTLINE, true))
+//         {
+//             std::cout << "clicked" << '\n';
+//         }
+//         mxgui::guiImage(ctx, "nfsu2", MxRect{220, 35, 100, 100}, anchor);
+//         mxgui::guiIcon(ctx, MxRect{10, 80, 0, 0}, anchor, ICON_FA_CIRCLE_PLAY);
+//         if (mxgui::guiIconButton(ctx, MxRect{10, 120, 20, 20}, anchor, ICON_FA_CIRCLE_PLAY, 28))
+//         {
+//             std::cout << "clicked Icon" << '\n';
+//         }
 
-        mxgui::guiScrollPanelBegin(ctx, "ScrollPanel", MxRect{300, 200, 100, 200}, MxRect{300, 200, 100, 250}, MxVec2{100, 100}, true);
-        mxgui::guiLabel(ctx, "hello world", MxVec2{100, 0}, anchor);
-        mxgui::guiLabel(ctx, "hello world 2", MxVec2{0, 80});
-        mxgui::guiScrollPanelEnd(ctx, "ScrollPanel");
+//         mxgui::guiScrollPanelBegin(ctx, "ScrollPanel", MxRect{300, 200, 100, 200}, MxRect{300, 200, 100, 250}, MxVec2{100, 100}, true);
+//         mxgui::guiLabel(ctx, "hello world", MxVec2{100, 0}, anchor);
+//         mxgui::guiLabel(ctx, "hello world 2", MxVec2{0, 80});
+//         mxgui::guiScrollPanelEnd(ctx, "ScrollPanel");
 
-        mxgui::guiCheckBox(ctx, MxRect{100, 100}, MxVec2{}, checked);
-        mxgui::guiToogle(ctx, MxRect{150, 100}, MxVec2{}, toogle);
+//         mxgui::guiCheckBox(ctx, MxRect{100, 100}, MxVec2{}, checked);
+//         mxgui::guiToogle(ctx, MxRect{150, 100}, MxVec2{}, toogle);
 
-        const float progress = mxgui::guiSlider(ctx, "Slider", MxRect{50, 530, 700, 6}, MxVec2{}, true);
-        mxgui::guiLabel(ctx, std::to_string(progress), MxVec2{10, 30});
-        mxgui::guiSliderProgress(ctx, MxRect{50, 560, 700, 6}, MxVec2{}, 0.8f);
+//         const float progress = mxgui::guiSlider(ctx, "Slider", MxRect{50, 530, 700, 6}, MxVec2{}, true);
+//         mxgui::guiLabel(ctx, std::to_string(progress), MxVec2{10, 30});
+//         mxgui::guiSliderProgress(ctx, MxRect{50, 560, 700, 6}, MxVec2{}, 0.8f);
 
-        // window.draw(text);
+//         // window.draw(text);
 
-        windowDisplay(&window);
-    }
+//         windowDisplay(&window);
+//     }
 
-    mxgui::destroyContext(ctx);
-}
+//     mxgui::destroyContext(ctx);
+// }
 
 
 #endif

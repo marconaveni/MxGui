@@ -95,9 +95,9 @@ StatementMacros:
 
 IncludeCategories:
   - Regex: '^<.*>'
-    Priority: 1      # headers do sistema (std, libs externas)
+    Priority: 1      # headers systems (std, libs externs)
   - Regex: '.*'
-    Priority: 2      # headers locais do projeto
+    Priority: 2      # headers projects locals
 
 
 

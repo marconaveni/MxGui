@@ -38,7 +38,7 @@
 
 #define FONT_AWESOME 1
 #define RAYLIB_BACKEND 1
-#define SFML_BACKEND 1
+// #define SFML_BACKEND 1
 // #define CUSTOM_BACKEND 1
 
 //-----------------------------------------------------------------------------
@@ -1565,10 +1565,8 @@ void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size)
 
 #include <SFML/Graphics.hpp>
 #include <SFML/OpenGL.hpp>
-#include <iostream>
 
 
-// void windowPollEvent(const std::optional<sf::Event> event);
 
 static float computeSfmlSizeScale(const sf::Font& font)
 {
