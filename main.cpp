@@ -1,6 +1,6 @@
 
 
-#define SFML_BACKEND 1
+// #define SFML_BACKEND 1
 
 #include <array>
 #include <iostream>

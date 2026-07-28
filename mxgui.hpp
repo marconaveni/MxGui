@@ -160,6 +160,8 @@ struct MxImage
     void* data{nullptr}; // Image raw data
     int width{0};        // Image base width
     int height{0};       // Image base height
+    int mipmaps{1};      // Mipmap levels, 1 by default
+    int format{1};       // Data format (PixelFormat type)
 };
 
 struct MxColor
@@ -565,6 +567,499 @@ struct MxGuiContext
 //-----------------------------------------------------------------------------
 // Internal functions
 //-----------------------------------------------------------------------------
+
+
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "stb_truetype.h"
+
+
+// Texture, tex data stored in GPU memory (VRAM)
+struct MxTexture
+{
+    unsigned int id{0}; // OpenGL texture id
+    int width{0};       // Texture base width
+    int height{0};      // Texture base height
+    int mipmaps{0};     // Mipmap levels, 1 by default
+    int format{0};      // Data format (PixelFormat type)
+};
+
+// GlyphInfo, font characters glyphs info
+struct MxGlyphInfo
+{
+    int value{0};    // Character value (Unicode)
+    int offsetX{0};  // Character offset X when drawing
+    int offsetY{0};  // Character offset Y when drawing
+    int advanceX{0}; // Character advance position X
+    MxImage image{}; // Character image data
+};
+
+// Font, font texture and GlyphInfo array data
+struct MxFont
+{
+    int baseSize{0};              // Base size (default chars height)
+    int glyphCount{0};            // Number of glyph characters
+    int glyphPadding{0};          // Padding around the glyph characters
+    MxTexture texture{};          // Texture atlas containing the glyphs
+    MxRect* recs{nullptr};        // Rectangles in texture for the glyphs
+    MxGlyphInfo* glyphs{nullptr}; // Glyphs info data
+};
+
+#define FONT_ATLAS_CORNER_REC_SIZE 3     // Size of white rectangle drawn on font atlas on font loading
+#define FONT_TTF_DEFAULT_CHARS_PADDING 4 // TTF font generation default glyphs padding
+#define FONT_SDF_CHAR_PADDING 4          // SDF font generation char padding
+#define FONT_SDF_ON_EDGE_VALUE 128       // SDF font generation on edge value
+#define FONT_SDF_PIXEL_DIST_SCALE 64.0f  // SDF font generation pixel distance scale
+#define FONT_BITMAP_ALPHA_THRESHOLD 80   // Bitmap (B&W) font generation alpha threshold
+
+MxFont loadFontFromMemory(const unsigned char* fileData, int dataSize, int fontSize, const int* codepoints, int codepointCount);
+MxGlyphInfo* loadFontData(const unsigned char* fileData, int dataSize, int fontSize, const int* codepoints, int codepointCount, int type, int* glyphCount);
+
+// Load font data for further use
+// NOTE: Requires TTF font memory data and can generate SDF data
+MxGlyphInfo* loadFontData(const unsigned char* fileData, int dataSize, int fontSize, const int* codepoints, int codepointCount, int type, int* glyphCount)
+{
+
+
+    MxGlyphInfo* glyphs = NULL;
+    int glyphCounter = 0;
+
+    // Load font data (including pixel data) from TTF memory file
+    // NOTE: Loaded information should be enough to generate font image atlas, using any packaging method
+    if (fileData != NULL)
+    {
+        bool genFontChars = false;
+        stbtt_fontinfo fontInfo{};
+        // TODO: Should a shallow copy be created to avoid "dealing" with a const user array?
+        int* requiredCodepoints = (int*)codepoints;
+
+        if (stbtt_InitFont(&fontInfo, (unsigned char*)fileData, 0)) // Initialize font for data reading
+        {
+            // Calculate font scale factor
+            float scaleFactor = stbtt_ScaleForPixelHeight(&fontInfo, (float)fontSize);
+
+            // Calculate font basic metrics
+            // NOTE: ascent is equivalent to font baseline
+            int ascent = 0;
+            int descent = 0;
+            int lineGap = 0;
+            stbtt_GetFontVMetrics(&fontInfo, &ascent, &descent, &lineGap);
+
+            // In case no chars count provided, default to 95
+            codepointCount = (codepointCount > 0) ? codepointCount : 95;
+
+            // Fill fontChars in case not provided externally
+            // NOTE: By default filling glyphCount consecutively, starting at 32 (Space)
+            if (requiredCodepoints == NULL)
+            {
+                requiredCodepoints = (int*)RL_MALLOC(codepointCount * sizeof(int));
+                for (int i = 0; i < codepointCount; i++)
+                {
+                    requiredCodepoints[i] = i + 32;
+                }
+                genFontChars = true;
+            }
+
+            // Check available glyphs on provided font before loading them
+            for (int i = 0, index; i < codepointCount; i++)
+            {
+                index = stbtt_FindGlyphIndex(&fontInfo, requiredCodepoints[i]);
+                if (index > 0)
+                {
+                    glyphCounter++;
+                }
+            }
+
+            // WARNING: Allocating space for maximum number of codepoints
+            glyphs = (MxGlyphInfo*)calloc(glyphCounter, sizeof(MxGlyphInfo));
+            glyphCounter = 0; // Reset to reuse
+
+            int k = 0;
+            for (int i = 0; i < codepointCount; i++)
+            {
+                int cpWidth = 0, cpHeight = 0;  // Codepoint width and height (on generation)
+                int cp = requiredCodepoints[i]; // Codepoint value to get info for
+
+                //  Render a unicode codepoint to a bitmap
+                //      stbtt_GetCodepointBitmap()           -- allocates and returns a bitmap
+                //      stbtt_GetCodepointBitmapBox()        -- how big the bitmap must be
+                //      stbtt_MakeCodepointBitmap()          -- renders into a provided bitmap
+
+                // Check if a glyph is available in the font
+                // WARNING: if (index == 0), glyph not found, it could fallback to default .notdef glyph (if defined in font)
+                int index = stbtt_FindGlyphIndex(&fontInfo, cp);
+
+                if (index > 0)
+                {
+                    // NOTE: Only storing glyphs for codepoints found in the font
+                    glyphs[k].value = cp;
+
+                    switch (type)
+                    {
+                        case FONT_DEFAULT:
+                        case FONT_BITMAP:
+                            {
+                                glyphs[k].image.data = stbtt_GetCodepointBitmap(&fontInfo, scaleFactor, scaleFactor, cp, &cpWidth, &cpHeight, &glyphs[k].offsetX, &glyphs[k].offsetY);
+                            }
+                            break;
+                        case FONT_SDF:
+                            {
+                                if (cp != 32)
+                                {
+                                    glyphs[k].image.data = stbtt_GetCodepointSDF(&fontInfo, scaleFactor, cp, FONT_SDF_CHAR_PADDING, FONT_SDF_ON_EDGE_VALUE, FONT_SDF_PIXEL_DIST_SCALE, &cpWidth, &cpHeight, &glyphs[k].offsetX, &glyphs[k].offsetY);
+                                }
+                            }
+                            break;
+                        // case FONT_MSDF:
+                        default: break;
+                    }
+
+                    if (glyphs[k].image.data != NULL) // Glyph data has been found in the font
+                    {
+                        stbtt_GetCodepointHMetrics(&fontInfo, cp, &glyphs[k].advanceX, NULL);
+                        glyphs[k].advanceX = (int)((float)glyphs[k].advanceX * scaleFactor);
+
+                        // WARNING: If requested SDF font, sdf-glyph height is definitely bigger than fontSize due to FONT_SDF_CHAR_PADDING
+                        if ((type != FONT_SDF) && (cpHeight > fontSize))
+                        {
+                            // TRACELOG(LOG_WARNING, "FONT: [0x%04x] Glyph height is bigger than requested font size: %i > %i", cp, cpHeight, (int)fontSize);
+                        }
+
+                        // Load glyph image
+                        glyphs[k].image.width = cpWidth;
+                        glyphs[k].image.height = cpHeight;
+                        glyphs[k].image.mipmaps = 1;
+                        glyphs[k].image.format = 1;
+
+                        glyphs[k].offsetY += (int)((float)ascent * scaleFactor);
+                    }
+                    // else TRACELOG(LOG_WARNING, "FONT: Glyph [0x%08x] has no image data available", cp); // Only reported for 0x20 and 0x3000
+
+                    // Create an empty image for Space character (0x20), useful for sprite font generation
+                    // NOTE: Another space to consider: 0x3000 (CJK - Ideographic Space)
+                    if ((cp == 0x20) || (cp == 0x3000))
+                    {
+                        stbtt_GetCodepointHMetrics(&fontInfo, cp, &glyphs[k].advanceX, NULL);
+                        glyphs[k].advanceX = (int)((float)glyphs[k].advanceX * scaleFactor);
+
+                        MxImage imSpace = {.data = NULL, .width = glyphs[k].advanceX, .height = fontSize, .mipmaps = 1, .format = 1};
+
+                        // Only allocate space image if required
+                        if (glyphs[k].advanceX > 0)
+                        {
+                            imSpace.data = RL_CALLOC(glyphs[k].advanceX * fontSize, 1);
+                        }
+                        else
+                        {
+                            glyphs[k].advanceX = 0;
+                        }
+
+                        glyphs[k].image = imSpace;
+                    }
+
+                    if (type == FONT_BITMAP)
+                    {
+                        // Aliased bitmap (black & white) font generation, avoiding anti-aliasing
+                        // NOTE: For optimum results, bitmap font should be generated at base pixel size
+                        for (int p = 0; p < cpWidth * cpHeight; p++)
+                        {
+                            if (((unsigned char*)glyphs[k].image.data)[p] < FONT_BITMAP_ALPHA_THRESHOLD)
+                            {
+                                ((unsigned char*)glyphs[k].image.data)[p] = 0;
+                            }
+                            else
+                            {
+                                ((unsigned char*)glyphs[k].image.data)[p] = 255;
+                            }
+                        }
+                    }
+
+                    k++;
+                    glyphCounter++;
+                }
+                else
+                {
+                    // WARNING: Glyph not found on font, optionally use a fallback glyph
+                }
+            }
+
+            if (glyphCounter < codepointCount)
+            {
+                // TRACELOG(LOG_WARNING, "FONT: Requested codepoints glyphs found: [%i/%i]", k, codepointCount);
+            }
+        }
+        else
+        {
+            // TRACELOG(LOG_WARNING, "FONT: Failed to process TTF font data");
+        }
+
+        if (genFontChars)
+        {
+            free(requiredCodepoints);
+        }
+    }
+
+
+    *glyphCount = glyphCounter;
+    return glyphs;
+}
+
+
+MxImage genImageFontAtlas(const MxGlyphInfo* glyphs, MxRect** glyphRecs, int glyphCount, int fontSize, int padding, int packMethod)
+{
+    MxImage atlas{};
+
+    if (glyphs == NULL)
+    {
+        // TRACELOG(LOG_WARNING, "FONT: Provided glyphs info not valid, returning empty image atlas");
+        return atlas;
+    }
+
+    *glyphRecs = NULL;
+
+    // In case no chars count provided, suppose default of 95
+    glyphCount = (glyphCount > 0) ? glyphCount : 95;
+
+    // NOTE: MxRects memory is loaded here!
+    MxRect* recs = (MxRect*)RL_MALLOC(glyphCount * sizeof(MxRect));
+
+    // Calculate image size based on total glyph width and glyph row count
+    int totalWidth = 0;
+    int maxGlyphWidth = 0;
+
+    for (int i = 0; i < glyphCount; i++)
+    {
+        if (glyphs[i].image.width > maxGlyphWidth)
+        {
+            maxGlyphWidth = glyphs[i].image.width;
+        }
+        totalWidth += glyphs[i].image.width + 2 * padding;
+    }
+
+    int paddedFontSize = fontSize + 2 * padding;
+
+    // Estimate image atlas size from available data
+    // NOTE: Multiplying total expected area by 1.2f scale factor but in case
+    // some glyphs do not fit, the atlas height is scaled x2 to fit them
+    float totalArea = totalWidth * paddedFontSize * 1.2f;
+    float imageMinSize = sqrtf(totalArea);
+    int imageSize = (int)powf(2, ceilf(logf(imageMinSize) / logf(2)));
+
+    if (totalArea < ((imageSize * imageSize) / 2))
+    {
+        atlas.width = imageSize;      // Atlas bitmap width
+        atlas.height = imageSize / 2; // Atlas bitmap height
+    }
+    else
+    {
+        atlas.width = imageSize;  // Atlas bitmap width
+        atlas.height = imageSize; // Atlas bitmap height
+    }
+
+    int atlasDataSize = atlas.width * atlas.height;        // Save total size for bounds checking
+    atlas.data = (unsigned char*)calloc(atlasDataSize, 1); // Create a bitmap to store characters (8 bpp)
+    atlas.format = 1;
+    atlas.mipmaps = 1;
+
+    // DEBUG: View padding in the generated image setting a gray background...
+    // for (int i = 0; i < atlas.width*atlas.height; i++) ((unsigned char *)atlas.data)[i] = 100;
+
+    if (packMethod == 0) // Use basic packing algorithm
+    {
+        int offsetX = padding;
+        int offsetY = padding;
+
+        // NOTE: Using simple packaging, one char after another
+        for (int i = 0; i < glyphCount; i++)
+        {
+            // Check remaining space for glyph
+            if (offsetX >= (atlas.width - glyphs[i].image.width - 2 * padding))
+            {
+                offsetX = padding;
+
+                // NOTE: Be careful on offsetY for SDF fonts, by default SDF
+                // use an internal padding of 4 pixels, it means char rectangle
+                // height is bigger than fontSize, it could be up to (fontSize + 8)
+                offsetY += (fontSize + 2 * padding);
+
+                if (offsetY > (atlas.height - fontSize - padding))
+                {
+                    // TRACELOG(LOG_WARNING, "FONT: Updating atlas size to fit all characters");
+
+                    // Update atlas size to fit all characters
+                    int updatedAtlasHeight = atlas.height * 2;
+                    int updatedAtlasDataSize = atlas.width * updatedAtlasHeight;
+                    unsigned char* updatedAtlasData = (unsigned char*)RL_CALLOC(updatedAtlasDataSize, 1);
+
+                    memcpy(updatedAtlasData, atlas.data, atlasDataSize);
+                    free(atlas.data);
+                    atlas.data = updatedAtlasData;
+                    atlas.height = updatedAtlasHeight;
+                    atlasDataSize = updatedAtlasDataSize;
+                }
+            }
+
+            // Copy pixel data from glyph image to atlas
+            for (int y = 0; y < glyphs[i].image.height; y++)
+            {
+                for (int x = 0; x < glyphs[i].image.width; x++)
+                {
+                    int destX = offsetX + x;
+                    int destY = offsetY + y;
+
+                    // Security: check both lower and upper bounds
+                    if ((destX >= 0) && (destX < atlas.width) && (destY >= 0) && (destY < atlas.height))
+                    {
+                        ((unsigned char*)atlas.data)[destY * atlas.width + destX] = ((unsigned char*)glyphs[i].image.data)[y * glyphs[i].image.width + x];
+                    }
+                }
+            }
+
+            // Fill chars rectangles in atlas info
+            recs[i].x = (float)offsetX;
+            recs[i].y = (float)offsetY;
+            recs[i].width = (float)glyphs[i].image.width;
+            recs[i].height = (float)glyphs[i].image.height;
+
+            // Move atlas position X for next character drawing
+            offsetX += (glyphs[i].image.width + 2 * padding);
+        }
+    }
+    else if (packMethod == 1) // Use Skyline rect packing algorithm (stb_pack_rect)
+    {
+        stbrp_context* context = (stbrp_context*)RL_MALLOC(sizeof(*context));
+        stbrp_node* nodes = (stbrp_node*)RL_MALLOC(glyphCount * sizeof(*nodes));
+
+        stbrp_init_target(context, atlas.width, atlas.height, nodes, glyphCount);
+        stbrp_rect* rects = (stbrp_rect*)RL_MALLOC(glyphCount * sizeof(stbrp_rect));
+
+        // Fill rectangles for packaging
+        for (int i = 0; i < glyphCount; i++)
+        {
+            rects[i].id = i;
+            rects[i].w = glyphs[i].image.width + 2 * padding;
+            rects[i].h = glyphs[i].image.height + 2 * padding;
+        }
+
+        // Package rectangles into atlas
+        stbrp_pack_rects(context, rects, glyphCount);
+
+        for (int i = 0; i < glyphCount; i++)
+        {
+            // It returns char rectangles in atlas
+            recs[i].x = rects[i].x + (float)padding;
+            recs[i].y = rects[i].y + (float)padding;
+            recs[i].width = (float)glyphs[i].image.width;
+            recs[i].height = (float)glyphs[i].image.height;
+
+            if (rects[i].was_packed)
+            {
+                // Copy pixel data from fc.data to atlas
+                for (int y = 0; y < glyphs[i].image.height; y++)
+                {
+                    for (int x = 0; x < glyphs[i].image.width; x++)
+                    {
+                        int destX = rects[i].x + padding + x;
+                        int destY = rects[i].y + padding + y;
+
+                        // Security fix: check both lower and upper bounds
+                        if (destX >= 0 && destX < atlas.width && destY >= 0 && destY < atlas.height)
+                        {
+                            ((unsigned char*)atlas.data)[destY * atlas.width + destX] = ((unsigned char*)glyphs[i].image.data)[y * glyphs[i].image.width + x];
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // TRACELOG(LOG_WARNING, "FONT: Failed to package glyph (0x%02x)", glyphs[i].value);
+            }
+        }
+
+        free(rects);
+        free(nodes);
+        free(context);
+    }
+
+    // Add a 3x3 white rectangle at the bottom-right corner of the generated atlas,
+    // useful to use as the white texture to draw shapes with raylib
+    // Security: ensure the atlas is large enough to hold a 3x3 rectangle
+    if ((FONT_ATLAS_CORNER_REC_SIZE > 0) && (atlas.width >= 3) && (atlas.height >= 3))
+    {
+        for (int i = 0, k = atlas.width * atlas.height - 1; i < FONT_ATLAS_CORNER_REC_SIZE; i++)
+        {
+            ((unsigned char*)atlas.data)[k - 0] = 255;
+            ((unsigned char*)atlas.data)[k - 1] = 255;
+            ((unsigned char*)atlas.data)[k - 2] = 255;
+            k -= atlas.width;
+        }
+    }
+
+    // Convert image data from GRAYSCALE to GRAY_ALPHA
+    unsigned char* dataGrayAlpha = (unsigned char*)RL_MALLOC(atlas.width * atlas.height * sizeof(unsigned char) * 2); // Two channels
+
+    for (int i = 0, k = 0; i < atlas.width * atlas.height; i++, k += 2)
+    {
+        dataGrayAlpha[k] = 255;
+        dataGrayAlpha[k + 1] = ((unsigned char*)atlas.data)[i];
+    }
+
+    free(atlas.data);
+    atlas.data = dataGrayAlpha;
+    atlas.format = PIXELFORMAT_UNCOMPRESSED_GRAY_ALPHA;
+
+    *glyphRecs = recs;
+
+    return atlas;
+}
+
+#include "rlgl.h"
+
+MxFont loadFontFromMemory(const unsigned char* fileData, int dataSize, int fontSize, const int* codepoints, int codepointCount)
+{
+    MxFont font{};
+
+    font.baseSize = fontSize;
+    font.glyphPadding = 0;
+    font.glyphs = loadFontData(fileData, dataSize, font.baseSize, codepoints, (codepointCount > 0) ? codepointCount : 95, FONT_DEFAULT, &font.glyphCount);
+
+
+    if (font.glyphs != NULL)
+    {
+        font.glyphPadding = FONT_TTF_DEFAULT_CHARS_PADDING;
+
+        MxImage atlas = genImageFontAtlas(font.glyphs, &font.recs, font.glyphCount, font.baseSize, font.glyphPadding, 0);
+
+
+        //font.texture = LoadTextureFromImage(atlas); //
+        if ((atlas.width != 0) && (atlas.height != 0))
+        {
+            font.texture.id = rlLoadTexture(atlas.data, atlas.width, atlas.height, atlas.format, atlas.mipmaps);
+            font.texture.width = atlas.width;
+            font.texture.height = atlas.height;
+            font.texture.mipmaps = atlas.mipmaps;
+            font.texture.format = atlas.format;
+        }
+
+
+
+        // Update glyphs[i].image to use alpha, required to be used on ImageDrawText()
+        for (int i = 0; i < font.glyphCount; i++)
+        {
+            free(font.glyphs[i].image.data);
+            // font.glyphs[i].image = ImageFromImage(atlas, font.recs[i]);
+        }
+
+        free(atlas.data);
+
+        // TRACELOG(LOG_INFO, "FONT: Data loaded successfully (%i pixel size | %i glyphs)", font.baseSize, font.glyphCount);
+    }
+    else
+    {
+        font = MxFont{};
+    }
+
+    return font;
+}
 
 
 //-----------------------------------------------------------------------------
@@ -1254,6 +1749,7 @@ public:
             codepoints[i] = 32 + i; // ASCII: espaço (32) até ~ (126)
         }
         Font font = LoadFontFromMemory(".ttf", notosans::data, notosans::size, textSize, codepoints, 95);
+        MxFont font_test = loadFontFromMemory(notosans::data, notosans::size, textSize, codepoints, 95);
 
         // Default font
         m_fonts[MX_DEFAULT_FONT_ID] = MxFontSpecsInternal{
@@ -1565,7 +2061,6 @@ void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size)
 
 #include <SFML/Graphics.hpp>
 #include <SFML/OpenGL.hpp>
-
 
 
 static float computeSfmlSizeScale(const sf::Font& font)
