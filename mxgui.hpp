@@ -438,6 +438,7 @@ void closeManagers();
 // misc
 void loadTexture(const std::filesystem::path& path, const std::string& name);
 void loadTextureFromMemory(void* data, int width, int height, int format, int mipmapCount, const std::string& name);
+void unloadTexture(const std::string& texture);
 
 MxVec2 getTextureSize(const std::string& textureName);
 MxVec2 measureText(const std::string& name, const std::string& text);
@@ -945,7 +946,7 @@ MxGlyphInfo* loadFontData(const unsigned char* fileData, int dataSize, int fontS
 
                     switch (type)
                     {
-                        case 0: //FONT_DEFAULT
+                        case 0: // FONT_DEFAULT
                         case 1: // FONT_BITMAP
                             {
                                 glyphs[k].image.data = stbtt_GetCodepointBitmap(&fontInfo, scaleFactor, scaleFactor, cp, &cpWidth, &cpHeight, &glyphs[k].offsetX, &glyphs[k].offsetY);
@@ -1293,11 +1294,11 @@ MxFont loadFontFromMemory(const std::string& name, const unsigned char* fileData
 
 
         // Update glyphs[i].image to use alpha, required to be used on ImageDrawText()
-        for (int i = 0; i < font.glyphCount; i++)
-        {
-            free(font.glyphs[i].image.data);
-            // font.glyphs[i].image = ImageFromImage(atlas, font.recs[i]);
-        }
+        // for (int i = 0; i < font.glyphCount; i++)
+        // {
+        //     //free(font.glyphs[i].image.data);
+        //     // font.glyphs[i].image = ImageFromImage(atlas, font.recs[i]);
+        // }
 
         free(atlas.data);
 
@@ -1944,8 +1945,8 @@ namespace mxgui
 
 #include <cstdio>
 
+//#include "rlgl.h"
 #include "raylib.h"
-#include "rlgl.h"
 
 // MxType to Raylib type helper
 inline Vector2 toVector(MxVec2 vec)
@@ -1982,8 +1983,7 @@ inline MxColor toMxColor(Color color)
 
 struct MxFontSpecsInternal
 {
-    Font font{};
-    MxFont font_test{};
+    MxFont font{};
     int size{20};
     int spacing{0};
 };
@@ -2000,17 +2000,17 @@ public:
         {
             codepoints[i] = 32 + i; // ASCII: espaço (32) até ~ (126)
         }
-        Font font = LoadFontFromMemory(".ttf", notosans::data, notosans::size, textSize, codepoints, 95);
+        // Font font = LoadFontFromMemory(".ttf", notosans::data, notosans::size, textSize, codepoints, 95);
         MxFont font_test = loadFontFromMemory(MX_DEFAULT_FONT_ID, notosans::data, notosans::size, textSize, codepoints, 95);
 
         // Default font
         m_fonts[MX_DEFAULT_FONT_ID] = MxFontSpecsInternal{
-            .font = font,
-            .font_test = font_test,
+            //.font = font,
+            .font = font_test,
             .size = textSize,
             .spacing = 0,
         };
-        SetTextureFilter(font.texture, TEXTURE_FILTER_BILINEAR);
+        // SetTextureFilter(font.texture, TEXTURE_FILTER_BILINEAR);
     }
 
     void setupFontAwesome(int iconSize)
@@ -2021,14 +2021,14 @@ public:
         stb_decompress(fontAwesomeData, fa_compressed_data, fa_compressed_size);
 
         int count = sizeof(codepointsFontAwesome) / sizeof(codepointsFontAwesome[0]);
-        Font faFont = LoadFontFromMemory(".otf", fontAwesomeData, arrayOriginalSize, iconSize, codepointsFontAwesome, count);
+        MxFont faFont = loadFontFromMemory("fontAwesome", fontAwesomeData, arrayOriginalSize, iconSize, codepointsFontAwesome, count);
 
         m_fonts[MX_FONT_AWESOME_ID] = MxFontSpecsInternal{
             .font = faFont,
             .size = iconSize,
             .spacing = 0,
         };
-        SetTextureFilter(faFont.texture, TEXTURE_FILTER_BILINEAR);
+        // SetTextureFilter(faFont.texture, TEXTURE_FILTER_BILINEAR);
 #endif
     }
 
@@ -2045,21 +2045,39 @@ public:
 
     void unload()
     {
-        for (auto& [id, fontSpec] : m_fonts)
+        for (auto& [id, fontSpec] : m_fonts) 
         {
-            UnloadFont(fontSpec.font);
+            unloadFont(fontSpec.font);
         }
         m_fonts.clear();
+    }
+
+    void unloadFont(MxFont font)
+    {
+        if (font.glyphs != NULL)
+        {
+            for (int i = 0; i < font.glyphCount; i++)
+            {
+                free(font.glyphs[i].image.data);
+            }
+            free(font.glyphs);
+        }
+
+        unloadTexture(font.texture);
+        free(font.recs);
+
+        TraceLog(LOG_INFO, "MXFONT: Unloaded font data from RAM and VRAM");
+
     }
 
     MxVec2 measureText(const std::string& name, const std::string& text)
     {
         MxFontSpecsInternal font = getFont(name);
-        if (!IsFontValid(font.font))
-        {
-            font.font = GetFontDefault();
-        }
-        return toMxVec2(MeasureTextEx(font.font, text.c_str(), font.size, font.spacing));
+        // if (!IsFontValid(font.font))
+        // {
+        //     font.font = GetFontDefault();
+        // }
+        return measureTextEx(font.font, text.c_str(), font.size, font.spacing);
     }
 
     MxFontSpecsInternal getFont(const std::string& name)
@@ -2131,6 +2149,13 @@ public:
             UnloadTexture(texture);
         }
         m_textures.clear();
+    }
+
+    void unloadTexture(const std::string& textureName)
+    {
+        Texture texture = getTexture(textureName);
+        UnloadTexture(texture);
+        m_textures.erase(textureName);
     }
 
     Texture getTexture(const std::string& textureName)
@@ -2217,6 +2242,11 @@ void loadTextureFromMemory(void* data, int width, int height, int format, int mi
     s_textureManager.loadTextureFromImageData(name, data, width, height, format, mipmapCount);
 }
 
+void unloadTexture(const std::string& texture)
+{
+    s_textureManager.unloadTexture(texture);
+}
+
 MxVec2 getTextureSize(const std::string& textureName)
 {
     return s_textureManager.getSize(textureName);
@@ -2283,12 +2313,13 @@ void drawTextPro(const std::string& fontName, const std::string& text, MxVec2 po
 
     MxFontSpecsInternal font = s_fontManager.getFont(fontName);
 
-    if (!IsFontValid(font.font))
-    {
-        font.font = GetFontDefault();
-    }
+    // if (!IsFontValid(font.font))
+    // {
+    //     font.font = GetFontDefault();
+    // }
 
-    DrawTextPro(font.font, text.c_str(), toVector(position), toVector(origin), rotation, fontSize, spacing, toColor(tint));
+    drawTextEx(font.font, text, position, fontSize, 0, tint);
+    // DrawTextPro(font.font, text.c_str(), toVector(position), toVector(origin), rotation, fontSize, spacing, toColor(tint));
 }
 
 void drawCircle(MxVec2 center, float radius, MxColor color)
@@ -2304,13 +2335,13 @@ void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size)
 
     MxFontSpecsInternal font = s_fontManager.getFont(MX_FONT_AWESOME_ID);
 
-    if (!IsFontValid(font.font))
-    {
-        return;
-    }
+    // if (!IsFontValid(font.font))
+    // {
+    //     return;
+    // }
 
     const int fontSize = (size < 0) ? font.size : size;
-    DrawTextEx(font.font, icon, toVector(position), fontSize, 0, toColor(color));
+    drawTextEx(font.font, icon, position, fontSize, 0, color);
 }
 
 #endif // RAYLIB_BACKEND
@@ -2329,16 +2360,24 @@ static float computeSfmlSizeScale(const sf::Font& font)
 }
 
 
-struct MxFontSpecsInternal
-{
-    sf::Font font{};
-    MxFont font_test{};
-    float sizeScale{1.0f};
-    float size{20};
-};
+// struct MxFontSpecsInternal
+// {
+//     // sf::Font font{};
+//     MxFont font{};
+//     float sizeScale{1.0f};
+//     float size{20};
+// };
 
 static std::unique_ptr<sf::Text> s_text;
 static std::unique_ptr<sf::Sprite> s_sprite;
+
+struct MxFontSpecsInternal
+{
+    MxFont font{};
+    int size{20};
+    int spacing{0};
+};
+
 
 class MxFontManager
 {
@@ -2346,11 +2385,119 @@ public:
 
     void setupDefaultFont(int textSize)
     {
-        sf::Font font;
-        if (!font.openFromMemory(notosans::data, notosans::size))
+        int codepoints[95];
+        for (int i = 0; i < 95; i++)
+        {
+            codepoints[i] = 32 + i; // ASCII: espaço (32) até ~ (126)
+        }
+        // Font font = LoadFontFromMemory(".ttf", notosans::data, notosans::size, textSize, codepoints, 95);
+        MxFont font_test = loadFontFromMemory(MX_DEFAULT_FONT_ID, notosans::data, notosans::size, textSize, codepoints, 95);
+
+        // Default font
+        m_fonts[MX_DEFAULT_FONT_ID] = MxFontSpecsInternal{
+            //.font = font,
+            .font = font_test,
+            .size = textSize,
+            .spacing = 0,
+        };
+        // SetTextureFilter(font.texture, TEXTURE_FILTER_BILINEAR);
+    }
+
+    void setupFontAwesome(int iconSize)
+    {
+#if FONT_AWESOME
+        int arrayOriginalSize = 414704;
+        unsigned char* fontAwesomeData = (unsigned char*)malloc(arrayOriginalSize);
+        stb_decompress(fontAwesomeData, fa_compressed_data, fa_compressed_size);
+
+        int count = sizeof(codepointsFontAwesome) / sizeof(codepointsFontAwesome[0]);
+        MxFont faFont = loadFontFromMemory("fontAwesome", fontAwesomeData, arrayOriginalSize, iconSize, codepointsFontAwesome, count);
+
+        m_fonts[MX_FONT_AWESOME_ID] = MxFontSpecsInternal{
+            .font = faFont,
+            .size = iconSize,
+            .spacing = 0,
+        };
+        // SetTextureFilter(faFont.texture, TEXTURE_FILTER_BILINEAR);
+#endif
+    }
+
+    void init(MxStyle style)
+    {
+        if (m_fonts.size() > 0)
         {
             return;
         }
+
+        setupDefaultFont(style.textSize);
+        setupFontAwesome(style.iconSize);
+    }
+
+    void unload()
+    {
+        for (auto& [id, fontSpec] : m_fonts) 
+        {
+            unloadFont(fontSpec.font);
+        }
+        m_fonts.clear();
+    }
+
+    void unloadFont(MxFont font)
+    {
+        if (font.glyphs != NULL)
+        {
+            for (int i = 0; i < font.glyphCount; i++)
+            {
+                free(font.glyphs[i].image.data);
+            }
+            free(font.glyphs);
+        }
+
+        unloadTexture(font.texture);
+        free(font.recs);
+
+        //TraceLog(LOG_INFO, "MXFONT: Unloaded font data from RAM and VRAM");
+
+    }
+
+    MxVec2 measureText(const std::string& name, const std::string& text)
+    {
+        MxFontSpecsInternal font = getFont(name);
+        // if (!IsFontValid(font.font))
+        // {
+        //     font.font = GetFontDefault();
+        // }
+        return measureTextEx(font.font, text.c_str(), font.size, font.spacing);
+    }
+
+    MxFontSpecsInternal getFont(const std::string& name)
+    {
+        auto it = m_fonts.find(name);
+        if (it != m_fonts.end())
+        {
+            return it->second;
+        }
+
+        return MxFontSpecsInternal{};
+    }
+
+
+private:
+
+    std::unordered_map<std::string, MxFontSpecsInternal> m_fonts{};
+};
+
+/*class MxFontManager
+{
+public:
+
+    void setupDefaultFont(int textSize)
+    {
+        // sf::Font font;
+        // if (!font.openFromMemory(notosans::data, notosans::size))
+        // {
+        //     return;
+        // }
 
         int codepoints[95];
         for (int i = 0; i < 95; i++)
@@ -2358,14 +2505,13 @@ public:
             codepoints[i] = 32 + i; // ASCII: espaço (32) até ~ (126)
         }
 
-        font.setSmooth(true);
-        MxFont font_test = loadFontFromMemory(MX_DEFAULT_FONT_ID, notosans::data, notosans::size, textSize, codepoints, 95);
+        //font.setSmooth(true);
+        MxFont font = loadFontFromMemory(MX_DEFAULT_FONT_ID, notosans::data, notosans::size, textSize, codepoints, 95);
 
         // Default font
         m_fonts[MX_DEFAULT_FONT_ID] = MxFontSpecsInternal{
             .font = font,
-            .font_test = font_test,
-            .sizeScale = computeSfmlSizeScale(font),
+            // .sizeScale = computeSfmlSizeScale(font),
             .size = (float)textSize,
         };
 
@@ -2448,6 +2594,8 @@ private:
     std::unordered_map<std::string, MxFontSpecsInternal> m_fonts{};
 };
 
+*/
+
 class MxTextureManager
 {
 public:
@@ -2457,7 +2605,7 @@ public:
     {
         if (m_textures.size() > 0)
         {
-            //return;
+            // return;
         }
         sf::Texture texture;
         s_sprite = std::make_unique<sf::Sprite>(texture);
@@ -2474,8 +2622,6 @@ public:
 
     void loadTextureFromImageData(const std::string& name, void* data, int width, int height, int mipmaps, int format)
     {
-
-
 
 
         std::vector<std::uint8_t> rgba(static_cast<size_t>(width) * height * 4);
@@ -2506,20 +2652,16 @@ public:
                 }
                 break;
 
-            case 7:
-                memcpy(rgba.data(), src, rgba.size());
-                break;
+            case 7: memcpy(rgba.data(), src, rgba.size()); break;
 
-            default:
-                MX_ASSERT(false, "loadTextureFromImageData: unsupported pixel format for SFML backend");
-                return;
+            default: MX_ASSERT(false, "loadTextureFromImageData: unsupported pixel format for SFML backend"); return;
         }
 
         sf::Image image({static_cast<unsigned int>(width), static_cast<unsigned int>(height)}, rgba.data());
 
 
         sf::Texture texture;
-        //if (texture.loadFromMemory(rgba.data(), width * height))
+        // if (texture.loadFromMemory(rgba.data(), width * height))
         if (texture.loadFromImage(image))
         {
             if (mipmaps > 1)
@@ -2741,6 +2883,11 @@ void loadTexture(const std::filesystem::path& path, const std::string& name)
     s_textureManager.loadTexture(path, name);
 }
 
+void unloadTexture(const std::string& texture)
+{
+    /// s_textureManager.unloadTexture(texture);
+}
+
 void loadTextureFromMemory(void* data, int width, int height, int format, int mipmapCount, const std::string& name)
 {
     s_textureManager.loadTextureFromImageData(name, data, width, height, format, mipmapCount);
@@ -2835,24 +2982,14 @@ void drawTexturePro(const std::string& textureName, MxRect source, MxRect dest, 
 
 void drawTextPro(const std::string& fontName, const std::string& text, MxVec2 position, MxVec2 origin, float rotation, float fontSize, float spacing, MxColor tint)
 {
-    if (!s_text)
-    {
-        MX_ASSERT(s_text, "s_text is not valid");
-        return;
-    }
-    // sf::Text text(font, "Hello SFML", 20);
-    MxFontSpecsInternal font = s_fontManager.getFont(fontName);
-    s_text->setFont(font.font);
-    s_text->setString(text);
-    s_text->setPosition(toVectorF(position));
-    s_text->setOrigin({origin.x, origin.y});
-    s_text->setRotation(sf::degrees(rotation));
-    s_text->setCharacterSize((MxUInt32)(fontSize * font.sizeScale));
-    s_text->setLetterSpacing((spacing + 0.5f));
-    s_text->setFillColor(toColor(tint));
+      MxFontSpecsInternal font = s_fontManager.getFont(fontName);
 
-    MX_ASSERT(s_windowRef, "window not reference");
-    s_windowRef->draw(*s_text);
+    // if (!IsFontValid(font.font))
+    // {
+    //     font.font = GetFontDefault();
+    // }
+
+    drawTextEx(font.font, text, position, fontSize, 0, tint);
 }
 
 void drawCircle(MxVec2 center, float radius, MxColor color)
@@ -2866,29 +3003,60 @@ void drawCircle(MxVec2 center, float radius, MxColor color)
     s_windowRef->draw(s_circleShape);
 }
 
+
+const char *CodepointToUTF8(int codepoint, int *utf8Size)
+{
+    static char utf8[6] = { 0 };
+    memset(utf8, 0, 6); // Clear static array
+    int size = 0;       // Byte size of codepoint
+
+    if (codepoint <= 0x7f)
+    {
+        utf8[0] = (char)codepoint;
+        size = 1;
+    }
+    else if (codepoint <= 0x7ff)
+    {
+        utf8[0] = (char)(((codepoint >> 6) & 0x1f) | 0xc0);
+        utf8[1] = (char)((codepoint & 0x3f) | 0x80);
+        size = 2;
+    }
+    else if (codepoint <= 0xffff)
+    {
+        utf8[0] = (char)(((codepoint >> 12) & 0x0f) | 0xe0);
+        utf8[1] = (char)(((codepoint >>  6) & 0x3f) | 0x80);
+        utf8[2] = (char)((codepoint & 0x3f) | 0x80);
+        size = 3;
+    }
+    else if (codepoint <= 0x10ffff)
+    {
+        utf8[0] = (char)(((codepoint >> 18) & 0x07) | 0xf0);
+        utf8[1] = (char)(((codepoint >> 12) & 0x3f) | 0x80);
+        utf8[2] = (char)(((codepoint >>  6) & 0x3f) | 0x80);
+        utf8[3] = (char)((codepoint & 0x3f) | 0x80);
+        size = 4;
+    }
+
+    *utf8Size = size;
+
+    return utf8;
+}
+
 void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size)
 {
-    if (!s_text)
-    {
-        MX_ASSERT(s_text, "s_text is not valid");
-        return;
-    }
+    // Converte o codepoint pra UTF-8 antes de desenhar
+    int byteCount = 0;
+    const char* icon = CodepointToUTF8(codepoint, &byteCount);
 
     MxFontSpecsInternal font = s_fontManager.getFont(MX_FONT_AWESOME_ID);
 
-    const float fontSize = (size < 0) ? font.size : (float)size;
+    // if (!IsFontValid(font.font))
+    // {
+    //     return;
+    // }
 
-    s_text->setFont(font.font);
-    s_text->setString(sf::String(static_cast<char32_t>(codepoint)));
-    s_text->setPosition(toVectorF(position));
-    s_text->setOrigin({0.f, 0.f});
-    s_text->setRotation(sf::degrees(0.f));
-    s_text->setCharacterSize((MxUInt32)(fontSize * font.sizeScale));
-    s_text->setLetterSpacing(0.5f);
-    s_text->setFillColor(toColor(color));
-
-    MX_ASSERT(s_windowRef, "window not reference");
-    s_windowRef->draw(*s_text);
+    const int fontSize = (size < 0) ? font.size : size;
+    drawTextEx(font.font, icon, position, fontSize, 0, color);
 }
 
 

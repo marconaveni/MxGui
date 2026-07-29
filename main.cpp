@@ -95,7 +95,7 @@ int main()
         mxgui::guiSliderProgress(ctx, MxRect{50, 560, 700, 6}, MxVec2{}, 0.8f);
 
 
-        MxFont font = s_fontManager.getFont(MX_DEFAULT_FONT_ID).font_test;
+        MxFont font = s_fontManager.getFont(MX_DEFAULT_FONT_ID).font;
         drawTextEx(font, "teste", MxVec2{60, 60}, 20, 0, MxColor::Red);
 
 #if RAYLIB_BACKEND
