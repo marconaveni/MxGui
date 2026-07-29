@@ -1,15 +1,21 @@
 
 
-// #define SFML_BACKEND 1
+#define SFML_BACKEND 1
 
 #include <array>
 #include <iostream>
 
 #define MX_GUI_IMPLEMENTATION
-#include <SFML/Graphics.hpp>
-#include <raylib.h>
-
 #include "mxgui.hpp"
+
+
+#if RAYLIB_BACKEND
+#include <raylib.h>
+#elif SFML_BACKEND
+#include <SFML/Graphics.hpp>
+#endif
+
+
 
 
 void testScissor();
@@ -67,7 +73,7 @@ int main()
         {
             std::cout << "clicked" << '\n';
         }
-        mxgui::guiImage(ctx, "nfsu2", MxRect{220, 35, 100, 100}, anchor);
+        // mxgui::guiImage(ctx, "nfsu2", MxRect{220, 35, 100, 100}, anchor);
         mxgui::guiIcon(ctx, MxRect{10, 80, 0, 0}, anchor, ICON_FA_CIRCLE_PLAY);
         if (mxgui::guiIconButton(ctx, MxRect{10, 120, 20, 20}, anchor, ICON_FA_CIRCLE_PLAY, 28))
         {
@@ -87,6 +93,10 @@ int main()
         const float progress = mxgui::guiSlider(ctx, "Slider", MxRect{50, 530, 700, 6}, MxVec2{}, true);
         mxgui::guiLabel(ctx, std::to_string(progress), MxVec2{10, 30});
         mxgui::guiSliderProgress(ctx, MxRect{50, 560, 700, 6}, MxVec2{}, 0.8f);
+
+
+        MxFont font = s_fontManager.getFont(MX_DEFAULT_FONT_ID).font_test;
+        drawTextEx(font, "teste", MxVec2{60, 60}, 20, 0, MxColor::Red);
 
 #if RAYLIB_BACKEND
         DrawFPS(10, 10);

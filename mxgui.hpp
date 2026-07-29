@@ -37,7 +37,7 @@
 #define MX_BAR_SIZE 6
 
 #define FONT_AWESOME 1
-#define RAYLIB_BACKEND 1
+// #define RAYLIB_BACKEND 1
 // #define SFML_BACKEND 1
 // #define CUSTOM_BACKEND 1
 
@@ -437,6 +437,8 @@ void closeManagers();
 
 // misc
 void loadTexture(const std::filesystem::path& path, const std::string& name);
+void loadTextureFromMemory(void* data, int width, int height, int format, int mipmapCount, const std::string& name);
+
 MxVec2 getTextureSize(const std::string& textureName);
 MxVec2 measureText(const std::string& name, const std::string& text);
 
@@ -596,13 +598,261 @@ struct MxGlyphInfo
 // Font, font texture and GlyphInfo array data
 struct MxFont
 {
-    int baseSize{0};              // Base size (default chars height)
-    int glyphCount{0};            // Number of glyph characters
-    int glyphPadding{0};          // Padding around the glyph characters
-    MxTexture texture{};          // Texture atlas containing the glyphs
+    int baseSize{0};     // Base size (default chars height)
+    int glyphCount{0};   // Number of glyph characters
+    int glyphPadding{0}; // Padding around the glyph characters
+    // MxTexture texture{};          // Texture atlas containing the glyphs
+    std::string texture{};        // Texture atlas containing the glyphs
     MxRect* recs{nullptr};        // Rectangles in texture for the glyphs
     MxGlyphInfo* glyphs{nullptr}; // Glyphs info data
 };
+
+
+//-----------------------------------------------------------------------------
+// (SECTION) Draw Text Funtions
+// Note: The code is initially the same code as text.c "raylib", to validate it and have something functional.
+// Todo: adapt as necessary to make it work and optimize it for mxgui.
+//-----------------------------------------------------------------------------
+
+
+int getCodepointNext(const char* text, int* codepointSize)
+{
+    const char* ptr = text;
+    int codepoint = 0x3f; // Codepoint (defaults to '?')
+    *codepointSize = 1;
+    if (text == NULL)
+    {
+        return codepoint;
+    }
+
+    // Get current codepoint and bytes processed
+    if (0xf0 == (0xf8 & ptr[0]))
+    {
+        // 4 byte UTF-8 codepoint
+        if (((ptr[1] & 0xC0) ^ 0x80) || ((ptr[2] & 0xC0) ^ 0x80) || ((ptr[3] & 0xC0) ^ 0x80))
+        {
+            return codepoint;
+        } // 10xxxxxx checks
+        codepoint = ((0x07 & ptr[0]) << 18) | ((0x3f & ptr[1]) << 12) | ((0x3f & ptr[2]) << 6) | (0x3f & ptr[3]);
+        *codepointSize = 4;
+    }
+    else if (0xe0 == (0xf0 & ptr[0]))
+    {
+        // 3 byte UTF-8 codepoint */
+        if (((ptr[1] & 0xC0) ^ 0x80) || ((ptr[2] & 0xC0) ^ 0x80))
+        {
+            return codepoint;
+        } // 10xxxxxx checks
+        codepoint = ((0x0f & ptr[0]) << 12) | ((0x3f & ptr[1]) << 6) | (0x3f & ptr[2]);
+        *codepointSize = 3;
+    }
+    else if (0xc0 == (0xe0 & ptr[0]))
+    {
+        // 2 byte UTF-8 codepoint
+        if ((ptr[1] & 0xC0) ^ 0x80)
+        {
+            return codepoint;
+        } // 10xxxxxx checks
+        codepoint = ((0x1f & ptr[0]) << 6) | (0x3f & ptr[1]);
+        *codepointSize = 2;
+    }
+    else if (0x00 == (0x80 & ptr[0]))
+    {
+        // 1 byte UTF-8 codepoint
+        codepoint = ptr[0];
+        *codepointSize = 1;
+    }
+
+    return codepoint;
+}
+
+int getGlyphIndex(MxFont font, int codepoint)
+{
+    int index = 0;
+    // if (!IsFontValid(font)) return index;
+
+    int fallbackIndex = 0; // Get index of fallback glyph '?'
+
+    // Look for character index in the unordered charset
+    for (int i = 0; i < font.glyphCount; i++)
+    {
+        if (font.glyphs[i].value == 63)
+        {
+            fallbackIndex = i;
+        }
+
+        if (font.glyphs[i].value == codepoint)
+        {
+            index = i;
+            break;
+        }
+    }
+
+    if ((index == 0) && (font.glyphs[0].value != codepoint))
+    {
+        index = fallbackIndex;
+    }
+
+
+    return index;
+}
+
+void drawTextCodepoint(MxFont font, int codepoint, MxVec2 position, float fontSize, MxColor tint)
+{
+    // Character index position in sprite font
+    // NOTE: In case a codepoint is not available in the font, index returned points to '?'
+    int index = getGlyphIndex(font, codepoint);
+    float scaleFactor = fontSize / font.baseSize; // Character quad scaling factor
+
+    // Character destination rectangle on screen
+    // NOTE: Considering glyph padding on drawing
+    MxRect dstRec = {position.x + font.glyphs[index].offsetX * scaleFactor - (float)font.glyphPadding * scaleFactor,
+                     position.y + font.glyphs[index].offsetY * scaleFactor - (float)font.glyphPadding * scaleFactor,
+                     (font.recs[index].width + 2.0f * font.glyphPadding) * scaleFactor,
+                     (font.recs[index].height + 2.0f * font.glyphPadding) * scaleFactor};
+
+    // Character source rectangle from font texture atlas
+    // NOTE: Considering glyphs padding when drawing, it could be required for outline/glow shader effects
+    MxRect srcRec = {font.recs[index].x - (float)font.glyphPadding, font.recs[index].y - (float)font.glyphPadding, font.recs[index].width + 2.0f * font.glyphPadding, font.recs[index].height + 2.0f * font.glyphPadding};
+
+    // Draw the character texture on the screen
+    drawTexturePro(font.texture, srcRec, dstRec, MxVec2{0, 0}, 0.0f, tint);
+}
+
+void drawTextEx(MxFont font, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint)
+{
+
+    // if (font.texture.id == 0) // Security check in case of not valid font
+    // {
+    //     return;
+    // }
+
+
+    // int size = TextLength(text);    // Total size in bytes of the text, scanned by codepoints in loop
+    int size = text.length(); // Total size in bytes of the text, scanned by codepoints in loop
+
+    float textOffsetY = 0;    // Offset between lines (on linebreak '\n')
+    float textOffsetX = 0.0f; // Offset X to next character to draw
+
+    float scaleFactor = fontSize / font.baseSize; // Character quad scaling factor
+
+    for (int i = 0; i < size;)
+    {
+        // Get next codepoint from byte string and glyph index in font
+        int codepointByteCount = 0;
+        int codepoint = getCodepointNext(&text[i], &codepointByteCount);
+        int index = getGlyphIndex(font, codepoint);
+
+        if (codepoint == '\n')
+        {
+            const float textLineSpacing = 0.0f;
+            // NOTE: Line spacing is a global variable, use SetTextLineSpacing() to setup
+            textOffsetY += (fontSize + textLineSpacing);
+            textOffsetX = 0.0f;
+        }
+        else
+        {
+            if ((codepoint != ' ') && (codepoint != '\t'))
+            {
+                drawTextCodepoint(font, codepoint, MxVec2{position.x + textOffsetX, position.y + textOffsetY}, fontSize, tint);
+            }
+
+            if (font.glyphs[index].advanceX == 0)
+            {
+                textOffsetX += ((float)font.recs[index].width * scaleFactor + spacing);
+            }
+            else
+            {
+                textOffsetX += ((float)font.glyphs[index].advanceX * scaleFactor + spacing);
+            }
+        }
+
+        i += codepointByteCount; // Move text bytes counter to next codepoint
+    }
+}
+
+
+MxVec2 measureTextEx(MxFont font, const std::string& text, float fontSize, float spacing)
+{
+    MxVec2 textSize{};
+
+    if (font.texture.empty())
+    {
+        return textSize; // Security check
+    }
+
+    int size = text.length(); // Get size in bytes of text
+    int tempByteCounter = 0;  // Used to count longer text line num chars
+    int byteCounter = 0;
+
+    float textWidth = 0.0f;
+    float tempTextWidth = 0.0f; // Used to count longer text line width
+
+    float textHeight = fontSize;
+    float scaleFactor = fontSize / (float)font.baseSize;
+
+    int letter = 0; // Current character
+    int index = 0;  // Index position in sprite font
+
+    for (int i = 0; i < size;)
+    {
+        byteCounter++;
+
+        int codepointByteCount = 0;
+        letter = getCodepointNext(&text[i], &codepointByteCount);
+        index = getGlyphIndex(font, letter);
+
+        i += codepointByteCount;
+
+        if (letter != '\n')
+        {
+            if (font.glyphs[index].advanceX > 0)
+            {
+                textWidth += font.glyphs[index].advanceX;
+            }
+            else
+            {
+                textWidth += (font.recs[index].width + font.glyphs[index].offsetX);
+            }
+        }
+        else
+        {
+            if (tempTextWidth < textWidth)
+            {
+                tempTextWidth = textWidth;
+            }
+            byteCounter = 0;
+            textWidth = 0;
+
+            const float textLineSpacing = 0.0f;
+            // NOTE: Line spacing is a global variable, use SetTextLineSpacing() to setup
+            textHeight += (fontSize + textLineSpacing);
+        }
+
+        if (tempByteCounter < byteCounter)
+        {
+            tempByteCounter = byteCounter;
+        }
+    }
+
+    if (tempTextWidth < textWidth)
+    {
+        tempTextWidth = textWidth;
+    }
+
+    textSize.x = tempTextWidth * scaleFactor + (float)((tempByteCounter - 1) * spacing);
+    textSize.y = textHeight;
+
+    return textSize;
+}
+
+
+//-----------------------------------------------------------------------------
+// (SECTION) LoadFontData
+// Note: The code is initially the same as text.c, to validate it and have something functional.
+// Todo: adapt as necessary to make it work and optimize it for mxgui.
+//-----------------------------------------------------------------------------
+
 
 #define FONT_ATLAS_CORNER_REC_SIZE 3     // Size of white rectangle drawn on font atlas on font loading
 #define FONT_TTF_DEFAULT_CHARS_PADDING 4 // TTF font generation default glyphs padding
@@ -611,8 +861,8 @@ struct MxFont
 #define FONT_SDF_PIXEL_DIST_SCALE 64.0f  // SDF font generation pixel distance scale
 #define FONT_BITMAP_ALPHA_THRESHOLD 80   // Bitmap (B&W) font generation alpha threshold
 
-MxFont loadFontFromMemory(const unsigned char* fileData, int dataSize, int fontSize, const int* codepoints, int codepointCount);
-MxGlyphInfo* loadFontData(const unsigned char* fileData, int dataSize, int fontSize, const int* codepoints, int codepointCount, int type, int* glyphCount);
+// MxFont loadFontFromMemory(const unsigned char* fileData, int dataSize, int fontSize, const int* codepoints, int codepointCount);
+// MxGlyphInfo* loadFontData(const unsigned char* fileData, int dataSize, int fontSize, const int* codepoints, int codepointCount, int type, int* glyphCount);
 
 // Load font data for further use
 // NOTE: Requires TTF font memory data and can generate SDF data
@@ -651,7 +901,7 @@ MxGlyphInfo* loadFontData(const unsigned char* fileData, int dataSize, int fontS
             // NOTE: By default filling glyphCount consecutively, starting at 32 (Space)
             if (requiredCodepoints == NULL)
             {
-                requiredCodepoints = (int*)RL_MALLOC(codepointCount * sizeof(int));
+                requiredCodepoints = (int*)malloc(codepointCount * sizeof(int));
                 for (int i = 0; i < codepointCount; i++)
                 {
                     requiredCodepoints[i] = i + 32;
@@ -695,13 +945,13 @@ MxGlyphInfo* loadFontData(const unsigned char* fileData, int dataSize, int fontS
 
                     switch (type)
                     {
-                        case FONT_DEFAULT:
-                        case FONT_BITMAP:
+                        case 0: //FONT_DEFAULT
+                        case 1: // FONT_BITMAP
                             {
                                 glyphs[k].image.data = stbtt_GetCodepointBitmap(&fontInfo, scaleFactor, scaleFactor, cp, &cpWidth, &cpHeight, &glyphs[k].offsetX, &glyphs[k].offsetY);
                             }
                             break;
-                        case FONT_SDF:
+                        case 2: // FONT_SDF
                             {
                                 if (cp != 32)
                                 {
@@ -719,7 +969,7 @@ MxGlyphInfo* loadFontData(const unsigned char* fileData, int dataSize, int fontS
                         glyphs[k].advanceX = (int)((float)glyphs[k].advanceX * scaleFactor);
 
                         // WARNING: If requested SDF font, sdf-glyph height is definitely bigger than fontSize due to FONT_SDF_CHAR_PADDING
-                        if ((type != FONT_SDF) && (cpHeight > fontSize))
+                        if ((type != 2) && (cpHeight > fontSize))
                         {
                             // TRACELOG(LOG_WARNING, "FONT: [0x%04x] Glyph height is bigger than requested font size: %i > %i", cp, cpHeight, (int)fontSize);
                         }
@@ -746,7 +996,7 @@ MxGlyphInfo* loadFontData(const unsigned char* fileData, int dataSize, int fontS
                         // Only allocate space image if required
                         if (glyphs[k].advanceX > 0)
                         {
-                            imSpace.data = RL_CALLOC(glyphs[k].advanceX * fontSize, 1);
+                            imSpace.data = calloc(glyphs[k].advanceX * fontSize, 1);
                         }
                         else
                         {
@@ -756,7 +1006,7 @@ MxGlyphInfo* loadFontData(const unsigned char* fileData, int dataSize, int fontS
                         glyphs[k].image = imSpace;
                     }
 
-                    if (type == FONT_BITMAP)
+                    if (type == 1)
                     {
                         // Aliased bitmap (black & white) font generation, avoiding anti-aliasing
                         // NOTE: For optimum results, bitmap font should be generated at base pixel size
@@ -820,7 +1070,7 @@ MxImage genImageFontAtlas(const MxGlyphInfo* glyphs, MxRect** glyphRecs, int gly
     glyphCount = (glyphCount > 0) ? glyphCount : 95;
 
     // NOTE: MxRects memory is loaded here!
-    MxRect* recs = (MxRect*)RL_MALLOC(glyphCount * sizeof(MxRect));
+    MxRect* recs = (MxRect*)malloc(glyphCount * sizeof(MxRect));
 
     // Calculate image size based on total glyph width and glyph row count
     int totalWidth = 0;
@@ -888,7 +1138,7 @@ MxImage genImageFontAtlas(const MxGlyphInfo* glyphs, MxRect** glyphRecs, int gly
                     // Update atlas size to fit all characters
                     int updatedAtlasHeight = atlas.height * 2;
                     int updatedAtlasDataSize = atlas.width * updatedAtlasHeight;
-                    unsigned char* updatedAtlasData = (unsigned char*)RL_CALLOC(updatedAtlasDataSize, 1);
+                    unsigned char* updatedAtlasData = (unsigned char*)calloc(updatedAtlasDataSize, 1);
 
                     memcpy(updatedAtlasData, atlas.data, atlasDataSize);
                     free(atlas.data);
@@ -926,11 +1176,11 @@ MxImage genImageFontAtlas(const MxGlyphInfo* glyphs, MxRect** glyphRecs, int gly
     }
     else if (packMethod == 1) // Use Skyline rect packing algorithm (stb_pack_rect)
     {
-        stbrp_context* context = (stbrp_context*)RL_MALLOC(sizeof(*context));
-        stbrp_node* nodes = (stbrp_node*)RL_MALLOC(glyphCount * sizeof(*nodes));
+        stbrp_context* context = (stbrp_context*)malloc(sizeof(*context));
+        stbrp_node* nodes = (stbrp_node*)malloc(glyphCount * sizeof(*nodes));
 
         stbrp_init_target(context, atlas.width, atlas.height, nodes, glyphCount);
-        stbrp_rect* rects = (stbrp_rect*)RL_MALLOC(glyphCount * sizeof(stbrp_rect));
+        stbrp_rect* rects = (stbrp_rect*)malloc(glyphCount * sizeof(stbrp_rect));
 
         // Fill rectangles for packaging
         for (int i = 0; i < glyphCount; i++)
@@ -995,7 +1245,7 @@ MxImage genImageFontAtlas(const MxGlyphInfo* glyphs, MxRect** glyphRecs, int gly
     }
 
     // Convert image data from GRAYSCALE to GRAY_ALPHA
-    unsigned char* dataGrayAlpha = (unsigned char*)RL_MALLOC(atlas.width * atlas.height * sizeof(unsigned char) * 2); // Two channels
+    unsigned char* dataGrayAlpha = (unsigned char*)malloc(atlas.width * atlas.height * sizeof(unsigned char) * 2); // Two channels
 
     for (int i = 0, k = 0; i < atlas.width * atlas.height; i++, k += 2)
     {
@@ -1005,22 +1255,21 @@ MxImage genImageFontAtlas(const MxGlyphInfo* glyphs, MxRect** glyphRecs, int gly
 
     free(atlas.data);
     atlas.data = dataGrayAlpha;
-    atlas.format = PIXELFORMAT_UNCOMPRESSED_GRAY_ALPHA;
+    atlas.format = 2; // PIXELFORMAT_UNCOMPRESSED_GRAY_ALPHA;
 
     *glyphRecs = recs;
 
     return atlas;
 }
 
-#include "rlgl.h"
 
-MxFont loadFontFromMemory(const unsigned char* fileData, int dataSize, int fontSize, const int* codepoints, int codepointCount)
+MxFont loadFontFromMemory(const std::string& name, const unsigned char* fileData, int dataSize, int fontSize, const int* codepoints, int codepointCount)
 {
     MxFont font{};
 
     font.baseSize = fontSize;
     font.glyphPadding = 0;
-    font.glyphs = loadFontData(fileData, dataSize, font.baseSize, codepoints, (codepointCount > 0) ? codepointCount : 95, FONT_DEFAULT, &font.glyphCount);
+    font.glyphs = loadFontData(fileData, dataSize, font.baseSize, codepoints, (codepointCount > 0) ? codepointCount : 95, 0, &font.glyphCount);
 
 
     if (font.glyphs != NULL)
@@ -1030,16 +1279,17 @@ MxFont loadFontFromMemory(const unsigned char* fileData, int dataSize, int fontS
         MxImage atlas = genImageFontAtlas(font.glyphs, &font.recs, font.glyphCount, font.baseSize, font.glyphPadding, 0);
 
 
-        //font.texture = LoadTextureFromImage(atlas); //
+        // font.texture = LoadTextureFromImage(atlas); //
         if ((atlas.width != 0) && (atlas.height != 0))
         {
-            font.texture.id = rlLoadTexture(atlas.data, atlas.width, atlas.height, atlas.format, atlas.mipmaps);
-            font.texture.width = atlas.width;
-            font.texture.height = atlas.height;
-            font.texture.mipmaps = atlas.mipmaps;
-            font.texture.format = atlas.format;
+            loadTextureFromMemory(atlas.data, atlas.width, atlas.height, atlas.mipmaps, atlas.format, name);
+            font.texture = name;
+            // font.texture.id = rlLoadTexture(atlas.data, atlas.width, atlas.height, atlas.format, atlas.mipmaps);
+            // font.texture.width = atlas.width;
+            // font.texture.height = atlas.height;
+            // font.texture.mipmaps = atlas.mipmaps;
+            // font.texture.format = atlas.format;
         }
-
 
 
         // Update glyphs[i].image to use alpha, required to be used on ImageDrawText()
@@ -1695,6 +1945,7 @@ namespace mxgui
 #include <cstdio>
 
 #include "raylib.h"
+#include "rlgl.h"
 
 // MxType to Raylib type helper
 inline Vector2 toVector(MxVec2 vec)
@@ -1732,6 +1983,7 @@ inline MxColor toMxColor(Color color)
 struct MxFontSpecsInternal
 {
     Font font{};
+    MxFont font_test{};
     int size{20};
     int spacing{0};
 };
@@ -1749,11 +2001,12 @@ public:
             codepoints[i] = 32 + i; // ASCII: espaço (32) até ~ (126)
         }
         Font font = LoadFontFromMemory(".ttf", notosans::data, notosans::size, textSize, codepoints, 95);
-        MxFont font_test = loadFontFromMemory(notosans::data, notosans::size, textSize, codepoints, 95);
+        MxFont font_test = loadFontFromMemory(MX_DEFAULT_FONT_ID, notosans::data, notosans::size, textSize, codepoints, 95);
 
         // Default font
         m_fonts[MX_DEFAULT_FONT_ID] = MxFontSpecsInternal{
             .font = font,
+            .font_test = font_test,
             .size = textSize,
             .spacing = 0,
         };
@@ -1959,6 +2212,11 @@ void loadTexture(const std::filesystem::path& path, const std::string& name)
     s_textureManager.loadTexture(path, name);
 }
 
+void loadTextureFromMemory(void* data, int width, int height, int format, int mipmapCount, const std::string& name)
+{
+    s_textureManager.loadTextureFromImageData(name, data, width, height, format, mipmapCount);
+}
+
 MxVec2 getTextureSize(const std::string& textureName)
 {
     return s_textureManager.getSize(textureName);
@@ -2074,6 +2332,7 @@ static float computeSfmlSizeScale(const sf::Font& font)
 struct MxFontSpecsInternal
 {
     sf::Font font{};
+    MxFont font_test{};
     float sizeScale{1.0f};
     float size{20};
 };
@@ -2093,12 +2352,19 @@ public:
             return;
         }
 
+        int codepoints[95];
+        for (int i = 0; i < 95; i++)
+        {
+            codepoints[i] = 32 + i; // ASCII: espaço (32) até ~ (126)
+        }
 
         font.setSmooth(true);
+        MxFont font_test = loadFontFromMemory(MX_DEFAULT_FONT_ID, notosans::data, notosans::size, textSize, codepoints, 95);
 
         // Default font
         m_fonts[MX_DEFAULT_FONT_ID] = MxFontSpecsInternal{
             .font = font,
+            .font_test = font_test,
             .sizeScale = computeSfmlSizeScale(font),
             .size = (float)textSize,
         };
@@ -2191,7 +2457,7 @@ public:
     {
         if (m_textures.size() > 0)
         {
-            return;
+            //return;
         }
         sf::Texture texture;
         s_sprite = std::make_unique<sf::Sprite>(texture);
@@ -2208,8 +2474,53 @@ public:
 
     void loadTextureFromImageData(const std::string& name, void* data, int width, int height, int mipmaps, int format)
     {
+
+
+
+
+        std::vector<std::uint8_t> rgba(static_cast<size_t>(width) * height * 4);
+        const unsigned char* src = static_cast<const unsigned char*>(data);
+
+        switch (format)
+        {
+            case 2:
+                for (int i = 0; i < width * height; i++)
+                {
+                    unsigned char gray = src[i * 2 + 0];
+                    unsigned char alpha = src[i * 2 + 1];
+                    rgba[i * 4 + 0] = gray;
+                    rgba[i * 4 + 1] = gray;
+                    rgba[i * 4 + 2] = gray;
+                    rgba[i * 4 + 3] = alpha;
+                }
+                break;
+
+            case 1:
+                for (int i = 0; i < width * height; i++)
+                {
+                    unsigned char gray = src[i];
+                    rgba[i * 4 + 0] = gray;
+                    rgba[i * 4 + 1] = gray;
+                    rgba[i * 4 + 2] = gray;
+                    rgba[i * 4 + 3] = 255;
+                }
+                break;
+
+            case 7:
+                memcpy(rgba.data(), src, rgba.size());
+                break;
+
+            default:
+                MX_ASSERT(false, "loadTextureFromImageData: unsupported pixel format for SFML backend");
+                return;
+        }
+
+        sf::Image image({static_cast<unsigned int>(width), static_cast<unsigned int>(height)}, rgba.data());
+
+
         sf::Texture texture;
-        if (texture.loadFromMemory(data, width * height))
+        //if (texture.loadFromMemory(rgba.data(), width * height))
+        if (texture.loadFromImage(image))
         {
             if (mipmaps > 1)
             {
@@ -2428,6 +2739,11 @@ void closeManagers()
 void loadTexture(const std::filesystem::path& path, const std::string& name)
 {
     s_textureManager.loadTexture(path, name);
+}
+
+void loadTextureFromMemory(void* data, int width, int height, int format, int mipmapCount, const std::string& name)
+{
+    s_textureManager.loadTextureFromImageData(name, data, width, height, format, mipmapCount);
 }
 
 MxVec2 getTextureSize(const std::string& textureName)
