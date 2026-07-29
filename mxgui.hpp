@@ -604,7 +604,6 @@ struct MxFont
     int baseSize{0};     // Base size (default chars height)
     int glyphCount{0};   // Number of glyph characters
     int glyphPadding{0}; // Padding around the glyph characters
-    // MxTexture texture{};          // Texture atlas containing the glyphs
     std::string texture{};        // Texture atlas containing the glyphs
     MxRect* recs{nullptr};        // Rectangles in texture for the glyphs
     MxGlyphInfo* glyphs{nullptr}; // Glyphs info data
@@ -1055,7 +1054,7 @@ MxGlyphInfo* loadFontData(const unsigned char* fileData, int fontSize, const int
 }
 
 
-MxImage genImageFontAtlas(const MxGlyphInfo* glyphs, MxRect** glyphRecs, int glyphCount, int fontSize, int padding, int packMethod)
+MxImage genImageFontAtlas(const MxGlyphInfo* glyphs, MxRect** glyphRecs, int glyphCount, int fontSize, int padding)
 {
     MxImage atlas{};
 
@@ -1114,122 +1113,67 @@ MxImage genImageFontAtlas(const MxGlyphInfo* glyphs, MxRect** glyphRecs, int gly
     // DEBUG: View padding in the generated image setting a gray background...
     // for (int i = 0; i < atlas.width*atlas.height; i++) ((unsigned char *)atlas.data)[i] = 100;
 
-    if (packMethod == 0) // Use basic packing algorithm
+    // Use basic packing algorithm
+
+    int offsetX = padding;
+    int offsetY = padding;
+
+    // NOTE: Using simple packaging, one char after another
+    for (int i = 0; i < glyphCount; i++)
     {
-        int offsetX = padding;
-        int offsetY = padding;
-
-        // NOTE: Using simple packaging, one char after another
-        for (int i = 0; i < glyphCount; i++)
+        // Check remaining space for glyph
+        if (offsetX >= (atlas.width - glyphs[i].image.width - 2 * padding))
         {
-            // Check remaining space for glyph
-            if (offsetX >= (atlas.width - glyphs[i].image.width - 2 * padding))
+            offsetX = padding;
+
+            // NOTE: Be careful on offsetY for SDF fonts, by default SDF
+            // use an internal padding of 4 pixels, it means char rectangle
+            // height is bigger than fontSize, it could be up to (fontSize + 8)
+            offsetY += (fontSize + 2 * padding);
+
+            if (offsetY > (atlas.height - fontSize - padding))
             {
-                offsetX = padding;
+                // TRACELOG(LOG_WARNING, "FONT: Updating atlas size to fit all characters");
 
-                // NOTE: Be careful on offsetY for SDF fonts, by default SDF
-                // use an internal padding of 4 pixels, it means char rectangle
-                // height is bigger than fontSize, it could be up to (fontSize + 8)
-                offsetY += (fontSize + 2 * padding);
+                // Update atlas size to fit all characters
+                int updatedAtlasHeight = atlas.height * 2;
+                int updatedAtlasDataSize = atlas.width * updatedAtlasHeight;
+                unsigned char* updatedAtlasData = (unsigned char*)calloc(updatedAtlasDataSize, 1);
 
-                if (offsetY > (atlas.height - fontSize - padding))
-                {
-                    // TRACELOG(LOG_WARNING, "FONT: Updating atlas size to fit all characters");
-
-                    // Update atlas size to fit all characters
-                    int updatedAtlasHeight = atlas.height * 2;
-                    int updatedAtlasDataSize = atlas.width * updatedAtlasHeight;
-                    unsigned char* updatedAtlasData = (unsigned char*)calloc(updatedAtlasDataSize, 1);
-
-                    memcpy(updatedAtlasData, atlas.data, atlasDataSize);
-                    free(atlas.data);
-                    atlas.data = updatedAtlasData;
-                    atlas.height = updatedAtlasHeight;
-                    atlasDataSize = updatedAtlasDataSize;
-                }
+                memcpy(updatedAtlasData, atlas.data, atlasDataSize);
+                free(atlas.data);
+                atlas.data = updatedAtlasData;
+                atlas.height = updatedAtlasHeight;
+                atlasDataSize = updatedAtlasDataSize;
             }
-
-            // Copy pixel data from glyph image to atlas
-            for (int y = 0; y < glyphs[i].image.height; y++)
-            {
-                for (int x = 0; x < glyphs[i].image.width; x++)
-                {
-                    int destX = offsetX + x;
-                    int destY = offsetY + y;
-
-                    // Security: check both lower and upper bounds
-                    if ((destX >= 0) && (destX < atlas.width) && (destY >= 0) && (destY < atlas.height))
-                    {
-                        ((unsigned char*)atlas.data)[destY * atlas.width + destX] = ((unsigned char*)glyphs[i].image.data)[y * glyphs[i].image.width + x];
-                    }
-                }
-            }
-
-            // Fill chars rectangles in atlas info
-            recs[i].x = (float)offsetX;
-            recs[i].y = (float)offsetY;
-            recs[i].width = (float)glyphs[i].image.width;
-            recs[i].height = (float)glyphs[i].image.height;
-
-            // Move atlas position X for next character drawing
-            offsetX += (glyphs[i].image.width + 2 * padding);
         }
+
+        // Copy pixel data from glyph image to atlas
+        for (int y = 0; y < glyphs[i].image.height; y++)
+        {
+            for (int x = 0; x < glyphs[i].image.width; x++)
+            {
+                int destX = offsetX + x;
+                int destY = offsetY + y;
+
+                // Security: check both lower and upper bounds
+                if ((destX >= 0) && (destX < atlas.width) && (destY >= 0) && (destY < atlas.height))
+                {
+                    ((unsigned char*)atlas.data)[destY * atlas.width + destX] = ((unsigned char*)glyphs[i].image.data)[y * glyphs[i].image.width + x];
+                }
+            }
+        }
+
+        // Fill chars rectangles in atlas info
+        recs[i].x = (float)offsetX;
+        recs[i].y = (float)offsetY;
+        recs[i].width = (float)glyphs[i].image.width;
+        recs[i].height = (float)glyphs[i].image.height;
+
+        // Move atlas position X for next character drawing
+        offsetX += (glyphs[i].image.width + 2 * padding);
     }
-    else if (packMethod == 1) // Use Skyline rect packing algorithm (stb_pack_rect)
-    {
-        stbrp_context* context = (stbrp_context*)malloc(sizeof(*context));
-        stbrp_node* nodes = (stbrp_node*)malloc(glyphCount * sizeof(*nodes));
 
-        stbrp_init_target(context, atlas.width, atlas.height, nodes, glyphCount);
-        stbrp_rect* rects = (stbrp_rect*)malloc(glyphCount * sizeof(stbrp_rect));
-
-        // Fill rectangles for packaging
-        for (int i = 0; i < glyphCount; i++)
-        {
-            rects[i].id = i;
-            rects[i].w = glyphs[i].image.width + 2 * padding;
-            rects[i].h = glyphs[i].image.height + 2 * padding;
-        }
-
-        // Package rectangles into atlas
-        stbrp_pack_rects(context, rects, glyphCount);
-
-        for (int i = 0; i < glyphCount; i++)
-        {
-            // It returns char rectangles in atlas
-            recs[i].x = rects[i].x + (float)padding;
-            recs[i].y = rects[i].y + (float)padding;
-            recs[i].width = (float)glyphs[i].image.width;
-            recs[i].height = (float)glyphs[i].image.height;
-
-            if (rects[i].was_packed)
-            {
-                // Copy pixel data from fc.data to atlas
-                for (int y = 0; y < glyphs[i].image.height; y++)
-                {
-                    for (int x = 0; x < glyphs[i].image.width; x++)
-                    {
-                        int destX = rects[i].x + padding + x;
-                        int destY = rects[i].y + padding + y;
-
-                        // Security fix: check both lower and upper bounds
-                        if (destX >= 0 && destX < atlas.width && destY >= 0 && destY < atlas.height)
-                        {
-                            ((unsigned char*)atlas.data)[destY * atlas.width + destX] = ((unsigned char*)glyphs[i].image.data)[y * glyphs[i].image.width + x];
-                        }
-                    }
-                }
-            }
-            else
-            {
-                // TRACELOG(LOG_WARNING, "FONT: Failed to package glyph (0x%02x)", glyphs[i].value);
-            }
-        }
-
-        free(rects);
-        free(nodes);
-        free(context);
-    }
 
     // Add a 3x3 white rectangle at the bottom-right corner of the generated atlas,
     // useful to use as the white texture to draw shapes with raylib
@@ -1269,7 +1213,6 @@ MxFont loadFontFromMemory(const std::string& name, const unsigned char* fileData
     MxFont font{};
 
     font.baseSize = fontSize;
-    font.glyphPadding = 0;
     font.glyphs = loadFontData(fileData, font.baseSize, codepoints, (codepointCount > 0) ? codepointCount : 95, 0, &font.glyphCount);
 
 
@@ -1277,7 +1220,7 @@ MxFont loadFontFromMemory(const std::string& name, const unsigned char* fileData
     {
         font.glyphPadding = FONT_TTF_DEFAULT_CHARS_PADDING;
 
-        MxImage atlas = genImageFontAtlas(font.glyphs, &font.recs, font.glyphCount, font.baseSize, font.glyphPadding, 0);
+        MxImage atlas = genImageFontAtlas(font.glyphs, &font.recs, font.glyphCount, font.baseSize, font.glyphPadding);
 
 
         // font.texture = LoadTextureFromImage(atlas); //
@@ -2005,7 +1948,7 @@ public:
         //                                   (name,                    fileData,                 dataSize,                fontSize, const int* codepoints, int codepointCount)
         MxFont font_test = loadFontFromMemory(MX_DEFAULT_FONT_ID, notosans::data, textSize, codepoints, 95);
 
-       // LoadFontFromMemory()
+        // LoadFontFromMemory()
 
         // Default font
         m_fonts[MX_DEFAULT_FONT_ID] = MxFontSpecsInternal{
