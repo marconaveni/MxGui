@@ -1,6 +1,6 @@
 
 
- #define SFML_BACKEND 1
+ // #define SFML_BACKEND 1
 
 #include <array>
 #include <iostream>
@@ -73,7 +73,7 @@ int main()
         {
             std::cout << "clicked" << '\n';
         }
-        // mxgui::guiImage(ctx, "nfsu2", MxRect{220, 35, 100, 100}, anchor);
+        mxgui::guiImage(ctx, "nfsu2", MxRect{220, 35, 100, 100}, anchor);
         mxgui::guiIcon(ctx, MxRect{10, 80, 0, 0}, anchor, ICON_FA_CIRCLE_PLAY);
         if (mxgui::guiIconButton(ctx, MxRect{10, 120, 20, 20}, anchor, ICON_FA_CIRCLE_PLAY, 28))
         {

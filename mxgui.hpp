@@ -51,6 +51,8 @@
 #include <string>
 #include <type_traits>
 
+#include "string.h"
+
 
 #ifdef CUSTOM_BACKEND
 #undef RAYLIB_BACKEND
@@ -385,7 +387,10 @@ namespace mxgui
 void nativeInit();
 MxTextureNative nativeLoadTexture(const std::filesystem::path& path);
 MxTextureNative nativeLoadTextureFromImageData(void* data, int width, int height, int mipmaps, int format);
-MxVec2 nativeTexureSize(const MxTextureNative* texture);
+void nativeSetTextureSmooth(MxTextureNative* texture, bool enable);
+MxVec2 nativeTextureSize(const MxTextureNative* texture);
+bool nativeTextureIsSmooth(const MxTextureNative* texture);
+bool nativeIsValidTexture(const MxTextureNative* texture);
 void nativeUnloadTexture(const MxTextureNative* texture);
 
 
@@ -412,8 +417,10 @@ void drawCircle(MxVec2 center, float radius, MxColor color);
 //-----------------------------------------------------------------------------
 
 // internal functions
+bool isValidFont(const MxFont& font);
+bool isValidImage(const MxImage& image);
 MxVec2 measureTextInternal(MxFont font, const std::string& text, float fontSize, float spacing);
-MxFont loadFontFromMemory(const std::string& textureNameID, const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount);
+MxFont loadFontFromMemoryInternal(const std::string& textureNameID, const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount);
 static unsigned int stb_decompress(unsigned char* output, const unsigned char* i, unsigned int /*length*/);
 
 // mxgui functions
@@ -429,12 +436,14 @@ void closeManagers();
 void loadTexture(const std::filesystem::path& path, const std::string& textureNameID);
 void loadTextureFromMemory(void* data, int width, int height, int format, int mipmaps, const std::string& textureNameID);
 void unloadTexture(const std::string& textureNameID);
-MxVec2 getTextureSize(const std::string& textureNameID);
+MxVec2 getSizeTexture(const std::string& textureNameID);
+void setSmoothTexture(const std::string& textureNameID, bool enable);
+bool isSmoothTexture(const std::string& textureNameID);
 const MxTextureNative* getTexture(const std::string& textureNameID);
 
 // font managers functions
 const MxFontSpecsInternal* getFont(const std::string& fontNameID);
-MxVec2 measureText(const std::string& fontNameID, const std::string& text);
+MxVec2 measureText(const std::string& fontNameID, const std::string& text, int fontSize, int spacing);
 void drawText(const std::string& fontNameID, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint);
 void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size = -1);
 
@@ -543,16 +552,6 @@ struct MxGuiContext
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 
-
-// Texture, tex data stored in GPU memory (VRAM)
-struct MxTexture
-{
-    unsigned int id{0}; // OpenGL texture id
-    int width{0};       // Texture base width
-    int height{0};      // Texture base height
-    int mipmaps{0};     // Mipmap levels, 1 by default
-    int format{0};      // Data format (PixelFormat type)
-};
 
 // GlyphInfo, font characters glyphs info
 struct MxGlyphInfo
@@ -735,13 +734,11 @@ void drawTextCodepoint(MxFont font, int codepoint, MxVec2 position, float fontSi
 void drawTextEx(MxFont font, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint)
 {
 
-    // if (font.texture.id == 0) // Security check in case of not valid font
-    // {
-    //     return;
-    // }
+    if (font.textureNameID.empty()) // Security check in case of not valid atlas fontID
+    {
+        return;
+    }
 
-
-    // int size = TextLength(text);    // Total size in bytes of the text, scanned by codepoints in loop
     int size = text.length(); // Total size in bytes of the text, scanned by codepoints in loop
 
     float textOffsetY = 0;    // Offset between lines (on linebreak '\n')
@@ -785,11 +782,29 @@ void drawTextEx(MxFont font, const std::string& text, MxVec2 position, float fon
 }
 
 
+inline bool isValidFont(const MxFont& font)
+{
+    const bool validFont = ((font.baseSize > 0) &&           // Validate font size
+                            (font.glyphCount > 0) &&         // Validate font contains some glyph
+                            (!font.textureNameID.empty()) && // Validate font contains Texture Atlas ID
+                            (font.recs != NULL) &&           // Validate font recs defining glyphs on texture atlas
+                            (font.glyphs != NULL));          // Validate glyph data is loaded
+    return validFont;
+}
+
+inline bool isValidImage(const MxImage& image)
+{
+    const bool validImage = ((image.data != NULL) && // Validate pixel data available
+                             (image.width > 0) &&    // Validate image width
+                             (image.height > 0));    // Validate image height
+    return validImage;
+}
+
 MxVec2 measureTextInternal(MxFont font, const std::string& text, float fontSize, float spacing)
 {
     MxVec2 textSize{};
 
-    if (font.textureNameID.empty())
+    if (!isValidFont(font))
     {
         return textSize; // Security check
     }
@@ -867,15 +882,8 @@ MxVec2 measureTextInternal(MxFont font, const std::string& text, float fontSize,
 //-----------------------------------------------------------------------------
 
 
-// #define FONT_ATLAS_CORNER_REC_SIZE 3     // Size of white rectangle drawn on font atlas on font loading
-// #define FONT_TTF_DEFAULT_CHARS_PADDING 4 // TTF font generation default glyphs padding
-// #define FONT_SDF_CHAR_PADDING 4          // SDF font generation char padding
-// #define FONT_SDF_ON_EDGE_VALUE 128       // SDF font generation on edge value
-// #define FONT_SDF_PIXEL_DIST_SCALE 64.0f  // SDF font generation pixel distance scale
-// #define FONT_BITMAP_ALPHA_THRESHOLD 80   // Bitmap (B&W) font generation alpha threshold
 
-
-MxGlyphInfo* loadFontData(const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount, int type, int* glyphCount)
+MxGlyphInfo* loadFontData(const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount, int* glyphCount)
 {
 
 
@@ -953,36 +961,12 @@ MxGlyphInfo* loadFontData(const unsigned char* fileData, int fontSize, const int
                     glyphs[k].value = cp;
                     glyphs[k].image.data = stbtt_GetCodepointBitmap(&fontInfo, scaleFactor, scaleFactor, cp, &cpWidth, &cpHeight, &glyphs[k].offsetX, &glyphs[k].offsetY);
 
-                    // switch (type)
-                    // {
-                    //     case 0: // FONT_DEFAULT
-                    //     case 1: // FONT_BITMAP
-                    //         {
-                    //             glyphs[k].image.data = stbtt_GetCodepointBitmap(&fontInfo, scaleFactor, scaleFactor, cp, &cpWidth, &cpHeight, &glyphs[k].offsetX, &glyphs[k].offsetY);
-                    //         }
-                    //         break;
-                    //     case 2: // FONT_SDF
-                    //         {
-                    //             if (cp != 32)
-                    //             {
-                    //                 glyphs[k].image.data = stbtt_GetCodepointSDF(&fontInfo, scaleFactor, cp, FONT_SDF_CHAR_PADDING, FONT_SDF_ON_EDGE_VALUE, FONT_SDF_PIXEL_DIST_SCALE, &cpWidth, &cpHeight, &glyphs[k].offsetX, &glyphs[k].offsetY);
-                    //             }
-                    //         }
-                    //         break;
-                    //     // case FONT_MSDF:
-                    //     default: break;
-                    // }
 
                     if (glyphs[k].image.data != NULL) // Glyph data has been found in the font
                     {
                         stbtt_GetCodepointHMetrics(&fontInfo, cp, &glyphs[k].advanceX, NULL);
                         glyphs[k].advanceX = (int)((float)glyphs[k].advanceX * scaleFactor);
 
-                        // // WARNING: If requested SDF font, sdf-glyph height is definitely bigger than fontSize due to FONT_SDF_CHAR_PADDING
-                        // if ((type != 2) && (cpHeight > fontSize))
-                        // {
-                        //     // TRACELOG(LOG_WARNING, "FONT: [0x%04x] Glyph height is bigger than requested font size: %i > %i", cp, cpHeight, (int)fontSize);
-                        // }
 
                         // Load glyph image
                         glyphs[k].image.width = cpWidth;
@@ -1015,23 +999,6 @@ MxGlyphInfo* loadFontData(const unsigned char* fileData, int fontSize, const int
 
                         glyphs[k].image = imSpace;
                     }
-
-                    // if (type == 1)
-                    // {
-                    //     // Aliased bitmap (black & white) font generation, avoiding anti-aliasing
-                    //     // NOTE: For optimum results, bitmap font should be generated at base pixel size
-                    //     for (int p = 0; p < cpWidth * cpHeight; p++)
-                    //     {
-                    //         if (((unsigned char*)glyphs[k].image.data)[p] < FONT_BITMAP_ALPHA_THRESHOLD)
-                    //         {
-                    //             ((unsigned char*)glyphs[k].image.data)[p] = 0;
-                    //         }
-                    //         else
-                    //         {
-                    //             ((unsigned char*)glyphs[k].image.data)[p] = 255;
-                    //         }
-                    //     }
-                    // }
 
                     k++;
                     glyphCounter++;
@@ -1184,21 +1151,6 @@ MxImage genImageFontAtlas(const MxGlyphInfo* glyphs, MxRect** glyphRecs, int gly
         offsetX += (glyphs[i].image.width + 2 * padding);
     }
 
-
-    // Add a 3x3 white rectangle at the bottom-right corner of the generated atlas,
-    // useful to use as the white texture to draw shapes with raylib
-    // Security: ensure the atlas is large enough to hold a 3x3 rectangle
-    // if ((FONT_ATLAS_CORNER_REC_SIZE > 0) && (atlas.width >= 3) && (atlas.height >= 3))
-    // {
-    //     for (int i = 0, k = atlas.width * atlas.height - 1; i < FONT_ATLAS_CORNER_REC_SIZE; i++)
-    //     {
-    //         ((unsigned char*)atlas.data)[k - 0] = 255;
-    //         ((unsigned char*)atlas.data)[k - 1] = 255;
-    //         ((unsigned char*)atlas.data)[k - 2] = 255;
-    //         k -= atlas.width;
-    //     }
-    // }
-
     // Convert image data from GRAYSCALE to GRAY_ALPHA
     unsigned char* dataGrayAlpha = (unsigned char*)MX_MALLOC(atlas.width * atlas.height * sizeof(unsigned char) * 2); // Two channels
 
@@ -1218,12 +1170,12 @@ MxImage genImageFontAtlas(const MxGlyphInfo* glyphs, MxRect** glyphRecs, int gly
 }
 
 
-MxFont loadFontFromMemory(const std::string& textureNameID, const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount)
+MxFont loadFontFromMemoryInternal(const std::string& textureNameID, const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount)
 {
     MxFont font{};
 
     font.baseSize = fontSize;
-    font.glyphs = loadFontData(fileData, font.baseSize, codepoints, (codepointCount > 0) ? codepointCount : 95, 0, &font.glyphCount);
+    font.glyphs = loadFontData(fileData, font.baseSize, codepoints, (codepointCount > 0) ? codepointCount : 95, &font.glyphCount);
 
 
     if (font.glyphs != NULL)
@@ -1232,26 +1184,19 @@ MxFont loadFontFromMemory(const std::string& textureNameID, const unsigned char*
 
         MxImage atlas = genImageFontAtlas(font.glyphs, &font.recs, font.glyphCount, font.baseSize, font.glyphPadding);
 
-
-        // font.texture = LoadTextureFromImage(atlas); //
         if ((atlas.width != 0) && (atlas.height != 0))
         {
+            // Note: The texture atlas is stored in the TextureManager; we only keep the reference ID.
             loadTextureFromMemory(atlas.data, atlas.width, atlas.height, atlas.format, atlas.mipmaps, textureNameID);
             font.textureNameID = textureNameID;
-            // font.texture.id = rlLoadTexture(atlas.data, atlas.width, atlas.height, atlas.format, atlas.mipmaps);
-            // font.texture.width = atlas.width;
-            // font.texture.height = atlas.height;
-            // font.texture.mipmaps = atlas.mipmaps;
-            // font.texture.format = atlas.format;
         }
 
-
-        // Update glyphs[i].image to use alpha, required to be used on ImageDrawText()
-        // for (int i = 0; i < font.glyphCount; i++)
-        // {
-        //     //MX_FREE(font.glyphs[i].image.data);
-        //     // font.glyphs[i].image = ImageFromImage(atlas, font.recs[i]);
-        // }
+        // It is not necessary to retain the glyph image data.
+        for (int i = 0; i < font.glyphCount; i++)
+        {
+            MX_FREE(font.glyphs[i].image.data);
+            font.glyphs[i].image = MxImage{};
+        }
 
         MX_FREE(atlas.data);
 
@@ -1272,8 +1217,6 @@ MxFont loadFontFromMemory(const std::string& textureNameID, const unsigned char*
 //  Decompression from stb.h (public domain) by Sean Barrett https://github.com/nothings/stb/blob/master/deprecated/stb.h#L10437
 //-----------------------------------------------------------------------------
 
-
-#include "string.h"
 
 #define stb__in2(x) ((i[x] << 8) + i[(x) + 1])
 #define stb__in3(x) ((i[x] << 16) + stb__in2((x) + 1))
@@ -1678,7 +1621,7 @@ namespace mxgui
         MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
         MxRect rect = transform.worldBounds;
 
-        const MxVec2 texture = getTextureSize(imageName);
+        const MxVec2 texture = getSizeTexture(imageName);
         const MxRect source = {0.0f, 0.0f, texture.x, texture.y};
         const MxRect dest = {rect.x, rect.y, texture.x, texture.y};
 
@@ -1743,7 +1686,9 @@ namespace mxgui
             drawRectanglePro(rect, MxVec2{}, 0, fadeColor(color, 0.3f));
         }
 
-        MxVec2 textSize = measureText(ctx->m_style.fontName, text);
+        const MxStyle style = ctx->m_style;
+
+        MxVec2 textSize = measureText(style.fontName, text, style.textSize, style.textSpacing);
         MxVec2 textPosition = MxVec2{rect.x + (rect.width - textSize.x) / 2, rect.y + (rect.height - textSize.y) / 2};
         textPosition.x -= ctx->m_anchor.x;
         textPosition.y -= ctx->m_anchor.y;
@@ -2022,6 +1967,7 @@ namespace mxgui
 struct MxTextureNative
 {
     Texture handle{};
+    bool isSmooth{false};
 };
 
 // MxType to Raylib type helper
@@ -2077,11 +2023,27 @@ MxTextureNative nativeLoadTextureFromImageData(void* data, int width, int height
     return MxTextureNative{.handle = LoadTextureFromImage(image)};
 }
 
-MxVec2 nativeTexureSize(const MxTextureNative* texture)
+inline void nativeSetTextureSmooth(MxTextureNative* texture, bool enable)
+{
+    const int filter = enable ? TEXTURE_FILTER_BILINEAR : TEXTURE_FILTER_POINT;
+    SetTextureFilter(texture->handle, filter);
+}
+
+MxVec2 nativeTextureSize(const MxTextureNative* texture)
 {
     const float width = (float)texture->handle.width;
     const float height = (float)texture->handle.height;
     return MxVec2{width, height};
+}
+
+inline bool nativeTextureIsSmooth(const MxTextureNative* texture)
+{
+    return texture->isSmooth;
+}
+
+inline bool nativeIsValidTexture(const MxTextureNative* texture)
+{
+    return IsTextureValid(texture->handle);
 }
 
 void nativeUnloadTexture(const MxTextureNative* texture)
@@ -2170,6 +2132,7 @@ void drawCircle(MxVec2 center, float radius, MxColor color)
 struct MxTextureNative
 {
     sf::Texture handle{};
+    bool isValid{false};
 };
 
 static std::unique_ptr<sf::Text> s_text;
@@ -2232,11 +2195,14 @@ void nativeInit()
 MxTextureNative nativeLoadTexture(const std::filesystem::path& path)
 {
     MxTextureNative texture{};
-    if (texture.handle.loadFromFile(path)) {}
+    if (texture.handle.loadFromFile(path))
+    {
+        texture.isValid = true;
+    }
     return texture;
 }
 
-MxTextureNative nativeLoadTextureFromImageData(void* data, int width, int height, int mipmaps, int format)
+MxTextureNative nativeLoadTextureFromImageData(void* data, int width, int height, int /*mipmaps*/, int format)
 {
 
     MxTextureNative texture{};
@@ -2277,19 +2243,30 @@ MxTextureNative nativeLoadTextureFromImageData(void* data, int width, int height
 
     if (texture.handle.loadFromImage(image))
     {
-        if (mipmaps > 1)
-        {
-            if (!texture.handle.generateMipmap()) {}
-        }
+        texture.isValid = true;
     }
     return texture;
 }
 
-MxVec2 nativeTexureSize(const MxTextureNative* texture)
+inline void nativeSetTextureSmooth(MxTextureNative* texture, bool enable)
+{
+    texture->handle.setSmooth(enable);
+}
+
+MxVec2 nativeTextureSize(const MxTextureNative* texture)
 {
     return MxVec2{(float)texture->handle.getSize().x, (float)texture->handle.getSize().y};
 }
 
+inline bool nativeTextureIsSmooth(const MxTextureNative* texture)
+{
+    return texture->handle.isSmooth();
+}
+
+inline bool nativeIsValidTexture(const MxTextureNative* texture)
+{
+    return texture->isValid;
+}
 
 void nativeUnloadTexture(const MxTextureNative* /*texture*/)
 {
@@ -2439,7 +2416,16 @@ void drawTexturePro(const std::string& textureNameID, MxRect source, MxRect dest
         return;
     }
 
+
     const MxTextureNative* texture = getTexture(textureNameID);
+
+    if (!texture->isValid)
+    {
+        MX_ASSERT(texture->isValid, "texture is not valid");
+        return;
+    }
+
+
     const sf::IntRect rect({(int)source.x, (int)source.y}, {(int)source.width, (int)source.height});
     s_sprite->setTexture(texture->handle);
     s_sprite->setTextureRect(rect);
@@ -2504,7 +2490,21 @@ void drawFPS(float x, float y)
 struct MxFontManager
 {
 
-    void setupDefaultFont(int textSize, int spacing)
+    void loadFromMemory(const std::string& textureNameID, const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount, bool smooth)
+    {
+        MxFont font = loadFontFromMemoryInternal(textureNameID, fileData, fontSize, codepoints, codepointCount);
+
+        // Default font
+        m_fonts[textureNameID] = MxFontSpecsInternal{
+            .font = font,
+            .size = fontSize,
+            .spacing = 0,
+        };
+
+        setSmoothTexture(font.textureNameID, smooth);
+    }
+
+    void setupDefaultFont(int textSize)
     {
         int codepoints[95];
         for (int i = 0; i < 95; i++)
@@ -2512,16 +2512,7 @@ struct MxFontManager
             codepoints[i] = 32 + i; // ASCII: from (32) to ~ (126)
         }
 
-
-        MxFont font = loadFontFromMemory(MX_FONT_NOTO_ID, notosans::data, textSize, codepoints, 95);
-
-        // Default font
-        m_fonts[MX_FONT_NOTO_ID] = MxFontSpecsInternal{
-            .font = font,
-            .size = textSize,
-            .spacing = spacing,
-        };
-        // SetTextureFilter(font.texture, TEXTURE_FILTER_BILINEAR);
+        loadFromMemory(MX_FONT_NOTO_ID, notosans::data, textSize, codepoints, 95, false);
     }
 
     void setupFontAwesome(int iconSize)
@@ -2530,16 +2521,9 @@ struct MxFontManager
         int arrayOriginalSize = 414704;
         unsigned char* fontAwesomeData = (unsigned char*)MX_MALLOC(arrayOriginalSize);
         stb_decompress(fontAwesomeData, fa_compressed_data, fa_compressed_size);
-
         int count = sizeof(codepointsFontAwesome) / sizeof(codepointsFontAwesome[0]);
-        MxFont faFont = loadFontFromMemory("fontAwesome", fontAwesomeData, iconSize, codepointsFontAwesome, count);
 
-        m_fonts[MX_FONT_AWESOME_ID] = MxFontSpecsInternal{
-            .font = faFont,
-            .size = iconSize,
-            .spacing = 0,
-        };
-        // SetTextureFilter(faFont.texture, TEXTURE_FILTER_BILINEAR);
+        loadFromMemory(MX_FONT_AWESOME_ID, fontAwesomeData, iconSize, codepointsFontAwesome, count, true);
 #endif
     }
 
@@ -2550,7 +2534,7 @@ struct MxFontManager
             return;
         }
 
-        setupDefaultFont(style.textSize, style.textSpacing);
+        setupDefaultFont(style.textSize);
         setupFontAwesome(style.iconSize);
     }
 
@@ -2569,7 +2553,10 @@ struct MxFontManager
         {
             for (int i = 0; i < font.glyphCount; i++)
             {
-                MX_FREE(font.glyphs[i].image.data);
+                if (isValidImage(font.glyphs[i].image))
+                {
+                    MX_FREE(font.glyphs[i].image.data);
+                }
             }
             MX_FREE(font.glyphs);
         }
@@ -2580,14 +2567,10 @@ struct MxFontManager
         // TraceLog(LOG_INFO, "MXFONT: Unloaded font data from RAM and VRAM");
     }
 
-    MxVec2 measureText(const std::string& fontNameID, const std::string& text)
+    MxVec2 measureText(const std::string& fontNameID, const std::string& text, int fontSize, int spacing)
     {
         const MxFontSpecsInternal* font = getFont(fontNameID);
-        // if (!IsFontValid(font.font))
-        // {
-        //     font.font = GetFontDefault();
-        // }
-        return measureTextInternal(font->font, text.c_str(), font->size, font->spacing);
+        return measureTextInternal(font->font, text.c_str(), fontSize, spacing);
     }
 
     const MxFontSpecsInternal* getFont(const std::string& fontNameID)
@@ -2630,7 +2613,22 @@ struct MxTextureManager
     MxVec2 getSize(const std::string& textureNameID)
     {
         const MxTextureNative* texture = getTexture(textureNameID);
-        return nativeTexureSize(texture);
+        return nativeTextureSize(texture);
+    }
+
+    bool isSmooth(const std::string& textureNameID)
+    {
+        const MxTextureNative* texture = getTexture(textureNameID);
+        return nativeTextureIsSmooth(texture);
+    }
+
+    void setSmooth(const std::string& textureNameID, bool enable)
+    {
+        auto it = m_textures.find(textureNameID);
+        if (it != m_textures.end())
+        {
+            nativeSetTextureSmooth(&it->second, enable);
+        }
     }
 
     void unload()
@@ -2686,23 +2684,16 @@ void closeManagers()
 // Font manager functions
 //-----------------------------------------------------------------------------
 
-MxVec2 measureText(const std::string& fontName, const std::string& text)
+MxVec2 measureText(const std::string& fontNameID, const std::string& text, int fontSize, int spacing)
 {
-    return s_fontManager.measureText(fontName, text);
+    return s_fontManager.measureText(fontNameID, text, fontSize, spacing);
 }
 
-void drawText(const std::string& fontName, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint)
+void drawText(const std::string& fontNameID, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint)
 {
-    const MxFontSpecsInternal* font = s_fontManager.getFont(fontName);
-
-    // if (!IsFontValid(font.font))
-    // {
-    //     font.font = GetFontDefault();
-    // }
-
+    const MxFontSpecsInternal* font = s_fontManager.getFont(fontNameID);
     drawTextEx(font->font, text, position, fontSize, spacing, tint);
 }
-
 
 void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size)
 {
@@ -2711,13 +2702,8 @@ void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size)
     const char* icon = codepointToUTF8(codepoint, &byteCount);
 
     const MxFontSpecsInternal* font = s_fontManager.getFont(MX_FONT_AWESOME_ID);
-
-    // if (!IsFontValid(font.font))
-    // {
-    //     return;
-    // }
-
     const int fontSize = (size < 0) ? font->size : size;
+
     drawTextEx(font->font, icon, position, fontSize, 0, color);
 }
 
@@ -2746,9 +2732,19 @@ void loadTextureFromMemory(void* data, int width, int height, int format, int mi
     s_textureManager.loadTextureFromImageData(textureNameID, data, width, height, mipmaps, format);
 }
 
-MxVec2 getTextureSize(const std::string& textureNameID)
+MxVec2 getSizeTexture(const std::string& textureNameID)
 {
     return s_textureManager.getSize(textureNameID);
+}
+
+inline void setSmoothTexture(const std::string& textureNameID, bool enable)
+{
+    s_textureManager.setSmooth(textureNameID, enable);
+}
+
+inline bool isSmoothTexture(const std::string& textureNameID)
+{
+    return s_textureManager.isSmooth(textureNameID);
 }
 
 const MxTextureNative* getTexture(const std::string& textureNameID)
