@@ -1,6 +1,6 @@
 
 
- // #define SFML_BACKEND 1
+ #define SFML_BACKEND 1
 
 #include <array>
 #include <iostream>
@@ -95,7 +95,7 @@ int main()
         mxgui::guiSliderProgress(ctx, MxRect{50, 560, 700, 6}, MxVec2{}, 0.8f);
 
 
-        const MxFontSpecsInternal* font = getFont(MX_DEFAULT_FONT_ID);
+        const MxFontSpecsInternal* font = getFont(MX_FONT_NOTO_ID);
         drawTextEx(font->font, "teste", MxVec2{60, 60}, 20, 0, MxColor::Red);
 
 #if RAYLIB_BACKEND
