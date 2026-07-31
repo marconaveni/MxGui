@@ -1,7 +1,26 @@
 #ifndef MXGUI_HPP
 #define MXGUI_HPP
 
-// Mini XPerience Gui
+//--------------------------- Mini XPerience Gui-------------------------------
+//                                                                            |
+// To use this library, you can define it like this:                          |
+//                                                                            |
+//----------------------------custom backend-----------------------------------
+//                                                                            |
+// #define MX_GUI_IMPLEMENTATION                                              |
+// #include "mxgui.hpp"                                                       |
+//                                                                            |
+//----------------------------with Sfml----------------------------------------
+//                                                                            |
+// #define MX_SFML_BACKEND_IMPLEMENTATION                                     |
+// #include "mxgui.hpp"                                                       |
+//                                                                            |
+//----------------------------with raylib--------------------------------------
+//                                                                            |
+// #define MX_RAYLIB_BACKEND_IMPLEMENTATION                                   |
+// #include "mxgui.hpp"                                                       |
+//                                                                            |
+//-----------------------------------------------------------------------------
 
 //--------------------------------MXGUI----------------------------------------
 //
@@ -30,41 +49,39 @@
 // (SECTION) configs
 //-----------------------------------------------------------------------------
 
-#define FORCE_DEBUG 0
-#define MX_FONT_NOTO_ID "notosans" // default font
-#define MX_FONT_AWESOME_ID "fontawesome"
-#define MX_DRAG_OFFSET 4
-#define MX_BAR_SIZE 6
+#define FORCE_DEBUG 0                    // force debug
+#define MX_FONT_NOTO_ID "notosans"       // font default ID
+#define MX_FONT_AWESOME_ID "fontawesome" // font awesome ID
+#define MX_DRAG_OFFSET 4                 // extra area px rect drags
+#define MX_TEXT_LINE_SPACING 0.0f        // config \n space in texts
+#define MX_BAR_SIZE 6                    // bar size scroll
 
 #define FONT_AWESOME 1
-// #define RAYLIB_BACKEND 1
-// #define SFML_BACKEND 1
-// #define CUSTOM_BACKEND 1
+
 
 //-----------------------------------------------------------------------------
 // (SECTION) Header and defines
 //-----------------------------------------------------------------------------
 
-#include <array>
+
 #include <filesystem>
-#include <optional>
 #include <string>
 #include <type_traits>
 
-#include "string.h"
+#define STB_TRUETYPE_IMPLEMENTATION
 
 
-#ifdef CUSTOM_BACKEND
-#undef RAYLIB_BACKEND
-#undef SFML_BACKEND
-#else
-#ifdef SFML_BACKEND
-#undef RAYLIB_BACKEND
-#undef CUSTOM_BACKEND
-#else
-#define RAYLIB_BACKEND 1
-#endif // SFML_BACKEND
-#endif // CUSTOM_BACKEND
+#include "stb_truetype.h"
+
+#ifdef MX_RAYLIB_BACKEND_IMPLEMENTATION
+#define MX_RAYLIB 1
+#elifdef MX_SFML_BACKEND_IMPLEMENTATION
+#define MX_SFML 1
+#endif
+
+#if defined(MX_RAYLIB_BACKEND_IMPLEMENTATION) || defined(MX_SFML_BACKEND_IMPLEMENTATION) && !defined(MX_GUI_IMPLEMENTATION)
+#define MX_GUI_IMPLEMENTATION
+#endif
 
 #if FORCE_DEBUG
 #define DEBUG_MODE
@@ -125,7 +142,6 @@ struct MxTextureNative;
 struct MxGuiContext;
 struct MxFont;
 struct MxVec2;
-struct MxFontSpecsInternal;
 
 //-----------------------------------------------------------------------------
 // (SECTION) basic types
@@ -160,25 +176,6 @@ struct MxRect
     float height{0.0f};
 };
 
-inline constexpr MxVec2 toMxVec2(const MxRect& rec)
-{
-    return MxVec2{rec.x, rec.y};
-}
-
-inline constexpr MxRect toMxRect(const MxVec2& vec)
-{
-    return MxRect{vec.x, vec.y, 0, 0};
-}
-
-inline constexpr MxRect toMxRect(const MxVec2& vec, const MxRect& rec)
-{
-    return MxRect{vec.x, vec.y, rec.width, rec.height};
-}
-inline constexpr MxRect toMxRect(const MxVec2& vec, const MxVec2& vec2)
-{
-    return MxRect{vec.x, vec.y, vec2.x, vec2.y};
-}
-
 struct MxImage
 {
     void* data{nullptr}; // Image raw data
@@ -186,6 +183,27 @@ struct MxImage
     int height{0};       // Image base height
     int mipmaps{1};      // Mipmap levels, 1 by default
     int format{1};       // Data format (PixelFormat type)
+};
+
+// MxGlyphInfo, font characters glyphs info
+struct MxGlyphInfo
+{
+    int value{0};    // Character value (Unicode)
+    int offsetX{0};  // Character offset X when drawing
+    int offsetY{0};  // Character offset Y when drawing
+    int advanceX{0}; // Character advance position X
+    MxImage image{}; // Character image data
+};
+
+// Font, MxGlyphInfo, TextureIdAtlas and array data
+struct MxFont
+{
+    int baseSize{0};              // Base size (default chars height)
+    int glyphCount{0};            // Number of glyph characters
+    int glyphPadding{0};          // Padding around the glyph characters
+    std::string textureNameID{};  // Id Texture atlas containing the glyphs storaged TextureManager
+    MxRect* recs{nullptr};        // Rectangles in texture for the glyphs
+    MxGlyphInfo* glyphs{nullptr}; // Glyphs info data
 };
 
 struct MxColor
@@ -267,12 +285,6 @@ struct MxTransform
     MxVec2 anchor{};
 };
 
-struct MxText
-{
-    std::string text{};
-    MxVec2 measuredText{};
-    int size{20};
-};
 
 struct MxStyle
 {
@@ -361,7 +373,7 @@ namespace mxgui
     MxTransform getCurrentTransform(MxGuiContext* ctx);
     MxMouseEvents getCurrentMouseEvents(MxGuiContext* ctx);
 
-    void createImage(const std::filesystem::path& path, const std::string& imageName);
+    void createImage(const std::filesystem::path& path, const std::string& imageName, bool smooth = true);
 
     MxVec2 guiPanel(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor = MxVec2{0}, bool enableDrag = false);
     void guiImage(MxGuiContext* ctx, const std::string& imageName, MxRect bounds, MxVec2 anchor = MxVec2{0}, MxColor color = MxColor::White);
@@ -442,10 +454,14 @@ bool isSmoothTexture(const std::string& textureNameID);
 const MxTextureNative* getTexture(const std::string& textureNameID);
 
 // font managers functions
-const MxFontSpecsInternal* getFont(const std::string& fontNameID);
+const MxFont* getFont(const std::string& fontNameID);
 MxVec2 measureText(const std::string& fontNameID, const std::string& text, int fontSize, int spacing);
 void drawText(const std::string& fontNameID, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint);
-void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size = -1);
+void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size);
+void loadFont(const std::string& textureNameID, const std::filesystem::path& path, int fontSize, const int* codepoints, int codepointCount);
+
+#endif // MXGUI_HPP
+
 
 /////////////////////////////////////////////////////
 //  implementations
@@ -454,11 +470,14 @@ void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size = -1);
 #ifdef MX_GUI_IMPLEMENTATION
 
 
+#include <fstream>
+#include <iostream>
 #include <memory>
 #include <unordered_map>
 #include <vector>
 
 #include "mxgui_notosans.hpp"
+#include "string.h"
 
 
 //-----------------------------------------------------------------------------
@@ -549,37 +568,27 @@ struct MxGuiContext
 //-----------------------------------------------------------------------------
 
 
-#define STB_TRUETYPE_IMPLEMENTATION
-#include "stb_truetype.h"
-
-
-// GlyphInfo, font characters glyphs info
-struct MxGlyphInfo
+std::vector<char> loadFileData(const std::filesystem::path& path)
 {
-    int value{0};    // Character value (Unicode)
-    int offsetX{0};  // Character offset X when drawing
-    int offsetY{0};  // Character offset Y when drawing
-    int advanceX{0}; // Character advance position X
-    MxImage image{}; // Character image data
-};
 
-// Font, font texture and GlyphInfo array data
-struct MxFont
-{
-    int baseSize{0};              // Base size (default chars height)
-    int glyphCount{0};            // Number of glyph characters
-    int glyphPadding{0};          // Padding around the glyph characters
-    std::string textureNameID{};  // Id Texture atlas containing the glyphs storaged TextureManager
-    MxRect* recs{nullptr};        // Rectangles in texture for the glyphs
-    MxGlyphInfo* glyphs{nullptr}; // Glyphs info data
-};
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
 
-struct MxFontSpecsInternal
-{
-    MxFont font{};
-    int size{20};
-    int spacing{0};
-};
+    if (!file.is_open())
+    {
+        std::cerr << "Erro ao abrir o arquivo: " << path << std::endl;
+        return std::vector<char>{};
+    }
+
+    std::streamsize size = file.tellg();
+    file.seekg(0, std::ios::beg);
+    std::vector<char> buffer(size);
+
+    if (file.read(buffer.data(), size))
+    {
+        std::cout << "File '" << path << "' loaded sucessfull. Bytes: " << size << '\n';
+    }
+    return buffer;
+}
 
 
 //-----------------------------------------------------------------------------
@@ -681,7 +690,10 @@ int getCodepointNext(const char* text, int* codepointSize)
 int getGlyphIndex(MxFont font, int codepoint)
 {
     int index = 0;
-    // if (!IsFontValid(font)) return index;
+    if (!isValidFont(font))
+    {
+        return index;
+    }
 
     int fallbackIndex = 0; // Get index of fallback glyph '?'
 
@@ -741,7 +753,7 @@ void drawTextEx(MxFont font, const std::string& text, MxVec2 position, float fon
 
     int size = text.length(); // Total size in bytes of the text, scanned by codepoints in loop
 
-    float textOffsetY = 0;    // Offset between lines (on linebreak '\n')
+    float textOffsetY = 0.0f; // Offset between lines (on linebreak '\n')
     float textOffsetX = 0.0f; // Offset X to next character to draw
 
     float scaleFactor = fontSize / font.baseSize; // Character quad scaling factor
@@ -755,9 +767,9 @@ void drawTextEx(MxFont font, const std::string& text, MxVec2 position, float fon
 
         if (codepoint == '\n')
         {
-            const float textLineSpacing = 0.0f;
-            // NOTE: Line spacing is a global variable, use SetTextLineSpacing() to setup
-            textOffsetY += (fontSize + textLineSpacing);
+
+            // NOTE: Line spacing is a global variable, use setTextLineSpacing() to setup
+            textOffsetY += (fontSize + MX_TEXT_LINE_SPACING);
             textOffsetX = 0.0f;
         }
         else
@@ -852,9 +864,7 @@ MxVec2 measureTextInternal(MxFont font, const std::string& text, float fontSize,
             byteCounter = 0;
             textWidth = 0;
 
-            const float textLineSpacing = 0.0f;
-            // NOTE: Line spacing is a global variable, use SetTextLineSpacing() to setup
-            textHeight += (fontSize + textLineSpacing);
+            textHeight += (fontSize + MX_TEXT_LINE_SPACING);
         }
 
         if (tempByteCounter < byteCounter)
@@ -880,7 +890,6 @@ MxVec2 measureTextInternal(MxFont font, const std::string& text, float fontSize,
 // Note: The code is initially the same as text.c, to validate it and have something functional.
 // Todo: adapt as necessary to make it work and optimize it for mxgui.
 //-----------------------------------------------------------------------------
-
 
 
 MxGlyphInfo* loadFontData(const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount, int* glyphCount)
@@ -1400,7 +1409,6 @@ static unsigned int stb_decompress(unsigned char* output, const unsigned char* i
     }
 }
 
-
 template <typename T>
 inline constexpr T mxMax(T min, T max)
 {
@@ -1449,6 +1457,26 @@ inline MxRect getCollisionRec(MxRect rect1, MxRect rect2)
     }
 
     return overlap;
+}
+
+inline constexpr MxVec2 toMxVec2(const MxRect& rec)
+{
+    return MxVec2{rec.x, rec.y};
+}
+
+inline constexpr MxRect toMxRect(const MxVec2& vec)
+{
+    return MxRect{vec.x, vec.y, 0, 0};
+}
+
+inline constexpr MxRect toMxRect(const MxVec2& vec, const MxRect& rec)
+{
+    return MxRect{vec.x, vec.y, rec.width, rec.height};
+}
+
+inline constexpr MxRect toMxRect(const MxVec2& vec, const MxVec2& vec2)
+{
+    return MxRect{vec.x, vec.y, vec2.x, vec2.y};
 }
 
 inline MxColor fadeColor(MxColor color, float alpha)
@@ -1511,7 +1539,6 @@ void popScissor()
     }
 }
 
-
 MxTransform updateTransformWorld(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor)
 {
     MxTransform transform{};
@@ -1554,7 +1581,6 @@ namespace mxgui
         return ctx->m_style;
     }
 
-
     MxTransform getCurrentTransform(MxGuiContext* ctx)
     {
         return ctx->m_currentTransform;
@@ -1565,9 +1591,10 @@ namespace mxgui
         return ctx->m_currentMouseEvents;
     }
 
-    void createImage(const std::filesystem::path& path, const std::string& imageName)
+    void createImage(const std::filesystem::path& path, const std::string& imageName, bool smooth)
     {
         loadTexture(path, imageName);
+        setSmoothTexture(imageName, smooth);
     }
 
     MxVec2 guiPanel(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor, bool enableDrag)
@@ -1620,10 +1647,12 @@ namespace mxgui
     {
         MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
         MxRect rect = transform.worldBounds;
-
         const MxVec2 texture = getSizeTexture(imageName);
+        const MxVec2 scale = (rect.width > 0 && rect.height > 0) ? MxVec2{rect.width, rect.height} : texture;
+
+
         const MxRect source = {0.0f, 0.0f, texture.x, texture.y};
-        const MxRect dest = {rect.x, rect.y, texture.x, texture.y};
+        const MxRect dest = {rect.x, rect.y, scale.x, scale.y};
 
         drawTexturePro(imageName, source, dest, MxVec2{0, 0}, 0, color);
         ctx->updateCurrents(transform, MxMouseEvents{});
@@ -1633,8 +1662,9 @@ namespace mxgui
     {
         MxTransform transform = updateTransformWorld(ctx, toMxRect(bounds), anchor);
         MxRect rect = transform.worldBounds;
+        const MxStyle style = ctx->m_style;
 
-        drawText(ctx->m_style.fontName, text, MxVec2{rect.x, rect.y}, ctx->m_style.textSize, 0, ctx->m_style.textColor);
+        drawText(style.fontName, text, MxVec2{rect.x, rect.y}, style.textSize, style.textSpacing, style.textColor);
         ctx->updateCurrents(transform, MxMouseEvents{});
     }
 
@@ -1861,7 +1891,7 @@ namespace mxgui
         MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
         MxColor color = ctx->m_style.primaryColor;
 
-        drawIconEx(codepoint, toMxVec2(transform.worldBounds), color, size);
+        drawIconEx(codepoint, toMxVec2(transform.worldBounds), color, iconSize);
     }
 
     bool guiIconButton(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size, bool enable)
@@ -1899,7 +1929,7 @@ namespace mxgui
         color.b = mxClamp(color.b - paint, 0, 255);
 
 
-        drawIconEx(codepoint, toMxVec2(transform.worldBounds), color, size);
+        drawIconEx(codepoint, toMxVec2(transform.worldBounds), color, iconSize);
 
         ctx->updateCurrents(transform, mouseEvents);
 
@@ -1949,19 +1979,17 @@ namespace mxgui
 } // namespace mxgui
 
 /////////////////////////////////////////////////////
-//  implementations backend
+// Backend Implementations
 /////////////////////////////////////////////////////
 
+#ifdef MX_RAYLIB_BACKEND_IMPLEMENTATION
 
 //-----------------------------------------------------------------------------
-// raylib backend
+// (SECTION) raylib backend
 //-----------------------------------------------------------------------------
-
-#ifdef RAYLIB_BACKEND
 
 #include <cstdio>
 
-// #include "rlgl.h"
 #include "raylib.h"
 
 struct MxTextureNative
@@ -2026,6 +2054,7 @@ MxTextureNative nativeLoadTextureFromImageData(void* data, int width, int height
 inline void nativeSetTextureSmooth(MxTextureNative* texture, bool enable)
 {
     const int filter = enable ? TEXTURE_FILTER_BILINEAR : TEXTURE_FILTER_POINT;
+    texture->isSmooth = enable;
     SetTextureFilter(texture->handle, filter);
 }
 
@@ -2118,13 +2147,12 @@ void drawCircle(MxVec2 center, float radius, MxColor color)
 }
 
 
-#endif // RAYLIB_BACKEND
+#elifdef MX_SFML_BACKEND_IMPLEMENTATION
 
 //-----------------------------------------------------------------------------
-// SFML backend
+// (SECTION) SFML backend
 //-----------------------------------------------------------------------------
 
-#ifdef SFML_BACKEND
 
 #include <SFML/Graphics.hpp>
 #include <SFML/OpenGL.hpp>
@@ -2206,8 +2234,9 @@ MxTextureNative nativeLoadTextureFromImageData(void* data, int width, int height
 {
 
     MxTextureNative texture{};
-    std::vector<std::uint8_t> rgba(static_cast<size_t>(width) * height * 4);
-    const unsigned char* src = static_cast<const unsigned char*>(data);
+    std::vector<unsigned char> rgba(width * height * 4);
+
+    const unsigned char* src = (const unsigned char*)data;
 
     switch (format)
     {
@@ -2238,13 +2267,13 @@ MxTextureNative nativeLoadTextureFromImageData(void* data, int width, int height
         default: MX_ASSERT(false, "loadTextureFromImageData: unsupported pixel format for SFML backend"); return texture;
     }
 
-    sf::Image image({static_cast<unsigned int>(width), static_cast<unsigned int>(height)}, rgba.data());
-
+    sf::Image image({(unsigned int)width, (unsigned int)height}, rgba.data());
 
     if (texture.handle.loadFromImage(image))
     {
         texture.isValid = true;
     }
+
     return texture;
 }
 
@@ -2429,10 +2458,17 @@ void drawTexturePro(const std::string& textureNameID, MxRect source, MxRect dest
     const sf::IntRect rect({(int)source.x, (int)source.y}, {(int)source.width, (int)source.height});
     s_sprite->setTexture(texture->handle);
     s_sprite->setTextureRect(rect);
+
+    // The scale factor must be derived manually from dest size / source size
+    const float scaleX = (source.width != 0.0f) ? (dest.width / source.width) : 1.0f;
+    const float scaleY = (source.height != 0.0f) ? (dest.height / source.height) : 1.0f;
+    s_sprite->setScale({scaleX, scaleY});
+
     s_sprite->setPosition({dest.x, dest.y});
     s_sprite->setOrigin({origin.x, origin.y});
     s_sprite->setRotation(sf::degrees(rotation));
     s_sprite->setColor(toColor(tint));
+
 
     MX_ASSERT(s_windowRef, "window not reference");
     s_windowRef->draw(*s_sprite);
@@ -2464,22 +2500,19 @@ void drawFPS(float x, float y)
     std::string text = std::to_string((int)fps) + " FPS";
     MxColor color = fps > 30 ? MxColor::Green : MxColor::Yellow;
 
-    const MxFontSpecsInternal* font = getFont(MX_FONT_NOTO_ID);
-    drawTextEx(font->font, text, MxVec2{x, y}, font->size, font->spacing, color);
+    const MxFont* font = getFont(MX_FONT_NOTO_ID);
+    drawTextEx(*font, text, MxVec2{x, y}, 20, 0, color);
 }
-
-
-#endif // SFML_BACKEND
+#else
 
 //-----------------------------------------------------------------------------
-// CUSTOM_BACKEND
+// (SECTION) CUSTOM_BACKEND
 //-----------------------------------------------------------------------------
-
-#ifdef CUSTOM_BACKEND
 
 #include "mxgui_custom.hpp" // Note:  Here you can implement a custom renderer.
 
-#endif // CUSTOM_BACKEND
+
+#endif // MX_XXX_BACKEND_IMPLEMENTATION
 
 
 //-----------------------------------------------------------------------------
@@ -2490,18 +2523,17 @@ void drawFPS(float x, float y)
 struct MxFontManager
 {
 
+    void init(MxStyle style)
+    {
+        setupDefaultFont(style.textSize);
+        setupFontAwesome(style.iconSize);
+    }
+
     void loadFromMemory(const std::string& textureNameID, const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount, bool smooth)
     {
         MxFont font = loadFontFromMemoryInternal(textureNameID, fileData, fontSize, codepoints, codepointCount);
-
-        // Default font
-        m_fonts[textureNameID] = MxFontSpecsInternal{
-            .font = font,
-            .size = fontSize,
-            .spacing = 0,
-        };
-
         setSmoothTexture(font.textureNameID, smooth);
+        m_fonts.insert_or_assign(textureNameID, font);
     }
 
     void setupDefaultFont(int textSize)
@@ -2527,22 +2559,11 @@ struct MxFontManager
 #endif
     }
 
-    void init(MxStyle style)
-    {
-        if (m_fonts.size() > 0)
-        {
-            return;
-        }
-
-        setupDefaultFont(style.textSize);
-        setupFontAwesome(style.iconSize);
-    }
-
     void unload()
     {
-        for (auto& [id, fontSpec] : m_fonts)
+        for (auto& [id, font] : m_fonts)
         {
-            unloadFont(fontSpec.font);
+            unloadFont(font);
         }
         m_fonts.clear();
     }
@@ -2569,13 +2590,13 @@ struct MxFontManager
 
     MxVec2 measureText(const std::string& fontNameID, const std::string& text, int fontSize, int spacing)
     {
-        const MxFontSpecsInternal* font = getFont(fontNameID);
-        return measureTextInternal(font->font, text.c_str(), fontSize, spacing);
+        const MxFont* font = getFont(fontNameID);
+        return measureTextInternal(*font, text.c_str(), fontSize, spacing);
     }
 
-    const MxFontSpecsInternal* getFont(const std::string& fontNameID)
+    const MxFont* getFont(const std::string& fontNameID)
     {
-        static MxFontSpecsInternal empty{};
+        static MxFont empty{};
         auto it = m_fonts.find(fontNameID);
         if (it != m_fonts.end())
         {
@@ -2585,7 +2606,7 @@ struct MxFontManager
         return &empty;
     }
 
-    std::unordered_map<std::string, MxFontSpecsInternal> m_fonts{};
+    std::unordered_map<std::string, MxFont> m_fonts{};
 };
 
 
@@ -2684,6 +2705,22 @@ void closeManagers()
 // Font manager functions
 //-----------------------------------------------------------------------------
 
+const MxFont* getFont(const std::string& fontName)
+{
+    const MxFont* font = s_fontManager.getFont(fontName);
+    return font;
+}
+
+void loadFont(const std::string& textureNameID, const std::filesystem::path& path, int fontSize, const int* codepoints, int codepointCount)
+{
+    std::vector<char> fileData = loadFileData(path);
+    if (!fileData.empty())
+    {
+        // Loading font from memory data
+        s_fontManager.loadFromMemory(textureNameID, (unsigned char*)fileData.data(), fontSize, codepoints, codepointCount, false);
+    }
+}
+
 MxVec2 measureText(const std::string& fontNameID, const std::string& text, int fontSize, int spacing)
 {
     return s_fontManager.measureText(fontNameID, text, fontSize, spacing);
@@ -2691,8 +2728,8 @@ MxVec2 measureText(const std::string& fontNameID, const std::string& text, int f
 
 void drawText(const std::string& fontNameID, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint)
 {
-    const MxFontSpecsInternal* font = s_fontManager.getFont(fontNameID);
-    drawTextEx(font->font, text, position, fontSize, spacing, tint);
+    const MxFont* font = s_fontManager.getFont(fontNameID);
+    drawTextEx(*font, text, position, fontSize, spacing, tint);
 }
 
 void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size)
@@ -2700,18 +2737,11 @@ void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size)
     // Convert codepoint to UTF-8 before to draw
     int byteCount = 0;
     const char* icon = codepointToUTF8(codepoint, &byteCount);
+    const MxFont* font = s_fontManager.getFont(MX_FONT_AWESOME_ID);
 
-    const MxFontSpecsInternal* font = s_fontManager.getFont(MX_FONT_AWESOME_ID);
-    const int fontSize = (size < 0) ? font->size : size;
-
-    drawTextEx(font->font, icon, position, fontSize, 0, color);
+    drawTextEx(*font, icon, position, size, 0, color);
 }
 
-const MxFontSpecsInternal* getFont(const std::string& fontName)
-{
-    const MxFontSpecsInternal* font = s_fontManager.getFont(fontName);
-    return font;
-}
 
 //-----------------------------------------------------------------------------
 // Texture manager functions
@@ -2754,4 +2784,3 @@ const MxTextureNative* getTexture(const std::string& textureNameID)
 }
 
 #endif // MX_GUI_IMPLEMENTATION
-#endif // MXGUI_HPP

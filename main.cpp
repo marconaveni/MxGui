@@ -1,21 +1,13 @@
 
 
- // #define SFML_BACKEND 1
 
 #include <array>
 #include <iostream>
 
-#define MX_GUI_IMPLEMENTATION
+// #define MX_RAYLIB_BACKEND_IMPLEMENTATION
+#define MX_SFML_BACKEND_IMPLEMENTATION
+// #define MX_GUI_IMPLEMENTATION
 #include "mxgui.hpp"
-
-
-#if RAYLIB_BACKEND
-#include <raylib.h>
-#elif SFML_BACKEND
-#include <SFML/Graphics.hpp>
-#endif
-
-
 
 
 void testScissor();
@@ -25,16 +17,18 @@ int main()
 {
 
 
-#if RAYLIB_BACKEND
+#if MX_RAYLIB
     SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
     InitWindow(800, 600, "GUI");
     SetTextLineSpacing(0);
-    // SetTargetFPS(60);
-#elif SFML_BACKEND
+
+// SetTargetFPS(60);
+#elif MX_SFML
     sf::RenderWindow window(sf::VideoMode({800, 600}), "GUI");
     s_windowRef = &window;
 #endif
 
+    loadFont("teste", "/home/marco/Diversos/Inter,Noto_Sans/Inter/static/Inter_28pt-Regular.ttf", 20, NULL, 0);
     MxStyle style = MxStyle::Light;
     style.iconSize = 28;
     MxGuiContext* ctx = mxgui::createContext(style);
@@ -47,13 +41,13 @@ int main()
     bool checked = false;
     bool toogle = false;
 
-#if RAYLIB_BACKEND
+#if MX_RAYLIB
     while (!WindowShouldClose())
     {
 
         BeginDrawing();
         ClearBackground((mxgui::getStyle(ctx).isDarkMode) ? BLACK : RAYWHITE);
-#elif SFML_BACKEND
+#elif MX_SFML
     while (window.isOpen())
     {
         while (const std::optional event = windowPollEvent(&window))
@@ -72,8 +66,10 @@ int main()
         if (mxgui::guiButton(ctx, "Click", MxRect{10, 35, 75, 35}, anchor, MX_OUTLINE, true))
         {
             std::cout << "clicked" << '\n';
+            setSmoothTexture(MX_FONT_NOTO_ID, !isSmoothTexture(MX_FONT_NOTO_ID));
+            setSmoothTexture(MX_FONT_AWESOME_ID, !isSmoothTexture(MX_FONT_AWESOME_ID));
         }
-        mxgui::guiImage(ctx, "nfsu2", MxRect{220, 35, 100, 100}, anchor);
+        mxgui::guiImage(ctx, "nfsu2", MxRect{220, 35, 180, 180}, anchor);
         mxgui::guiIcon(ctx, MxRect{10, 80, 0, 0}, anchor, ICON_FA_CIRCLE_PLAY);
         if (mxgui::guiIconButton(ctx, MxRect{10, 120, 20, 20}, anchor, ICON_FA_CIRCLE_PLAY, 28))
         {
@@ -95,14 +91,19 @@ int main()
         mxgui::guiSliderProgress(ctx, MxRect{50, 560, 700, 6}, MxVec2{}, 0.8f);
 
 
-        const MxFontSpecsInternal* font = getFont(MX_FONT_NOTO_ID);
-        drawTextEx(font->font, "teste", MxVec2{60, 60}, 20, 0, MxColor::Red);
+        const MxFont* font = getFont(MX_FONT_NOTO_ID);
+        const MxFont* font2 = getFont("teste");
+        MxColor color = {200, 41, 55, 255};
 
-#if RAYLIB_BACKEND
+        drawTextEx(*font, "teste \nteste quebra linha", MxVec2{60, 60}, 20, 0, color);
+        drawTextEx(*font2, "teste \nteste quebra linha", MxVec2{60, 160}, 20, 0, color);
+
+#if MX_RAYLIB
+
         DrawFPS(10, 10);
         // DrawText(TextFormat("cor: %zu", sizeof(Transform)), 30, 30, 20, BLACK);
         EndDrawing();
-#elif SFML_BACKEND
+#elif MX_SFML
         drawFPS(10, 10);
         windowDisplay(&window);
 #endif
@@ -111,14 +112,14 @@ int main()
 
     mxgui::destroyContext(ctx);
 
-#if RAYLIB_BACKEND
+#if MX_RAYLIB
     CloseWindow();
 #endif
 
     return 0;
 }
 
-#if RAYLIB_BACKEND
+#if MX_RAYLIB
 
 
 void testScissor()
