@@ -68,10 +68,6 @@
 #include <string>
 #include <type_traits>
 
-#define STB_TRUETYPE_IMPLEMENTATION
-
-
-#include "stb_truetype.h"
 
 #ifdef MX_RAYLIB_BACKEND_IMPLEMENTATION
 #define MX_RAYLIB 1
@@ -122,6 +118,27 @@
 #endif
 #ifndef MX_FREE
 #define MX_FREE(ptr) free(ptr)
+#endif
+
+
+//-----------------------------------------------------------------------------
+// (SECTION) nothings libs
+//-----------------------------------------------------------------------------
+
+#if defined(__GNUC__) // GCC and Clang
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+#endif
+
+#define STBTT_malloc(x, u) ((void)(u), MX_MALLOC(x))
+#define STBTT_free(x, u) ((void)(u), MX_FREE(x))
+
+#define STBTT_STATIC
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "stb_truetype.h"
+
+#if defined(__GNUC__) // GCC and Clang
+#pragma GCC diagnostic pop
 #endif
 
 //-----------------------------------------------------------------------------
@@ -947,7 +964,7 @@ MxGlyphInfo* loadFontData(const unsigned char* fileData, int fontSize, const int
             }
 
             // WARNING: Allocating space for maximum number of codepoints
-            glyphs = (MxGlyphInfo*)calloc(glyphCounter, sizeof(MxGlyphInfo));
+            glyphs = (MxGlyphInfo*)MX_CALLOC(glyphCounter, sizeof(MxGlyphInfo));
             glyphCounter = 0; // Reset to reuse
 
             int k = 0;
@@ -1000,7 +1017,7 @@ MxGlyphInfo* loadFontData(const unsigned char* fileData, int fontSize, const int
                         // Only allocate space image if required
                         if (glyphs[k].advanceX > 0)
                         {
-                            imSpace.data = calloc(glyphs[k].advanceX * fontSize, 1);
+                            imSpace.data = MX_CALLOC(glyphs[k].advanceX * fontSize, 1);
                         }
                         else
                         {
@@ -1092,8 +1109,8 @@ MxImage genImageFontAtlas(const MxGlyphInfo* glyphs, MxRect** glyphRecs, int gly
         atlas.height = imageSize; // Atlas bitmap height
     }
 
-    int atlasDataSize = atlas.width * atlas.height;        // Save total size for bounds checking
-    atlas.data = (unsigned char*)calloc(atlasDataSize, 1); // Create a bitmap to store characters (8 bpp)
+    int atlasDataSize = atlas.width * atlas.height;           // Save total size for bounds checking
+    atlas.data = (unsigned char*)MX_CALLOC(atlasDataSize, 1); // Create a bitmap to store characters (8 bpp)
     atlas.format = 1;
     atlas.mipmaps = 1;
 
@@ -1125,7 +1142,7 @@ MxImage genImageFontAtlas(const MxGlyphInfo* glyphs, MxRect** glyphRecs, int gly
                 // Update atlas size to fit all characters
                 int updatedAtlasHeight = atlas.height * 2;
                 int updatedAtlasDataSize = atlas.width * updatedAtlasHeight;
-                unsigned char* updatedAtlasData = (unsigned char*)calloc(updatedAtlasDataSize, 1);
+                unsigned char* updatedAtlasData = (unsigned char*)MX_CALLOC(updatedAtlasDataSize, 1);
 
                 memcpy(updatedAtlasData, atlas.data, atlasDataSize);
                 MX_FREE(atlas.data);
@@ -2088,7 +2105,7 @@ MxTextureNative nativeLoadTextureFromImageData(void* data, int width, int height
     return MxTextureNative{.handle = LoadTextureFromImage(image)};
 }
 
-inline void nativeSetTextureSmooth(MxTextureNative* texture, bool enable)
+void nativeSetTextureSmooth(MxTextureNative* texture, bool enable)
 {
     const int filter = enable ? TEXTURE_FILTER_BILINEAR : TEXTURE_FILTER_POINT;
     texture->isSmooth = enable;
@@ -2102,12 +2119,12 @@ MxVec2 nativeTextureSize(const MxTextureNative* texture)
     return MxVec2{width, height};
 }
 
-inline bool nativeTextureIsSmooth(const MxTextureNative* texture)
+bool nativeTextureIsSmooth(const MxTextureNative* texture)
 {
     return texture->isSmooth;
 }
 
-inline bool nativeIsValidTexture(const MxTextureNative* texture)
+bool nativeIsValidTexture(const MxTextureNative* texture)
 {
     return IsTextureValid(texture->handle);
 }
@@ -2314,7 +2331,7 @@ MxTextureNative nativeLoadTextureFromImageData(void* data, int width, int height
     return texture;
 }
 
-inline void nativeSetTextureSmooth(MxTextureNative* texture, bool enable)
+void nativeSetTextureSmooth(MxTextureNative* texture, bool enable)
 {
     texture->handle.setSmooth(enable);
 }
@@ -2324,12 +2341,12 @@ MxVec2 nativeTextureSize(const MxTextureNative* texture)
     return MxVec2{(float)texture->handle.getSize().x, (float)texture->handle.getSize().y};
 }
 
-inline bool nativeTextureIsSmooth(const MxTextureNative* texture)
+bool nativeTextureIsSmooth(const MxTextureNative* texture)
 {
     return texture->handle.isSmooth();
 }
 
-inline bool nativeIsValidTexture(const MxTextureNative* texture)
+bool nativeIsValidTexture(const MxTextureNative* texture)
 {
     return texture->isValid;
 }
@@ -2593,6 +2610,7 @@ struct MxFontManager
         int count = sizeof(codepointsFontAwesome) / sizeof(codepointsFontAwesome[0]);
 
         loadFromMemory(MX_FONT_AWESOME_ID, fontAwesomeData, iconSize, codepointsFontAwesome, count, true);
+        MX_FREE(fontAwesomeData);
 #endif
     }
 
@@ -2804,12 +2822,12 @@ MxVec2 getSizeTexture(const std::string& textureNameID)
     return s_textureManager.getSize(textureNameID);
 }
 
-inline void setSmoothTexture(const std::string& textureNameID, bool enable)
+void setSmoothTexture(const std::string& textureNameID, bool enable)
 {
     s_textureManager.setSmooth(textureNameID, enable);
 }
 
-inline bool isSmoothTexture(const std::string& textureNameID)
+bool isSmoothTexture(const std::string& textureNameID)
 {
     return s_textureManager.isSmooth(textureNameID);
 }
