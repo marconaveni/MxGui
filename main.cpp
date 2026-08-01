@@ -4,8 +4,8 @@
 #include <array>
 #include <iostream>
 
-// #define MX_RAYLIB_BACKEND_IMPLEMENTATION
-#define MX_SFML_BACKEND_IMPLEMENTATION
+#define MX_RAYLIB_BACKEND_IMPLEMENTATION
+// #define MX_SFML_BACKEND_IMPLEMENTATION
 // #define MX_GUI_IMPLEMENTATION
 #include "mxgui.hpp"
 
@@ -21,8 +21,8 @@ int main()
     SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
     InitWindow(800, 600, "GUI");
     SetTextLineSpacing(0);
+    //SetTargetFPS(60);
 
-// SetTargetFPS(60);
 #elif MX_SFML
     sf::RenderWindow window(sf::VideoMode({800, 600}), "GUI");
     s_windowRef = &window;
@@ -76,7 +76,7 @@ int main()
             std::cout << "clicked Icon" << '\n';
         }
 
-        mxgui::guiScrollPanelBegin(ctx, "ScrollPanel", MxRect{300, 200, 100, 200}, MxRect{300, 200, 100, 250}, MxVec2{100, 100}, true);
+        mxgui::guiScrollPanelBegin(ctx, "ScrollPanel", MxRect{300, 200, 100, 200}, MxRect{300, 200, 100, 550}, MxVec2{100, 100}, true);
         mxgui::guiLabel(ctx, "hello world", MxVec2{100, 0}, anchor);
         mxgui::guiLabel(ctx, "hello world 2", MxVec2{0, 80});
         mxgui::guiScrollPanelEnd(ctx, "ScrollPanel");

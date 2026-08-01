@@ -332,6 +332,7 @@ struct ScrollPanelComponent
     MxTransform transformCanvas{};
     float scrollTop{0.0f};
     MxRect scrollBarThumb{};
+    float pointDrag{0.0f};
 };
 
 struct SliderComponent
@@ -1435,6 +1436,18 @@ inline bool checkCollisionPointRect(MxVec2 point, MxRect rec)
     return collision;
 }
 
+inline bool checkCollisionPointRectX(MxVec2 point, MxRect rec)
+{
+    const bool collision = ((point.x >= rec.x) && (point.x < (rec.x + rec.width)));
+    return collision;
+}
+
+inline bool checkCollisionPointRectY(MxVec2 point, MxRect rec)
+{
+    const bool collision = ((point.y >= rec.y) && (point.y < (rec.y + rec.height)));
+    return collision;
+}
+
 inline MxRect getCollisionRec(MxRect rect1, MxRect rect2)
 {
     MxRect overlap{};
@@ -1739,34 +1752,42 @@ namespace mxgui
 
         ctx->m_anchor = MxVec2{rect.x, rect.y};
 
+
         scrollPanel.transformCanvas.bounds = scrollBounds;
 
         if (scrollPanel.transformCanvas.bounds.height > rect.height && enable)
         {
-            const float previousScrollTop = scrollPanel.scrollTop;
+            float scrollTop = scrollPanel.scrollTop;
 
             if (checkCollisionPointRect(getMousePosition(), scrollPanel.scrollBarThumb) && isMouseButtonPressed(MX_MOUSE_BUTTON_LEFT))
             {
                 scrollPanel.isDrag = true;
+                scrollPanel.pointDrag = getMousePosition().y - scrollPanel.scrollBarThumb.y;
             }
-
-            if (scrollPanel.isDrag && isMouseButtonDown(MX_MOUSE_BUTTON_LEFT))
+            else if (scrollPanel.isDrag && isMouseButtonDown(MX_MOUSE_BUTTON_LEFT))
             {
-                scrollPanel.scrollTop += getMouseDelta().y;
+                constexpr float offsetTrack = 3.0f;
+                const float currentPointDrag = getMousePosition().y - scrollPanel.scrollBarThumb.y;
+                const float mouseDelta = currentPointDrag - scrollPanel.pointDrag;
+                if (currentPointDrag > scrollPanel.pointDrag + offsetTrack)
+                {
+                    scrollTop += 1.0f + mouseDelta;
+                }
+                else if (currentPointDrag < scrollPanel.pointDrag - offsetTrack)
+                {
+                    scrollTop -= 1.0f - mouseDelta;
+                }
             }
-            else if (checkCollisionPointRect(getMousePosition(), rect))
+            else if (scrollPanel.isDrag && isMouseButtonReleased(MX_MOUSE_BUTTON_LEFT))
             {
                 scrollPanel.isDrag = false;
-                scrollPanel.scrollTop -= getMouseWheelMove() * 10;
             }
-            else
+
+            if (getMouseWheelMove() != 0 && checkCollisionPointRect(getMousePosition(), rect))
             {
                 scrollPanel.isDrag = false;
+                scrollTop -= getMouseWheelMove() * 40;
             }
-
-
-            scrollPanel.scrollTop = (scrollPanel.scrollTop < 0) ? 0 : scrollPanel.scrollTop;
-            ctx->m_scrollTop = scrollPanel.scrollTop;
 
 
             scrollPanel.transformCanvas.bounds.x = 0;
@@ -1775,11 +1796,27 @@ namespace mxgui
             scrollPanel.transformCanvas = updateTransformWorld(ctx, scrollPanel.transformCanvas.bounds, MxVec2{0, 0});
             rectCanvas = scrollPanel.transformCanvas.worldBounds;
 
-            scrollPanel.scrollTop = (rectCanvas.y + rectCanvas.height < rect.y + rect.height) ? previousScrollTop : scrollPanel.scrollTop;
-            ctx->m_scrollTop = scrollPanel.scrollTop;
 
             float visibleProportion = rect.height / rectCanvas.height;
-            float progress = scrollPanel.scrollTop / (rectCanvas.height - rect.height);
+            float progress = scrollTop / (rectCanvas.height - rect.height);
+
+
+            scrollPanel.scrollTop = scrollTop;
+            if (rectCanvas.y + rectCanvas.height - scrollTop <= rect.y + rect.height)
+            {
+                scrollPanel.scrollTop = (rectCanvas.y + rectCanvas.height) - (rect.y + rect.height);
+            }
+            else if (scrollTop < 0)
+            {
+                scrollPanel.scrollTop = 0;
+            }
+
+
+            // std::cout << (rectCanvas.y + rectCanvas.height) - (rect.y + rect.height) << '\n';
+            // std::cout << scrollTop << " | " << rectCanvas.y + rectCanvas.height - scrollPanel.scrollTop << " | " << rect.y + rect.height << '\n';
+
+            progress = mxClamp(progress, 0.0f, 1.0f);
+            ctx->m_scrollTop = scrollPanel.scrollTop;
 
             scrollPanel.scrollBarThumb = MxRect{
                 .x = rect.x + rect.width - 6 - MX_DRAG_OFFSET,
