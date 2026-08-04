@@ -105,8 +105,12 @@ int main()
         const MxFont* font2 = getFont("teste");
         MxColor color = {200, 41, 55, 255};
 
-        drawTextEx(*font, "teste \nteste quebra linha", MxVec2{60, 60}, 20, 0, color);
-        drawTextEx(*font2, "teste \nteste quebra linha", MxVec2{60, 160}, 20, 0, color);
+        if (isCursorOnScreen())
+        {
+            drawTextEx(*font, "teste \nteste quebra linha", MxVec2{60, 60}, 20, 0, color);
+            drawTextEx(*font2, "teste \nteste quebra linha", MxVec2{60, 160}, 20, 0, color);
+        }
+        
 
 #if MX_RAYLIB
 

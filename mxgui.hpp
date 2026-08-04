@@ -50,40 +50,37 @@
 //-----------------------------------------------------------------------------
 
 
-
 #ifndef FORCE_DEBUG
-#define FORCE_DEBUG 0                    // Force debug
-#endif // FORCE_DEBUG
+#define FORCE_DEBUG 0 // Force debug
+#endif                // FORCE_DEBUG
 
 #ifndef MX_FONT_NOTO_ID
-#define MX_FONT_NOTO_ID "notosans"       // Font default ID
-#endif // MX_FONT_NOTO_ID
+#define MX_FONT_NOTO_ID "notosans" // Font default ID
+#endif                             // MX_FONT_NOTO_ID
 
 #ifndef MX_FONT_AWESOME_ID
 #define MX_FONT_AWESOME_ID "fontawesome" // Font awesome ID
-#endif // MX_FONT_AWESOME_ID
+#endif                                   // MX_FONT_AWESOME_ID
 
 #ifndef MX_DRAG_OFFSET
-#define MX_DRAG_OFFSET 4                 // Extra area px rect drags
-#endif // MX_DRAG_OFFSET
+#define MX_DRAG_OFFSET 4 // Extra area px rect drags
+#endif                   // MX_DRAG_OFFSET
 
 #ifndef MX_TEXT_LINE_SPACING
-#define MX_TEXT_LINE_SPACING 0.0f        // Config \n space in texts
-#endif // MX_TEXT_LINE_SPACING
+#define MX_TEXT_LINE_SPACING 0.0f // Config \n space in texts
+#endif                            // MX_TEXT_LINE_SPACING
 
 #ifndef MX_BAR_SIZE
-#define MX_BAR_SIZE 6                    // Bar size scroll
-#endif // MX_BAR_SIZE
+#define MX_BAR_SIZE 6 // Bar size scroll
+#endif                // MX_BAR_SIZE
 
 #ifndef MX_FONT_AWESOME
-#define MX_FONT_AWESOME 1                // Enable font_awesome (0 - disabled | 1 enabled)
-#endif // MX_FONT_AWESOME
+#define MX_FONT_AWESOME 1 // Enable font_awesome (0 - disabled | 1 enabled)
+#endif                    // MX_FONT_AWESOME
 
 #ifndef MX_SUPPRESS_WARNINGS
-#define MX_SUPPRESS_WARNINGS 1           // Supress Warnings    (0 - disabled | 1 enabled)
-#endif // MX_SUPPRESS_WARNINGS
-
-
+#define MX_SUPPRESS_WARNINGS 1 // Supress Warnings    (0 - disabled | 1 enabled)
+#endif                         // MX_SUPPRESS_WARNINGS
 
 
 // warnings headers
@@ -489,6 +486,9 @@ bool nativeTextureIsSmooth(const MxTextureNative* texture);
 bool nativeIsValidTexture(const MxTextureNative* texture);
 void nativeUnloadTexture(const MxTextureNative* texture);
 
+// window
+bool isCursorOnScreen();
+MxVec2 windowSize();
 
 // clip
 void beginScissorMode(int x, int y, int width, int height);
@@ -1704,13 +1704,13 @@ namespace mxgui
                 canvas.Offset.y = transform.anchor.y + mousePosition.y - rect.y;
                 canvas.isDrag = true;
             }
-            if (canvas.isDrag && isMouseButtonDown(MX_MOUSE_BUTTON_LEFT))
+            if (canvas.isDrag && isMouseButtonDown(MX_MOUSE_BUTTON_LEFT) && isCursorOnScreen())
             {
                 const MxVec2 mousePosition = getMousePosition();
                 transform.bounds.x = mousePosition.x - canvas.Offset.x - ctx->m_anchor.x;
                 transform.bounds.y = mousePosition.y - canvas.Offset.y - ctx->m_anchor.y + ctx->m_scrollTop;
             }
-            else
+            else if (mouseEvents.isMouseRelease)
             {
                 canvas.isDrag = false;
             }
@@ -2194,6 +2194,16 @@ void nativeUnloadTexture(const MxTextureNative* texture)
     UnloadTexture(texture->handle);
 }
 
+bool isCursorOnScreen()
+{
+    return IsCursorOnScreen();
+}
+
+MxVec2 windowSize()
+{
+    return MxVec2{(float)GetScreenWidth(), (float)GetScreenHeight()};
+}
+
 void beginScissorMode(int x, int y, int width, int height)
 {
     BeginScissorMode(x, y, width, height);
@@ -2288,6 +2298,7 @@ struct MxMousePolling
     bool release{false};
 };
 
+static bool s_cursorOnScreen{false};
 
 static sf::RectangleShape s_rectShape;
 static sf::CircleShape s_circleShape;
@@ -2323,7 +2334,13 @@ inline MxVec2 toMxVec2(sf::Vector2f vec)
 {
     return MxVec2{vec.x, vec.y};
 }
+
 inline MxVec2 toMxVec2(sf::Vector2i vec)
+{
+    return MxVec2{(float)vec.x, (float)vec.y};
+}
+
+inline MxVec2 toMxVec2(sf::Vector2u vec)
 {
     return MxVec2{(float)vec.x, (float)vec.y};
 }
@@ -2476,7 +2493,27 @@ std::optional<sf::Event> windowPollEvent(sf::RenderWindow* window)
         s_mousePolling[button].release = true;
     }
 
+    if (event->is<sf::Event::MouseEntered>())
+    {
+        s_cursorOnScreen = true;
+    }
+    
+    if (event->is<sf::Event::MouseLeft>())
+    {
+        s_cursorOnScreen = false;
+    }
+
     return event;
+}
+
+bool isCursorOnScreen()
+{
+    return s_cursorOnScreen;
+}
+
+MxVec2 windowSize()
+{
+    return toMxVec2(s_windowRef->getSize());
 }
 
 void beginScissorMode(int x, int y, int width, int height)
