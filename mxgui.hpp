@@ -49,24 +49,65 @@
 // (SECTION) configs
 //-----------------------------------------------------------------------------
 
-#define FORCE_DEBUG 0                    // force debug
-#define MX_FONT_NOTO_ID "notosans"       // font default ID
-#define MX_FONT_AWESOME_ID "fontawesome" // font awesome ID
-#define MX_DRAG_OFFSET 4                 // extra area px rect drags
-#define MX_TEXT_LINE_SPACING 0.0f        // config \n space in texts
-#define MX_BAR_SIZE 6                    // bar size scroll
 
-#define FONT_AWESOME 1
 
+#ifndef FORCE_DEBUG
+#define FORCE_DEBUG 0                    // Force debug
+#endif // FORCE_DEBUG
+
+#ifndef MX_FONT_NOTO_ID
+#define MX_FONT_NOTO_ID "notosans"       // Font default ID
+#endif // MX_FONT_NOTO_ID
+
+#ifndef MX_FONT_AWESOME_ID
+#define MX_FONT_AWESOME_ID "fontawesome" // Font awesome ID
+#endif // MX_FONT_AWESOME_ID
+
+#ifndef MX_DRAG_OFFSET
+#define MX_DRAG_OFFSET 4                 // Extra area px rect drags
+#endif // MX_DRAG_OFFSET
+
+#ifndef MX_TEXT_LINE_SPACING
+#define MX_TEXT_LINE_SPACING 0.0f        // Config \n space in texts
+#endif // MX_TEXT_LINE_SPACING
+
+#ifndef MX_BAR_SIZE
+#define MX_BAR_SIZE 6                    // Bar size scroll
+#endif // MX_BAR_SIZE
+
+#ifndef MX_FONT_AWESOME
+#define MX_FONT_AWESOME 1                // Enable font_awesome (0 - disabled | 1 enabled)
+#endif // MX_FONT_AWESOME
+
+#ifndef MX_SUPPRESS_WARNINGS
+#define MX_SUPPRESS_WARNINGS 1           // Supress Warnings    (0 - disabled | 1 enabled)
+#endif // MX_SUPPRESS_WARNINGS
+
+
+
+
+// warnings headers
+#if defined(__GNUC__) && (MX_SUPPRESS_WARNINGS == 1) // GCC and Clang
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wunused-function"
+#endif
 
 //-----------------------------------------------------------------------------
 // (SECTION) Header and defines
 //-----------------------------------------------------------------------------
 
-
 #include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <memory>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
+#include <vector>
+
+#include "mxgui_notosans.hpp"
+#include "string.h"
 
 
 #ifdef MX_RAYLIB_BACKEND_IMPLEMENTATION
@@ -75,7 +116,7 @@
 #define MX_SFML 1
 #endif
 
-#if defined(MX_RAYLIB_BACKEND_IMPLEMENTATION) || defined(MX_SFML_BACKEND_IMPLEMENTATION) && !defined(MX_GUI_IMPLEMENTATION)
+#if (defined(MX_RAYLIB_BACKEND_IMPLEMENTATION) || defined(MX_SFML_BACKEND_IMPLEMENTATION)) && (!defined(MX_GUI_IMPLEMENTATION))
 #define MX_GUI_IMPLEMENTATION
 #endif
 
@@ -125,8 +166,12 @@
 // (SECTION) nothings libs
 //-----------------------------------------------------------------------------
 
+
+// Third-party header: always suppress regardless of MX_SUPPRESS_WARNINGS,
+// since these warnings come from stb_truetype.h, not from mxgui itself.
 #if defined(__GNUC__) // GCC and Clang
 #pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Wunused-function"
 #endif
 
@@ -137,15 +182,15 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 
-#if defined(__GNUC__) // GCC and Clang
-#pragma GCC diagnostic pop
+#if defined(__GNUC__)      // GCC and Clang
+#pragma GCC diagnostic pop // "-Wunused-parameter"  "-Wunused-function"
 #endif
 
 //-----------------------------------------------------------------------------
 // (SECTION) GuiIcons FontAwesome
 //-----------------------------------------------------------------------------
 
-#if FONT_AWESOME
+#if MX_FONT_AWESOME
 #include "mxgui_font_awesome.h"
 #include "mxgui_icons_font_awesome7.hpp"
 #endif
@@ -192,6 +237,26 @@ struct MxRect
     float width{0.0f};
     float height{0.0f};
 };
+
+inline constexpr MxVec2 toMxVec2(const MxRect& rec)
+{
+    return MxVec2{rec.x, rec.y};
+}
+
+inline constexpr MxRect toMxRect(const MxVec2& vec)
+{
+    return MxRect{vec.x, vec.y, 0, 0};
+}
+
+inline constexpr MxRect toMxRect(const MxVec2& vec, const MxRect& rec)
+{
+    return MxRect{vec.x, vec.y, rec.width, rec.height};
+}
+
+inline constexpr MxRect toMxRect(const MxVec2& vec, const MxVec2& vec2)
+{
+    return MxRect{vec.x, vec.y, vec2.x, vec2.y};
+}
 
 struct MxImage
 {
@@ -386,6 +451,7 @@ namespace mxgui
 
     MxGuiContext* createContext(MxStyle style = MxStyle{});
     void destroyContext(MxGuiContext* ctx);
+    MxGuiContext* getCurrentContext();
     MxStyle getStyle(MxGuiContext* ctx);
 
     MxTransform getCurrentTransform(MxGuiContext* ctx);
@@ -451,7 +517,6 @@ bool isValidFont(const MxFont& font);
 bool isValidImage(const MxImage& image);
 MxVec2 measureTextInternal(MxFont font, const std::string& text, float fontSize, float spacing);
 MxFont loadFontFromMemoryInternal(const std::string& textureNameID, const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount);
-static unsigned int stb_decompress(unsigned char* output, const unsigned char* i, unsigned int /*length*/);
 
 // mxgui functions
 void pushScissor(int x, int y, int width, int height);
@@ -477,25 +542,6 @@ MxVec2 measureText(const std::string& fontNameID, const std::string& text, int f
 void drawText(const std::string& fontNameID, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint);
 void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size);
 void loadFont(const std::string& textureNameID, const std::filesystem::path& path, int fontSize, const int* codepoints, int codepointCount);
-
-#endif // MXGUI_HPP
-
-
-/////////////////////////////////////////////////////
-//  implementations
-/////////////////////////////////////////////////////
-
-#ifdef MX_GUI_IMPLEMENTATION
-
-
-#include <fstream>
-#include <iostream>
-#include <memory>
-#include <unordered_map>
-#include <vector>
-
-#include "mxgui_notosans.hpp"
-#include "string.h"
 
 
 //-----------------------------------------------------------------------------
@@ -581,10 +627,31 @@ struct MxGuiContext
 };
 
 
+// warnings headers
+#if defined(__GNUC__) && (MX_SUPPRESS_WARNINGS == 1) // GCC and Clang
+#pragma GCC diagnostic pop                           // "-Wunused-parameter"  "-Wunused-function"
+#endif
+
+#endif // MXGUI_HPP
+
+
+/////////////////////////////////////////////////////
+//  implementations
+/////////////////////////////////////////////////////
+
+#ifdef MX_GUI_IMPLEMENTATION
+
+// warnings implementations
+#if defined(__GNUC__) && (MX_SUPPRESS_WARNINGS == 1) // GCC and Clang
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wunused-function"
+#endif
+
+
 //-----------------------------------------------------------------------------
 // Internal functions
 //-----------------------------------------------------------------------------
-
 
 std::vector<char> loadFileData(const std::filesystem::path& path)
 {
@@ -1377,6 +1444,7 @@ static unsigned int stb_adler32(unsigned int adler32, unsigned char* buffer, uns
     return (unsigned int)(s2 << 16) + (unsigned int)s1;
 }
 
+
 static unsigned int stb_decompress(unsigned char* output, const unsigned char* i, unsigned int /*length*/)
 {
     if (stb__in4(0) != 0x57bC0000)
@@ -1489,26 +1557,6 @@ inline MxRect getCollisionRec(MxRect rect1, MxRect rect2)
     return overlap;
 }
 
-inline constexpr MxVec2 toMxVec2(const MxRect& rec)
-{
-    return MxVec2{rec.x, rec.y};
-}
-
-inline constexpr MxRect toMxRect(const MxVec2& vec)
-{
-    return MxRect{vec.x, vec.y, 0, 0};
-}
-
-inline constexpr MxRect toMxRect(const MxVec2& vec, const MxRect& rec)
-{
-    return MxRect{vec.x, vec.y, rec.width, rec.height};
-}
-
-inline constexpr MxRect toMxRect(const MxVec2& vec, const MxVec2& vec2)
-{
-    return MxRect{vec.x, vec.y, vec2.x, vec2.y};
-}
-
 inline MxColor fadeColor(MxColor color, float alpha)
 {
     MxColor result = color;
@@ -1604,6 +1652,11 @@ namespace mxgui
     {
         ctx->close();
         s_context.reset();
+    }
+
+    MxGuiContext* getCurrentContext()
+    {
+        return s_context.get();
     }
 
     MxStyle getStyle(MxGuiContext* ctx)
@@ -2021,14 +2074,21 @@ namespace mxgui
 
     bool guiCheckBox(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked)
     {
+#if MX_FONT_AWESOME
         return guiToogleEx(ctx, bounds, anchor, checked, ICON_FA_SQUARE_CHECK, ICON_FA_SQUARE);
+#else
+        return false;
+#endif // MX_FONT_AWESOME
     }
 
     bool guiToogle(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked)
     {
+#if MX_FONT_AWESOME
         return guiToogleEx(ctx, bounds, anchor, checked, ICON_FA_TOGGLE_ON, ICON_FA_TOGGLE_OFF);
+#else
+        return false;
+#endif // MX_FONT_AWESOME
     }
-
 
 } // namespace mxgui
 
@@ -2563,8 +2623,12 @@ void drawFPS(float x, float y)
 // (SECTION) CUSTOM_BACKEND
 //-----------------------------------------------------------------------------
 
-#include "mxgui_custom.hpp" // Note:  Here you can implement a custom renderer.
+// Note:  Here you can implement a custom renderer.
+#ifdef MX_CUSTOM_BACKEND_HEADER
 
+#include MX_CUSTOM_BACKEND_HEADER
+
+#endif // MX_CUSTOM_BACKEND_HEADER
 
 #endif // MX_XXX_BACKEND_IMPLEMENTATION
 
@@ -2603,7 +2667,7 @@ struct MxFontManager
 
     void setupFontAwesome(int iconSize)
     {
-#if FONT_AWESOME
+#if MX_FONT_AWESOME
         int arrayOriginalSize = 414704;
         unsigned char* fontAwesomeData = (unsigned char*)MX_MALLOC(arrayOriginalSize);
         stb_decompress(fontAwesomeData, fa_compressed_data, fa_compressed_size);
@@ -2837,5 +2901,20 @@ const MxTextureNative* getTexture(const std::string& textureNameID)
     const MxTextureNative* texture = s_textureManager.getTexture(textureNameID);
     return texture;
 }
+
+#if defined(__GNUC__) && (MX_SUPPRESS_WARNINGS == 1) // GCC and Clang
+#pragma GCC diagnostic pop                           // "-Wunused-parameter"  "-Wunused-function"
+#endif
+
+//-----------------------------------------------------------------------------
+// (SECTION) CUSTOM_USER_FUNCTIONS
+//-----------------------------------------------------------------------------
+
+// Note:  Here you can implement a custom functions.
+#ifdef MX_CUSTOM_USER_HEADER
+
+#include MX_CUSTOM_USER_HEADER
+
+#endif // MX_CUSTOM_IMPL_HEADER
 
 #endif // MX_GUI_IMPLEMENTATION

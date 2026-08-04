@@ -4,11 +4,17 @@
 #include <array>
 #include <iostream>
 
-#define MX_RAYLIB_BACKEND_IMPLEMENTATION
-// #define MX_SFML_BACKEND_IMPLEMENTATION
-// #define MX_GUI_IMPLEMENTATION
+#define MX_SUPPRESS_WARNINGS 0
+
+// #define MX_CUSTOM_BACKEND_HEADER "mxgui_custom_render.hpp"
+// #define MX_RAYLIB_BACKEND_IMPLEMENTATION
+#define MX_SFML_BACKEND_IMPLEMENTATION
+#define MX_GUI_IMPLEMENTATION
 #include "mxgui.hpp"
 
+
+
+// #define MX_SFML 1
 
 void testScissor();
 
@@ -32,6 +38,8 @@ int main()
     MxStyle style = MxStyle::Light;
     style.iconSize = 28;
     MxGuiContext* ctx = mxgui::createContext(style);
+
+         
 
     mxgui::createImage("/home/marco/Imagens/icons/nfsu2.png", "nfsu2");
 
@@ -70,11 +78,13 @@ int main()
             setSmoothTexture(MX_FONT_AWESOME_ID, !isSmoothTexture(MX_FONT_AWESOME_ID));
         }
         mxgui::guiImage(ctx, "nfsu2", MxRect{220, 35, 180, 180}, anchor);
+#if MX_FONT_AWESOME
         mxgui::guiIcon(ctx, MxRect{10, 80, 0, 0}, anchor, ICON_FA_CIRCLE_PLAY);
         if (mxgui::guiIconButton(ctx, MxRect{10, 120, 20, 20}, anchor, ICON_FA_CIRCLE_PLAY, 28))
         {
             std::cout << "clicked Icon" << '\n';
         }
+#endif // MX_FONT_AWESOME
 
         mxgui::guiScrollPanelBegin(ctx, "ScrollPanel", MxRect{300, 200, 100, 200}, MxRect{300, 200, 100, 550}, MxVec2{100, 100}, true);
         mxgui::guiLabel(ctx, "hello world", MxVec2{100, 0}, anchor);

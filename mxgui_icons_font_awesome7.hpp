@@ -1430,7 +1430,7 @@
 
 // clang-format on
 
-static int codepointsFontAwesome[] = {
+inline int codepointsFontAwesome[] = {
     ICON_FA_0,
     ICON_FA_1,
     ICON_FA_2,
