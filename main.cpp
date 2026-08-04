@@ -7,9 +7,9 @@
 #define MX_SUPPRESS_WARNINGS 0
 
 // #define MX_CUSTOM_BACKEND_HEADER "mxgui_custom_render.hpp"
-// #define MX_RAYLIB_BACKEND_IMPLEMENTATION
-#define MX_SFML_BACKEND_IMPLEMENTATION
-#define MX_GUI_IMPLEMENTATION
+#define MX_RAYLIB_BACKEND_IMPLEMENTATION
+// #define MX_SFML_BACKEND_IMPLEMENTATION
+// #define MX_GUI_IMPLEMENTATION
 #include "mxgui.hpp"
 
 
@@ -101,12 +101,12 @@ int main()
         mxgui::guiSliderProgress(ctx, MxRect{50, 560, 700, 6}, MxVec2{}, 0.8f);
 
 
-        const MxFont* font = getFont(MX_FONT_NOTO_ID);
-        const MxFont* font2 = getFont("teste");
-        MxColor color = {200, 41, 55, 255};
-
         if (isCursorOnScreen())
         {
+            const MxFont* font = getFont(MX_FONT_NOTO_ID);
+            const MxFont* font2 = getFont("teste");
+            MxColor color = {200, 41, 55, 255};
+    
             drawTextEx(*font, "teste \nteste quebra linha", MxVec2{60, 60}, 20, 0, color);
             drawTextEx(*font2, "teste \nteste quebra linha", MxVec2{60, 160}, 20, 0, color);
         }

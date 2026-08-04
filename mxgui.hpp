@@ -1710,7 +1710,7 @@ namespace mxgui
                 transform.bounds.x = mousePosition.x - canvas.Offset.x - ctx->m_anchor.x;
                 transform.bounds.y = mousePosition.y - canvas.Offset.y - ctx->m_anchor.y + ctx->m_scrollTop;
             }
-            else if (mouseEvents.isMouseRelease)
+            else /*if (mouseEvents.isMouseRelease)*/
             {
                 canvas.isDrag = false;
             }
@@ -2196,7 +2196,11 @@ void nativeUnloadTexture(const MxTextureNative* texture)
 
 bool isCursorOnScreen()
 {
-    return IsCursorOnScreen();
+    const bool isValid = (GetMousePosition().x > 0 && 
+                            GetMousePosition().y > 0 &&  
+                            GetMousePosition().x < GetScreenWidth() && // check cursor is outscreen
+                            GetMousePosition().y < GetScreenHeight()) && IsCursorOnScreen();
+                            return isValid;
 }
 
 MxVec2 windowSize()
