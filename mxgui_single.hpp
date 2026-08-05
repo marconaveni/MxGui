@@ -15563,11 +15563,11 @@ struct MxFontManager
         setupFontAwesome(style.iconSize);
     }
 
-    void loadFromMemory(const std::string& textureNameID, const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount, bool smooth)
+    void loadFromMemory(const std::string& fontNameID, const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount, bool smooth)
     {
-        MxFont font = loadFontFromMemoryInternal(textureNameID, fileData, fontSize, codepoints, codepointCount);
+        MxFont font = loadFontFromMemoryInternal(fontNameID, fileData, fontSize, codepoints, codepointCount);
         setSmoothTexture(font.textureNameID, smooth);
-        m_fonts.insert_or_assign(textureNameID, font);
+        m_fonts.insert_or_assign(fontNameID, font);
     }
 
     void setupDefaultFont(int textSize)
@@ -15642,6 +15642,7 @@ struct MxFontManager
     }
 
     std::unordered_map<std::string, MxFont> m_fonts{};
+    std::vector<std::string> m_currentFont{};
 };
 
 
