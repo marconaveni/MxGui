@@ -44,6 +44,12 @@
 // you can search for (SECTION)
 //-----------------------------------------------------------------------------
 
+//-----------------------------------------------------------------------------
+// (SECTION) Library version
+//-----------------------------------------------------------------------------
+
+#define MXGUI_VERSION "0.0.1 ALPHA"
+#define MXGUI_VERSION_NUM 0
 
 //-----------------------------------------------------------------------------
 // (SECTION) configs
@@ -52,35 +58,35 @@
 
 #ifndef FORCE_DEBUG
 #define FORCE_DEBUG 0 // Force debug
-#endif                // FORCE_DEBUG
+#endif
 
 #ifndef MX_FONT_NOTO_ID
 #define MX_FONT_NOTO_ID "notosans" // Font default ID
-#endif                             // MX_FONT_NOTO_ID
+#endif
 
 #ifndef MX_FONT_AWESOME_ID
 #define MX_FONT_AWESOME_ID "fontawesome" // Font awesome ID
-#endif                                   // MX_FONT_AWESOME_ID
+#endif
 
 #ifndef MX_DRAG_OFFSET
 #define MX_DRAG_OFFSET 4 // Extra area px rect drags
-#endif                   // MX_DRAG_OFFSET
+#endif
 
 #ifndef MX_TEXT_LINE_SPACING
 #define MX_TEXT_LINE_SPACING 0.0f // Config \n space in texts
-#endif                            // MX_TEXT_LINE_SPACING
+#endif
 
 #ifndef MX_BAR_SIZE
 #define MX_BAR_SIZE 6 // Bar size scroll
-#endif                // MX_BAR_SIZE
+#endif
 
 #ifndef MX_FONT_AWESOME
 #define MX_FONT_AWESOME 1 // Enable font_awesome (0 - disabled | 1 enabled)
-#endif                    // MX_FONT_AWESOME
+#endif
 
 #ifndef MX_SUPPRESS_WARNINGS
 #define MX_SUPPRESS_WARNINGS 1 // Supress Warnings    (0 - disabled | 1 enabled)
-#endif                         // MX_SUPPRESS_WARNINGS
+#endif
 
 
 // warnings headers
@@ -15036,11 +15042,10 @@ void nativeUnloadTexture(const MxTextureNative* texture)
 
 bool isCursorOnScreen()
 {
-    const bool isValid = (GetMousePosition().x > 0 && 
-                            GetMousePosition().y > 0 &&  
-                            GetMousePosition().x < GetScreenWidth() && // check cursor is outscreen
-                            GetMousePosition().y < GetScreenHeight()) && IsCursorOnScreen();
-                            return isValid;
+    const bool isValid = (GetMousePosition().x > 0 && GetMousePosition().y > 0 && GetMousePosition().x < GetScreenWidth() && // check cursor is outscreen
+                          GetMousePosition().y < GetScreenHeight()) &&
+                         IsCursorOnScreen();
+    return isValid;
 }
 
 MxVec2 windowSize()
@@ -15341,7 +15346,7 @@ std::optional<sf::Event> windowPollEvent(sf::RenderWindow* window)
     {
         s_cursorOnScreen = true;
     }
-    
+
     if (event->is<sf::Event::MouseLeft>())
     {
         s_cursorOnScreen = false;

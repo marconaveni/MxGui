@@ -97,6 +97,22 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     SFML::Graphics
 )
 
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
+set(SCRIPT_MXGUI_SINGLE "${CMAKE_CURRENT_SOURCE_DIR}/build_mxgui_single.py")
+set(OUTPUT_SINGLE "${CMAKE_CURRENT_SOURCE_DIR}/mxgui_single.hpp")
+
+add_custom_target(genmxgui
+    COMMAND Python3::Interpreter "${SCRIPT_MXGUI_SINGLE}"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    COMMENT "Generate mxgui_single.hpp..."
+    VERBATIM
+)
+
+
+add_dependencies(mxgui genmxgui)
+
+
 
 
 
