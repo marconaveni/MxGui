@@ -14948,6 +14948,14 @@ namespace mxgui
 // (SECTION) raylib backend
 //-----------------------------------------------------------------------------
 
+
+
+
+// ==============mxgui_raylib.hpp================
+
+#ifndef MXGUI_RAYLIB_HPP
+#define MXGUI_RAYLIB_HPP
+
 #include <cstdio>
 
 #include "raylib.h"
@@ -15120,12 +15128,25 @@ void drawCircle(MxVec2 center, float radius, MxColor color)
 }
 
 
+#endif // MXGUI_RAYLIB_HPP
+
+
+// =============end mxgui_raylib.hpp=============
+
+
+
 #elifdef MX_SFML_BACKEND_IMPLEMENTATION
 
 //-----------------------------------------------------------------------------
 // (SECTION) SFML backend
 //-----------------------------------------------------------------------------
 
+
+
+// ==============mxgui_sfml.hpp================
+
+#ifndef MXGUI_SFML_HPP
+#define MXGUI_SFML_HPP
 
 #include <SFML/Graphics.hpp>
 #include <SFML/OpenGL.hpp>
@@ -15503,6 +15524,15 @@ void drawFPS(float x, float y)
     const MxFont* font = getFont(MX_FONT_NOTO_ID);
     drawTextEx(*font, text, MxVec2{x, y}, 20, 0, color);
 }
+
+
+
+#endif // MXGUI_SFML_HPP
+
+
+// =============end mxgui_sfml.hpp=============
+
+
 #else
 
 //-----------------------------------------------------------------------------

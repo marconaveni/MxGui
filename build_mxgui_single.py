@@ -1,4 +1,4 @@
-files_includes = ["mxgui_font_awesome.h", "mxgui_icons_font_awesome7.hpp" , "mxgui_notosans.hpp","stb_truetype.h"]
+files_includes = ["mxgui_font_awesome.h", "mxgui_icons_font_awesome7.hpp" , "mxgui_notosans.hpp","stb_truetype.h", "mxgui_raylib.hpp", "mxgui_sfml.hpp"]
 mxgui_single = ""
 mxgui = open("mxgui.hpp")
 
