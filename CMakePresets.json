@@ -26,6 +26,12 @@
             }
         },
         {
+            "name": "mingw",
+            "inherits": "base",
+            "displayName": "MinGW-w64",
+            "toolchainFile": "${sourceDir}/cmake/mingw-toolchain.cmake"
+        },
+        {
             "name": "clang",
             "inherits": "base",
             "displayName": "CLANG",

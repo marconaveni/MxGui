@@ -88,7 +88,7 @@ int main()
 
         mxgui::guiScrollPanelBegin(ctx, "ScrollPanel", MxRect{300, 200, 100, 200}, MxRect{300, 200, 100, 550}, MxVec2{100, 100}, true);
         mxgui::guiLabel(ctx, "hello world", MxVec2{100, 0}, anchor);
-        mxgui::guiLabel(ctx, "hello world 2", MxVec2{0, 80});
+        mxgui::guiLabel(ctx, "hello world 2", MxVec2{0, 80.35554});
         mxgui::guiScrollPanelEnd(ctx, "ScrollPanel");
 
 

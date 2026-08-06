@@ -100,6 +100,7 @@
 // (SECTION) Header and defines
 //-----------------------------------------------------------------------------
 
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -659,26 +660,41 @@ struct MxGuiContext
 // Internal functions
 //-----------------------------------------------------------------------------
 
-std::vector<char> loadFileData(const std::filesystem::path& path)
+static unsigned char* loadFileData(const std::filesystem::path& path, int& dataSize)
 {
-
+    unsigned char* data = NULL;
+    dataSize = 0;
     std::ifstream file(path, std::ios::binary | std::ios::ate);
 
     if (!file.is_open())
     {
-        std::cerr << "Erro ao abrir o arquivo: " << path << std::endl;
-        return std::vector<char>{};
+        std::cerr << "Error to open file: " << path << '\n';
+        return data;
     }
 
     std::streamsize size = file.tellg();
     file.seekg(0, std::ios::beg);
-    std::vector<char> buffer(size);
+    data = (unsigned char*)MX_MALLOC(size * sizeof(unsigned char));
+    if (data == NULL)
+    {
+        std::cerr << "Error to allocate memory." << '\n';
+        return NULL;
+    }
 
-    if (file.read(buffer.data(), size))
+
+    if (file.read((char*)data, size))
     {
         std::cout << "File '" << path << "' loaded sucessfull. Bytes: " << size << '\n';
+        dataSize = (int)size;
     }
-    return buffer;
+    else
+    {
+        std::cerr << "Error to read file." << '\n';
+        MX_FREE(data);
+        data = NULL;
+    }
+
+    return data;
 }
 
 
@@ -1753,7 +1769,7 @@ namespace mxgui
         MxRect rect = transform.worldBounds;
         const MxStyle style = ctx->m_style;
 
-        drawText(style.fontName, text, MxVec2{rect.x, rect.y}, style.textSize, style.textSpacing, style.textColor);
+        drawText(style.fontName, text, MxVec2{std::round(rect.x), std::round(rect.y)}, style.textSize, style.textSpacing, style.textColor);
         ctx->updateCurrents(transform, MxMouseEvents{});
     }
 
@@ -1807,12 +1823,13 @@ namespace mxgui
 
         const MxStyle style = ctx->m_style;
 
-        MxVec2 textSize = measureText(style.fontName, text, style.textSize, style.textSpacing);
-        MxVec2 textPosition = MxVec2{rect.x + (rect.width - textSize.x) / 2, rect.y + (rect.height - textSize.y) / 2};
-        textPosition.x -= ctx->m_anchor.x;
-        textPosition.y -= ctx->m_anchor.y;
+        const MxVec2 textSize = measureText(style.fontName, text, style.textSize, style.textSpacing);
 
-        guiLabel(ctx, text, MxVec2{0}, textPosition);
+        MxVec2 textPosition = MxVec2{rect.x + (rect.width - textSize.x) / 2.0f, rect.y + (rect.height - textSize.y) / 2.0f};
+        textPosition.x -= (int)ctx->m_anchor.x;
+        textPosition.y -= (int)ctx->m_anchor.y;
+
+        drawText(style.fontName, text, MxVec2{std::round(textPosition.x), std::round(textPosition.y)}, style.textSize, style.textSpacing, style.textColor);
 
         ctx->updateCurrents(transform, mouseEvents);
 
@@ -2229,7 +2246,6 @@ struct MxFontManager
     }
 
     std::unordered_map<std::string, MxFont> m_fonts{};
-    std::vector<std::string> m_currentFont{};
 };
 
 
@@ -2336,11 +2352,13 @@ const MxFont* getFont(const std::string& fontName)
 
 void loadFont(const std::string& textureNameID, const std::filesystem::path& path, int fontSize, const int* codepoints, int codepointCount)
 {
-    std::vector<char> fileData = loadFileData(path);
-    if (!fileData.empty())
+    int size = 0;
+    unsigned char* fileData = loadFileData(path, size);
+    if (fileData != NULL)
     {
         // Loading font from memory data
-        s_fontManager.loadFromMemory(textureNameID, (unsigned char*)fileData.data(), fontSize, codepoints, codepointCount, false);
+        s_fontManager.loadFromMemory(textureNameID, fileData, fontSize, codepoints, codepointCount, false);
+        MX_FREE(fileData);
     }
 }
 
