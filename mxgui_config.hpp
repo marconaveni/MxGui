@@ -1,5 +1,5 @@
 
-
+#define MX_LOG_SUPORT 0                  // Enable Log
 #define FORCE_DEBUG 0                    // Force debug
 #define MX_FONT_NOTO_ID "notosans"       // Font default ID
 #define MX_FONT_AWESOME_ID "fontawesome" // Font awesome ID

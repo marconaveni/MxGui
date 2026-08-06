@@ -5,6 +5,7 @@
 #include <iostream>
 
 #define MX_SUPPRESS_WARNINGS 0
+#define MX_LOG_SUPORT 1 
 
 // #define MX_CUSTOM_BACKEND_HEADER "mxgui_custom_render.hpp"
 #define MX_RAYLIB_BACKEND_IMPLEMENTATION
@@ -12,7 +13,7 @@
 // #define MX_GUI_IMPLEMENTATION
 #include "mxgui.hpp"
 
-
+// #define MX_LOG(...) mxLog(__LINE__, __FILE__, __VA_ARGS__)
 
 // #define MX_SFML 1
 
@@ -73,7 +74,7 @@ int main()
         mxgui::guiPanel(ctx, "Canvas2", MxRect{0, (height - 1), width, width}, anchor, false);
         if (mxgui::guiButton(ctx, "Click", MxRect{10, 35, 75, 35}, anchor, MX_OUTLINE, true))
         {
-            std::cout << "clicked" << '\n';
+            MX_LOG("Clicked");
             setSmoothTexture(MX_FONT_NOTO_ID, !isSmoothTexture(MX_FONT_NOTO_ID));
             setSmoothTexture(MX_FONT_AWESOME_ID, !isSmoothTexture(MX_FONT_AWESOME_ID));
         }
@@ -82,7 +83,7 @@ int main()
         mxgui::guiIcon(ctx, MxRect{10, 80, 0, 0}, anchor, ICON_FA_CIRCLE_PLAY);
         if (mxgui::guiIconButton(ctx, MxRect{10, 120, 20, 20}, anchor, ICON_FA_CIRCLE_PLAY, 28))
         {
-            std::cout << "clicked Icon" << '\n';
+            MX_LOG("Clicked Icon");
         }
         mxgui::pushIconSize(ctx, 50);
         mxgui::guiIcon(ctx, MxRect{10, 160, 0, 0}, anchor, ICON_FA_COPY);
@@ -108,6 +109,7 @@ int main()
         mxgui::guiSliderProgress(ctx, MxRect{50, 560, 700, 6}, MxVec2{}, 0.8f);
 
 
+        //MX_LOG("teste %.2f", progress);
         if (isCursorOnScreen())
         {
             const MxFont* font = getFont(MX_FONT_NOTO_ID, 20);
