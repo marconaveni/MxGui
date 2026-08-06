@@ -463,6 +463,8 @@ namespace mxgui
 
     void createImage(const std::filesystem::path& path, const std::string& imageName, bool smooth = true);
 
+    void pushTextSize(MxGuiContext* ctx, int newSize);
+    void pushIconSize(MxGuiContext* ctx, int newSize);
     MxVec2 guiPanel(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor = MxVec2{0}, bool enableDrag = false);
     void guiImage(MxGuiContext* ctx, const std::string& imageName, MxRect bounds, MxVec2 anchor = MxVec2{0}, MxColor color = MxColor::White);
     bool guiButton(MxGuiContext* ctx, const std::string& text, MxRect bounds, MxVec2 anchor = MxVec2{0}, int buttonStyle = MX_CONTAINED, bool enable = true);
@@ -544,7 +546,7 @@ bool isSmoothTexture(const std::string& textureNameID);
 const MxTextureNative* getTexture(const std::string& textureNameID);
 
 // font managers functions
-const MxFont* getFont(const std::string& fontNameID);
+const MxFont* getFont(const std::string& fontNameID, int size);
 MxVec2 measureText(const std::string& fontNameID, const std::string& text, int fontSize, int spacing);
 void drawText(const std::string& fontNameID, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint);
 void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size);
@@ -1702,6 +1704,16 @@ namespace mxgui
         setSmoothTexture(imageName, smooth);
     }
 
+    void pushTextSize(MxGuiContext* ctx, int newSize)
+    {
+        ctx->m_style.textSize = newSize;
+    }
+
+    void pushIconSize(MxGuiContext* ctx, int newSize)
+    {
+        ctx->m_style.iconSize = newSize;
+    }
+
     MxVec2 guiPanel(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor, bool enableDrag)
     {
 
@@ -2157,6 +2169,16 @@ namespace mxgui
 // (SECTION) Managers
 //-----------------------------------------------------------------------------
 
+struct MxFontData
+{
+    unsigned char* fileData{nullptr};
+    int* codepoints{nullptr};
+    int codepointCount{0};
+    std::unordered_map<int, MxFont> fonts{};
+};
+
+
+#define GEN_TEXTURE_NAME_ID(name, id) name + std::to_string(id)
 
 struct MxFontManager
 {
@@ -2167,11 +2189,29 @@ struct MxFontManager
         setupFontAwesome(style.iconSize);
     }
 
-    void loadFromMemory(const std::string& fontNameID, const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount, bool smooth)
+    void loadFromMemory(const std::string& fontNameID, const unsigned char* fileData, int dataSize, int fontSize, const int* codepoints, int codepointCount, bool smooth)
     {
-        MxFont font = loadFontFromMemoryInternal(fontNameID, fileData, fontSize, codepoints, codepointCount);
+        MxFontData fontData{};
+
+        fontData.fileData = (unsigned char*)MX_MALLOC(dataSize * sizeof(unsigned char));
+        memcpy(fontData.fileData, fileData, dataSize * sizeof(unsigned char));
+
+        if (codepoints != NULL)
+        {
+            fontData.codepoints = (int*)MX_MALLOC(codepointCount * sizeof(int));
+            memcpy(fontData.codepoints, codepoints, codepointCount * sizeof(int));
+            fontData.codepointCount = codepointCount;
+        }
+
+        const std::string textureNameID = GEN_TEXTURE_NAME_ID(fontNameID, fontSize);
+        MxFont font = loadFontFromMemoryInternal(textureNameID, fontData.fileData, fontSize, codepoints, codepointCount);
         setSmoothTexture(font.textureNameID, smooth);
-        m_fonts.insert_or_assign(fontNameID, font);
+
+
+        fontData.fonts.insert_or_assign(fontSize, font);
+        m_fonts.insert_or_assign(fontNameID, fontData);
+
+        // MX_FREE(data);
     }
 
     void setupDefaultFont(int textSize)
@@ -2182,7 +2222,7 @@ struct MxFontManager
             codepoints[i] = 32 + i; // ASCII: from (32) to ~ (126)
         }
 
-        loadFromMemory(MX_FONT_NOTO_ID, notosans::data, textSize, codepoints, 95, false);
+        loadFromMemory(MX_FONT_NOTO_ID, notosans::data, notosans::size, textSize, codepoints, 95, false);
     }
 
     void setupFontAwesome(int iconSize)
@@ -2193,16 +2233,24 @@ struct MxFontManager
         stb_decompress(fontAwesomeData, fa_compressed_data, fa_compressed_size);
         int count = sizeof(codepointsFontAwesome) / sizeof(codepointsFontAwesome[0]);
 
-        loadFromMemory(MX_FONT_AWESOME_ID, fontAwesomeData, iconSize, codepointsFontAwesome, count, true);
+        loadFromMemory(MX_FONT_AWESOME_ID, fontAwesomeData, arrayOriginalSize, iconSize, codepointsFontAwesome, count, true);
         MX_FREE(fontAwesomeData);
 #endif
     }
 
     void unload()
     {
-        for (auto& [id, font] : m_fonts)
+        for (auto& [idFontName, fontDatas] : m_fonts)
         {
-            unloadFont(font);
+            for (auto& [id, font] : fontDatas.fonts)
+            {
+                unloadFont(font);
+            }
+            MX_FREE(fontDatas.fileData);
+            if (fontDatas.codepoints != nullptr)
+            {
+                MX_FREE(fontDatas.codepoints);
+            }
         }
         m_fonts.clear();
     }
@@ -2229,23 +2277,33 @@ struct MxFontManager
 
     MxVec2 measureText(const std::string& fontNameID, const std::string& text, int fontSize, int spacing)
     {
-        const MxFont* font = getFont(fontNameID);
+        const MxFont* font = getFont(fontNameID, fontSize);
         return measureTextInternal(*font, text.c_str(), fontSize, spacing);
     }
 
-    const MxFont* getFont(const std::string& fontNameID)
+    const MxFont* getFont(const std::string& fontNameID, int size)
     {
         static MxFont empty{};
-        auto it = m_fonts.find(fontNameID);
-        if (it != m_fonts.end())
-        {
-            return &it->second;
-        }
 
+        auto itFontData = m_fonts.find(fontNameID);
+        if (itFontData != m_fonts.end())
+        {
+            auto& fontData = itFontData->second;
+            auto itFont = fontData.fonts.find(size);
+            if (itFont != fontData.fonts.end())
+            {
+                return &itFont->second;
+            }
+            
+            const std::string textureNameID = GEN_TEXTURE_NAME_ID(fontNameID, size);
+            MxFont font = loadFontFromMemoryInternal(textureNameID, fontData.fileData, size, fontData.codepoints, fontData.codepointCount);
+            fontData.fonts.insert_or_assign(size, font);
+            return &fontData.fonts.at(size);
+        }
         return &empty;
     }
 
-    std::unordered_map<std::string, MxFont> m_fonts{};
+    std::unordered_map<std::string, MxFontData> m_fonts{};
 };
 
 
@@ -2344,20 +2402,20 @@ void closeManagers()
 // Font manager functions
 //-----------------------------------------------------------------------------
 
-const MxFont* getFont(const std::string& fontName)
+const MxFont* getFont(const std::string& fontName, int size)
 {
-    const MxFont* font = s_fontManager.getFont(fontName);
+    const MxFont* font = s_fontManager.getFont(fontName, size);
     return font;
 }
 
 void loadFont(const std::string& textureNameID, const std::filesystem::path& path, int fontSize, const int* codepoints, int codepointCount)
 {
-    int size = 0;
-    unsigned char* fileData = loadFileData(path, size);
+    int dataSize = 0;
+    unsigned char* fileData = loadFileData(path, dataSize);
     if (fileData != NULL)
     {
         // Loading font from memory data
-        s_fontManager.loadFromMemory(textureNameID, fileData, fontSize, codepoints, codepointCount, false);
+        s_fontManager.loadFromMemory(textureNameID, fileData, dataSize, fontSize, codepoints, codepointCount, false);
         MX_FREE(fileData);
     }
 }
@@ -2369,7 +2427,7 @@ MxVec2 measureText(const std::string& fontNameID, const std::string& text, int f
 
 void drawText(const std::string& fontNameID, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint)
 {
-    const MxFont* font = s_fontManager.getFont(fontNameID);
+    const MxFont* font = s_fontManager.getFont(fontNameID, fontSize);
     drawTextEx(*font, text, position, fontSize, spacing, tint);
 }
 
@@ -2378,7 +2436,7 @@ void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size)
     // Convert codepoint to UTF-8 before to draw
     int byteCount = 0;
     const char* icon = codepointToUTF8(codepoint, &byteCount);
-    const MxFont* font = s_fontManager.getFont(MX_FONT_AWESOME_ID);
+    const MxFont* font = s_fontManager.getFont(MX_FONT_AWESOME_ID, size);
 
     drawTextEx(*font, icon, position, size, 0, color);
 }

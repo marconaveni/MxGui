@@ -374,7 +374,7 @@ void drawFPS(float x, float y)
     std::string text = std::to_string((int)fps) + " FPS";
     MxColor color = fps > 30 ? MxColor::Green : MxColor::Yellow;
 
-    const MxFont* font = getFont(MX_FONT_NOTO_ID);
+    const MxFont* font = getFont(MX_FONT_NOTO_ID, 20);
     drawTextEx(*font, text, MxVec2{x, y}, 20, 0, color);
 }
 

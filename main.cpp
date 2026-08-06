@@ -8,7 +8,7 @@
 
 // #define MX_CUSTOM_BACKEND_HEADER "mxgui_custom_render.hpp"
 #define MX_RAYLIB_BACKEND_IMPLEMENTATION
-// #define MX_SFML_BACKEND_IMPLEMENTATION
+//#define MX_SFML_BACKEND_IMPLEMENTATION
 // #define MX_GUI_IMPLEMENTATION
 #include "mxgui.hpp"
 
@@ -84,11 +84,18 @@ int main()
         {
             std::cout << "clicked Icon" << '\n';
         }
+        mxgui::pushIconSize(ctx, 50);
+        mxgui::guiIcon(ctx, MxRect{10, 160, 0, 0}, anchor, ICON_FA_COPY);
+        mxgui::pushIconSize(ctx, 28);
 #endif // MX_FONT_AWESOME
 
         mxgui::guiScrollPanelBegin(ctx, "ScrollPanel", MxRect{300, 200, 100, 200}, MxRect{300, 200, 100, 550}, MxVec2{100, 100}, true);
+        mxgui::pushTextSize(ctx, 25);
         mxgui::guiLabel(ctx, "hello world", MxVec2{100, 0}, anchor);
-        mxgui::guiLabel(ctx, "hello world 2", MxVec2{0, 80.35554});
+        mxgui::guiLabel(ctx, "hello world 2", MxVec2{0, 80});
+        mxgui::guiLabel(ctx, "hello world 3", MxVec2{0, 100});
+        mxgui::guiLabel(ctx, "hello world 4", MxVec2{0, 120});
+        mxgui::pushTextSize(ctx, 20);
         mxgui::guiScrollPanelEnd(ctx, "ScrollPanel");
 
 
@@ -103,19 +110,19 @@ int main()
 
         if (isCursorOnScreen())
         {
-            const MxFont* font = getFont(MX_FONT_NOTO_ID);
-            const MxFont* font2 = getFont("teste");
+            const MxFont* font = getFont(MX_FONT_NOTO_ID, 20);
+            const MxFont* font2 = getFont("teste", 30);
             MxColor color = {200, 41, 55, 255};
     
             drawTextEx(*font, "teste \nteste quebra linha", MxVec2{60, 60}, 20, 0, color);
-            drawTextEx(*font2, "teste \nteste quebra linha", MxVec2{60, 160}, 20, 0, color);
+            drawTextEx(*font2, "teste \nteste quebra linha", MxVec2{60, 160}, 30, 0, color);
         }
         
 
 #if MX_RAYLIB
 
         DrawFPS(10, 10);
-        // DrawText(TextFormat("cor: %zu", sizeof(Transform)), 30, 30, 20, BLACK);
+        //DrawText(TextFormat("cor: %zu", sizeof(Transform)), 30, 30, 20, BLACK);
         EndDrawing();
 #elif MX_SFML
         drawFPS(10, 10);
