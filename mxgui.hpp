@@ -13,11 +13,13 @@
 //----------------------------with Sfml----------------------------------------
 //                                                                            |
 // #define MX_SFML_BACKEND_IMPLEMENTATION                                     |
+// #define MX_GUI_IMPLEMENTATION                                              |
 // #include "mxgui.hpp"                                                       |
 //                                                                            |
 //----------------------------with raylib--------------------------------------
 //                                                                            |
 // #define MX_RAYLIB_BACKEND_IMPLEMENTATION                                   |
+// #define MX_GUI_IMPLEMENTATION                                              |
 // #include "mxgui.hpp"                                                       |
 //                                                                            |
 //-----------------------------------------------------------------------------
@@ -118,22 +120,23 @@
 #include "mxgui_notosans.hpp"
 #include "string.h"
 
-
-#ifdef MX_RAYLIB_BACKEND_IMPLEMENTATION
-#define MX_RAYLIB 1
-#elifdef MX_SFML_BACKEND_IMPLEMENTATION
-#define MX_SFML 1
-#endif
-
 #if defined(MX_LOG_SUPORT) == 1
 #define MX_LOG(...) mxLog(__LINE__, __FILE__, __VA_ARGS__)
 #else
 #define MX_LOG(...)
 #endif
 
-#if (defined(MX_RAYLIB_BACKEND_IMPLEMENTATION) || defined(MX_SFML_BACKEND_IMPLEMENTATION)) && (!defined(MX_GUI_IMPLEMENTATION))
-#define MX_GUI_IMPLEMENTATION
-#endif
+
+// #ifdef MX_RAYLIB_BACKEND_IMPLEMENTATION
+// #define MX_RAYLIB 1
+// #elifdef MX_SFML_BACKEND_IMPLEMENTATION
+// #define MX_SFML 1
+// #endif
+
+
+// #if (defined(MX_RAYLIB_BACKEND_IMPLEMENTATION) || defined(MX_SFML_BACKEND_IMPLEMENTATION)) && (!defined(MX_GUI_IMPLEMENTATION))
+// #define MX_GUI_IMPLEMENTATION
+// #endif
 
 #if FORCE_DEBUG
 #define DEBUG_MODE
@@ -656,11 +659,26 @@ struct MxGuiContext
 #endif // MXGUI_HPP
 
 
+//#ifdef MX_GUI_IMPLEMENTATION
+#if defined(MX_GUI_IMPLEMENTATION) && !defined(MXGUI_IMPLEMENTATION_DONE)
+#define MXGUI_IMPLEMENTATION_DONE
+
 /////////////////////////////////////////////////////
-//  implementations
+////  implementations
+////
+////
+////
+////
 /////////////////////////////////////////////////////
 
-#ifdef MX_GUI_IMPLEMENTATION
+
+
+#ifdef MX_RAYLIB_BACKEND_IMPLEMENTATION
+#define MX_RAYLIB 1
+#elifdef MX_SFML_BACKEND_IMPLEMENTATION
+#define MX_SFML 1
+#endif
+
 
 // warnings implementations
 #if defined(__GNUC__) && (MX_SUPPRESS_WARNINGS == 1) // GCC and Clang
@@ -682,7 +700,7 @@ static unsigned char* loadFileData(const std::filesystem::path& path, int& dataS
 
     if (!file.is_open())
     {
-        std::cerr << "Error to open file: " << path << '\n';
+        MX_LOG("WARNING: Error to open file: %s" , path.string().c_str());
         return data;
     }
 
@@ -691,19 +709,19 @@ static unsigned char* loadFileData(const std::filesystem::path& path, int& dataS
     data = (unsigned char*)MX_MALLOC(size * sizeof(unsigned char));
     if (data == NULL)
     {
-        std::cerr << "Error to allocate memory." << '\n';
+        MX_LOG("WARNING: Error to allocate memory.");
         return NULL;
     }
 
 
     if (file.read((char*)data, size))
     {
-        std::cout << "File '" << path << "' loaded sucessfull. Bytes: " << size << '\n';
         dataSize = (int)size;
+        MX_LOG("INFO: File %s loaded sucessfull. Bytes: %d", path.string().c_str() , dataSize);
     }
     else
     {
-        std::cerr << "Error to read file." << '\n';
+        MX_LOG("WARNING: Error to read file.");
         MX_FREE(data);
         data = NULL;
     }

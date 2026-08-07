@@ -67,6 +67,7 @@ FetchContent_MakeAvailable(
 add_executable(${PROJECT_NAME} 
     "main.cpp"
     "mxgui.hpp"
+    "temp/include_test.cpp"
 )
 
 if(MSVC)
@@ -87,9 +88,10 @@ set_target_properties(${PROJECT_NAME}
     CMAKE_CXX_EXTENSIONS OFF
 )
 
-# target_include_directories(${PROJECT_NAME} PUBLIC 
-#     "include" 
-# )
+target_include_directories(${PROJECT_NAME} PUBLIC 
+    "include" 
+    "temp" 
+)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
     raylib

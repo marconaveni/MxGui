@@ -1,34 +1,39 @@
 
 
-
-#include <array>
-#include <iostream>
-
 #define MX_SUPPRESS_WARNINGS 0
-#define MX_LOG_SUPORT 1 
+#define MX_LOG_SUPORT 1
 
 // #define MX_CUSTOM_BACKEND_HEADER "mxgui_custom_render.hpp"
 #define MX_RAYLIB_BACKEND_IMPLEMENTATION
-//#define MX_SFML_BACKEND_IMPLEMENTATION
-// #define MX_GUI_IMPLEMENTATION
+// #define MX_SFML_BACKEND_IMPLEMENTATION
+#define MX_GUI_IMPLEMENTATION
 #include "mxgui.hpp"
 
 // #define MX_LOG(...) mxLog(__LINE__, __FILE__, __VA_ARGS__)
 
 // #define MX_SFML 1
 
-void testScissor();
+
+// includes temp for fast tests
+#include "temp/include_test.h"
+#include "temp/scissor_test.h"
+#include "temp/text_block_prototype.h"
 
 
 int main()
 {
 
+    test();
 
 #if MX_RAYLIB
+    
+    // init_text_block();
+    // init_test_scissor();
+    
     SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
     InitWindow(800, 600, "GUI");
     SetTextLineSpacing(0);
-    //SetTargetFPS(60);
+    // SetTargetFPS(60);
 
 #elif MX_SFML
     sf::RenderWindow window(sf::VideoMode({800, 600}), "GUI");
@@ -40,7 +45,6 @@ int main()
     style.iconSize = 28;
     MxGuiContext* ctx = mxgui::createContext(style);
 
-         
 
     mxgui::createImage("/home/marco/Imagens/icons/nfsu2.png", "nfsu2");
 
@@ -109,22 +113,22 @@ int main()
         mxgui::guiSliderProgress(ctx, MxRect{50, 560, 700, 6}, MxVec2{}, 0.8f);
 
 
-        //MX_LOG("teste %.2f", progress);
+        // MX_LOG("teste %.2f", progress);
         if (isCursorOnScreen())
         {
             const MxFont* font = getFont(MX_FONT_NOTO_ID, 20);
             const MxFont* font2 = getFont("teste", 30);
             MxColor color = {200, 41, 55, 255};
-    
+
             drawTextEx(*font, "teste \nteste quebra linha", MxVec2{60, 60}, 20, 0, color);
             drawTextEx(*font2, "teste \nteste quebra linha", MxVec2{60, 160}, 30, 0, color);
         }
-        
+
 
 #if MX_RAYLIB
 
         DrawFPS(10, 10);
-        //DrawText(TextFormat("cor: %zu", sizeof(Transform)), 30, 30, 20, BLACK);
+        // DrawText(TextFormat("cor: %zu", sizeof(Transform)), 30, 30, 20, BLACK);
         EndDrawing();
 #elif MX_SFML
         drawFPS(10, 10);
@@ -141,49 +145,3 @@ int main()
 
     return 0;
 }
-
-#if MX_RAYLIB
-
-
-void testScissor()
-{
-    InitWindow(800, 450, "Raylib - Scissor Stack");
-    Rectangle rect = {10, 10, 400, 300};
-    Rectangle root = {};
-    Rectangle child = {250, 100, 250, 200};
-
-    while (!WindowShouldClose())
-    {
-        BeginDrawing();
-        ClearBackground(RAYWHITE);
-
-        Vector2 mousepos = GetMousePosition();
-        root.x = mousepos.x - 300 / 2;
-        root.y = mousepos.y - 300 / 2;
-        root.width = 300;
-        root.height = 300;
-
-        // root scissor
-        pushScissor(root.x, root.y, root.width, root.height);
-        DrawRectangleRec(rect, RED);
-
-        // child scissor
-        pushScissor(250, 100, 250, 200);
-        DrawRectangleRec(child, GRAY);
-        DrawText("Text in scissor child!", 240, 150, 20, WHITE);
-
-        // end child scissor
-        popScissor();
-
-        DrawText("Text in scissor root!", 240, 170, 20, WHITE); // draw in root scissor
-
-        // end root scissor
-        popScissor();
-
-        DrawRectangleLines(root.x, root.y, root.width, root.height, BLACK);
-        EndDrawing();
-    }
-    CloseWindow();
-}
-
-#endif
