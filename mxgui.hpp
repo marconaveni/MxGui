@@ -121,7 +121,9 @@
 
 #if defined(MX_LOG_SUPORT) == 1
 #ifndef MX_LOG
-#define MX_LOG(...) printf(__VA_ARGS__); printf("\n");
+#define MX_LOG(...)      \
+    printf(__VA_ARGS__); \
+    printf("\n");
 #endif // MX_LOG
 #else
 #ifndef MX_LOG
@@ -529,8 +531,6 @@ void drawCircle(MxVec2 center, float radius, MxColor color);
 // internal functions publics
 bool isValidFont(const MxFont& font);
 bool isValidImage(const MxImage& image);
-MxVec2 measureTextInternal(MxFont font, const std::string& text, float fontSize, float spacing);
-MxFont loadFontFromMemoryInternal(const std::string& textureNameID, const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount);
 
 // mxgui functions
 void pushScissor(int x, int y, int width, int height);
@@ -648,7 +648,7 @@ struct MxGuiContext
 #endif // MXGUI_HPP
 
 
-//#ifdef MX_GUI_IMPLEMENTATION
+// #ifdef MX_GUI_IMPLEMENTATION
 #if defined(MX_GUI_IMPLEMENTATION) && !defined(MXGUI_IMPLEMENTATION_DONE)
 #define MXGUI_IMPLEMENTATION_DONE
 
@@ -659,7 +659,6 @@ struct MxGuiContext
 ////
 ////
 /////////////////////////////////////////////////////
-
 
 
 #ifdef MX_RAYLIB_BACKEND_IMPLEMENTATION
@@ -676,51 +675,36 @@ struct MxGuiContext
 #pragma GCC diagnostic ignored "-Wunused-function"
 #endif
 
+//-----------------------------------------------------------------------------
+// (Section) Internal functions publics
+//-----------------------------------------------------------------------------
+
+
+inline bool isValidFont(const MxFont& font)
+{
+    const bool validFont = ((font.baseSize > 0) &&           // Validate font size
+                            (font.glyphCount > 0) &&         // Validate font contains some glyph
+                            (!font.textureNameID.empty()) && // Validate font contains Texture Atlas ID
+                            (font.recs != NULL) &&           // Validate font recs defining glyphs on texture atlas
+                            (font.glyphs != NULL));          // Validate glyph data is loaded
+    return validFont;
+}
+
+inline bool isValidImage(const MxImage& image)
+{
+    const bool validImage = ((image.data != NULL) && // Validate pixel data available
+                             (image.width > 0) &&    // Validate image width
+                             (image.height > 0));    // Validate image height
+    return validImage;
+}
+
 
 //-----------------------------------------------------------------------------
 // (Section) Internal functions privates
 //-----------------------------------------------------------------------------
 
-static unsigned char* loadFileData(const std::filesystem::path& path, int& dataSize)
-{
-    unsigned char* data = NULL;
-    dataSize = 0;
-    std::ifstream file(path, std::ios::binary | std::ios::ate);
-
-    if (!file.is_open())
-    {
-        MX_LOG("WARNING: Error to open file: %s" , path.string().c_str());
-        return data;
-    }
-
-    std::streamsize size = file.tellg();
-    file.seekg(0, std::ios::beg);
-    data = (unsigned char*)MX_MALLOC(size * sizeof(unsigned char));
-    if (data == NULL)
-    {
-        MX_LOG("WARNING: Error to allocate memory.");
-        return NULL;
-    }
-
-
-    if (file.read((char*)data, size))
-    {
-        dataSize = (int)size;
-        MX_LOG("INFO: File %s loaded sucessfull. Bytes: %d", path.string().c_str() , dataSize);
-    }
-    else
-    {
-        MX_LOG("WARNING: Error to read file.");
-        MX_FREE(data);
-        data = NULL;
-    }
-
-    return data;
-}
-
-
 //-----------------------------------------------------------------------------
-// (SECTION) Draw Text Funtions
+// (SECTION) Draw and Text Funtions
 // Note: The code is initially the same code as text.c "raylib", to validate it and have something functional.
 // Todo: adapt as necessary to make it work and optimize it for mxgui.
 //-----------------------------------------------------------------------------
@@ -813,6 +797,40 @@ int getCodepointNext(const char* text, int* codepointSize)
     }
 
     return codepoint;
+}
+
+// Load all codepoints from a UTF-8 text string, codepoints count returned by parameter
+int* loadCodepoints(const std::string& text, int* count)
+{
+    int* codepoints = NULL;
+    int codepointCount = 0;
+
+    if (!text.empty())
+    {
+        int textLength = text.length();
+
+        // Allocate a big enough buffer to store as many codepoints as text bytes
+        codepoints = (int*)MX_CALLOC(textLength, sizeof(int));
+
+        int codepointSize = 0;
+        for (int i = 0; i < textLength; codepointCount++)
+        {
+            codepoints[codepointCount] = getCodepointNext(text.c_str() + i, &codepointSize);
+            i += codepointSize;
+        }
+
+        // Create second buffer and copy data manually to it
+        int* temp = (int*)MX_CALLOC(codepointCount, sizeof(int));
+        for (int i = 0; i < codepointCount; i++)
+        {
+            temp[i] = codepoints[i];
+        }
+        MX_FREE(codepoints);
+        codepoints = temp;
+    }
+
+    *count = codepointCount;
+    return codepoints;
 }
 
 int getGlyphIndex(MxFont font, int codepoint)
@@ -921,28 +939,6 @@ void drawTextEx(MxFont font, const std::string& text, MxVec2 position, float fon
     }
 }
 
-//-----------------------------------------------------------------------------
-// (Section) Internal functions publics
-//-----------------------------------------------------------------------------
-
-
-inline bool isValidFont(const MxFont& font)
-{
-    const bool validFont = ((font.baseSize > 0) &&           // Validate font size
-                            (font.glyphCount > 0) &&         // Validate font contains some glyph
-                            (!font.textureNameID.empty()) && // Validate font contains Texture Atlas ID
-                            (font.recs != NULL) &&           // Validate font recs defining glyphs on texture atlas
-                            (font.glyphs != NULL));          // Validate glyph data is loaded
-    return validFont;
-}
-
-inline bool isValidImage(const MxImage& image)
-{
-    const bool validImage = ((image.data != NULL) && // Validate pixel data available
-                             (image.width > 0) &&    // Validate image width
-                             (image.height > 0));    // Validate image height
-    return validImage;
-}
 
 MxVec2 measureTextInternal(MxFont font, const std::string& text, float fontSize, float spacing)
 {
@@ -1015,14 +1011,6 @@ MxVec2 measureTextInternal(MxFont font, const std::string& text, float fontSize,
 
     return textSize;
 }
-
-
-//-----------------------------------------------------------------------------
-// (SECTION) LoadFontData
-// Note: The code is initially the same as text.c, to validate it and have something functional.
-// Todo: adapt as necessary to make it work and optimize it for mxgui.
-//-----------------------------------------------------------------------------
-
 
 MxGlyphInfo* loadFontData(const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount, int* glyphCount)
 {
@@ -1353,6 +1341,12 @@ MxFont loadFontFromMemoryInternal(const std::string& textureNameID, const unsign
 
 
 //-----------------------------------------------------------------------------
+// (SECTION) STB single-file public domain (or MIT licensed) libraries for C/C++ by Sean Barrett https://github.com/nothings/stb/
+//-----------------------------------------------------------------------------
+
+
+
+//-----------------------------------------------------------------------------
 // (SECTION) Decompression code
 //  an algorithm with the sole objective of compressing the matrices to save font size
 //  Decompression from stb.h (public domain) by Sean Barrett https://github.com/nothings/stb/blob/master/deprecated/stb.h#L10437
@@ -1540,6 +1534,64 @@ static unsigned int stb_decompress(unsigned char* output, const unsigned char* i
             return 0;
         }
     }
+}
+
+//-----------------------------------------------------------------------------
+// (SECTION) Text Edit code
+// stb_textedit implements the guts of a text-editing widget; 
+// mxgui implement display,
+// insertion/deletion, and stb_textedit will map user inputs into
+// insertions & deletions, plus updates to the cursor position,
+// selection state, and undo state.
+// Textedit from stb_textedit.h (public domain) by Sean Barrett https://github.com/nothings/stb/blob/master/stb_textedit.h
+//-----------------------------------------------------------------------------
+
+
+
+// todo implement 
+
+
+
+
+//-----------------------------------------------------------------------------
+// (SECTION) Internal functions to MxGui
+//-----------------------------------------------------------------------------
+
+static unsigned char* loadFileData(const std::filesystem::path& path, int& dataSize)
+{
+    unsigned char* data = NULL;
+    dataSize = 0;
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+
+    if (!file.is_open())
+    {
+        MX_LOG("WARNING: Error to open file: %s", path.string().c_str());
+        return data;
+    }
+
+    std::streamsize size = file.tellg();
+    file.seekg(0, std::ios::beg);
+    data = (unsigned char*)MX_MALLOC(size * sizeof(unsigned char));
+    if (data == NULL)
+    {
+        MX_LOG("WARNING: Error to allocate memory.");
+        return NULL;
+    }
+
+
+    if (file.read((char*)data, size))
+    {
+        dataSize = (int)size;
+        MX_LOG("INFO: File %s loaded sucessfull. Bytes: %d", path.string().c_str(), dataSize);
+    }
+    else
+    {
+        MX_LOG("WARNING: Error to read file.");
+        MX_FREE(data);
+        data = NULL;
+    }
+
+    return data;
 }
 
 template <typename T>
@@ -2233,7 +2285,6 @@ struct MxFontManager
 
         fontData.fonts.insert_or_assign(fontSize, font);
         m_fonts.insert_or_assign(fontNameID, fontData);
-
     }
 
     void setupDefaultFont(int textSize)
@@ -2300,7 +2351,7 @@ struct MxFontManager
     MxVec2 measureText(const std::string& fontNameID, const std::string& text, int fontSize, int spacing)
     {
         const MxFont* font = getFont(fontNameID, fontSize);
-        return measureTextInternal(*font, text.c_str(), fontSize, spacing);
+        return measureTextInternal(*font, text, fontSize, spacing);
     }
 
     const MxFont* getFont(const std::string& fontNameID, int size)
