@@ -1,7 +1,12 @@
 
+#define MX_LOG(...)                                             \
+    printf("FILE: [%s] LINE: [%d] (", __FILE_NAME__, __LINE__); \
+    printf(__VA_ARGS__);                                        \
+    printf(")\n");
+
 
 #define MX_SUPPRESS_WARNINGS 0
-#define MX_LOG_SUPORT 1
+
 
 // #define MX_CUSTOM_BACKEND_HEADER "mxgui_custom_render.hpp"
 #define MX_RAYLIB_BACKEND_IMPLEMENTATION
@@ -9,7 +14,6 @@
 #define MX_GUI_IMPLEMENTATION
 #include "mxgui.hpp"
 
-// #define MX_LOG(...) mxLog(__LINE__, __FILE__, __VA_ARGS__)
 
 // #define MX_SFML 1
 
@@ -26,10 +30,10 @@ int main()
     test();
 
 #if MX_RAYLIB
-    
+
     // init_text_block();
     // init_test_scissor();
-    
+
     SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
     InitWindow(800, 600, "GUI");
     SetTextLineSpacing(0);

@@ -107,7 +107,6 @@
 //-----------------------------------------------------------------------------
 
 #include <cmath>
-#include <cstdarg>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -121,22 +120,14 @@
 #include "string.h"
 
 #if defined(MX_LOG_SUPORT) == 1
-#define MX_LOG(...) mxLog(__LINE__, __FILE__, __VA_ARGS__)
+#ifndef MX_LOG
+#define MX_LOG(...) printf(__VA_ARGS__); printf("\n");
+#endif // MX_LOG
 #else
+#ifndef MX_LOG
 #define MX_LOG(...)
+#endif // MX_LOG
 #endif
-
-
-// #ifdef MX_RAYLIB_BACKEND_IMPLEMENTATION
-// #define MX_RAYLIB 1
-// #elifdef MX_SFML_BACKEND_IMPLEMENTATION
-// #define MX_SFML 1
-// #endif
-
-
-// #if (defined(MX_RAYLIB_BACKEND_IMPLEMENTATION) || defined(MX_SFML_BACKEND_IMPLEMENTATION)) && (!defined(MX_GUI_IMPLEMENTATION))
-// #define MX_GUI_IMPLEMENTATION
-// #endif
 
 #if FORCE_DEBUG
 #define DEBUG_MODE
@@ -536,8 +527,6 @@ void drawCircle(MxVec2 center, float radius, MxColor color);
 //-----------------------------------------------------------------------------
 
 // internal functions publics
-void mxLog(int line, const std::filesystem::path& file, const std::string& text, ...);
-std::string mxTextFormat(const std::string& stringArg, ...);
 bool isValidFont(const MxFont& font);
 bool isValidImage(const MxImage& image);
 MxVec2 measureTextInternal(MxFont font, const std::string& text, float fontSize, float spacing);
@@ -935,50 +924,6 @@ void drawTextEx(MxFont font, const std::string& text, MxVec2 position, float fon
 //-----------------------------------------------------------------------------
 // (Section) Internal functions publics
 //-----------------------------------------------------------------------------
-
-void mxLog(int line, const std::filesystem::path& file, const std::string& text, ...)
-{
-    if (text.empty())
-    {
-        return;
-    }
-
-    const std::string textFinal = "FILE: [" + file.filename().string() + "] LINE: [" + std::to_string(line) + "] " + text + "\n";
-
-    va_list args{};
-    va_start(args, text);
-
-    vprintf(textFinal.c_str(), args);
-    fflush(stdout);
-
-    va_end(args);
-}
-
-std::string mxTextFormat(const std::string& text, ...)
-{
-    if (text.empty())
-    {
-        return "";
-    }
-
-    va_list args{};
-    va_list copy{};
-
-    va_start(args, text);
-    va_copy(copy, args);
-
-    const int length{vsnprintf(nullptr, 0, &text[0], copy)};
-    va_end(copy);
-    std::string buffer(length, '\0');
-
-    va_copy(copy, args);
-    vsnprintf(&buffer[0], length + 1, &text[0], copy);
-
-    va_end(copy);
-    va_end(args);
-
-    return buffer;
-}
 
 
 inline bool isValidFont(const MxFont& font)
