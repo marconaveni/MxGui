@@ -13457,6 +13457,12 @@ void setSmoothTexture(const std::string& textureNameID, bool enable);
 bool isSmoothTexture(const std::string& textureNameID);
 const MxTextureNative* getTexture(const std::string& textureNameID);
 
+// internal helpers used by the managers and by the backends
+static unsigned int stb_decompress(unsigned char* output, const unsigned char* i, unsigned int length);
+MxVec2 measureTextInternal(MxFont font, const std::string& text, float fontSize, float spacing);
+MxFont loadFontFromMemoryInternal(const std::string& textureNameID, const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount);
+void drawTextEx(MxFont font, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint);
+
 //-----------------------------------------------------------------------------
 // macros getters and setters to MxGuiContext
 //-----------------------------------------------------------------------------
@@ -13575,6 +13581,910 @@ struct MxGuiContext
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Wunused-function"
 #endif
+
+
+/////////////////////////////////////////////////////
+//// Backend Implementations
+////
+////
+////
+/////////////////////////////////////////////////////
+
+#ifdef MX_RAYLIB_BACKEND_IMPLEMENTATION
+
+//-----------------------------------------------------------------------------
+// (SECTION) raylib backend
+//-----------------------------------------------------------------------------
+
+
+
+
+// ==============mxgui_raylib.hpp================
+
+#ifndef MXGUI_RAYLIB_HPP
+#define MXGUI_RAYLIB_HPP
+
+#include <cstdio>
+
+#include "mxgui.hpp"
+#include "raylib.h"
+
+struct MxTextureNative
+{
+    Texture handle{};
+    bool isSmooth{false};
+};
+
+// MxType to Raylib type helper
+inline Vector2 toVector(MxVec2 vec)
+{
+    return Vector2{vec.x, vec.y};
+}
+
+inline Rectangle toRectangle(MxRect rec)
+{
+    return Rectangle{rec.x, rec.y, rec.width, rec.height};
+}
+
+inline Color toColor(MxColor color)
+{
+    return Color{color.r, color.g, color.b, color.a};
+}
+
+inline MxVec2 toMxVec2(Vector2 vec)
+{
+    return MxVec2{vec.x, vec.y};
+}
+
+// Raylib to MxType type helper
+inline MxRect toMxRect(Rectangle rec)
+{
+    return MxRect{rec.x, rec.y, rec.width, rec.height};
+}
+
+inline MxColor toMxColor(Color color)
+{
+    return MxColor{color.r, color.g, color.b, color.a};
+}
+
+void nativeInit()
+{
+}
+
+MxTextureNative nativeLoadTexture(const std::filesystem::path& path)
+{
+    return MxTextureNative{.handle = LoadTexture(path.string().c_str())};
+}
+
+MxTextureNative nativeLoadTextureFromImageData(void* data, int width, int height, int mipmaps, int format)
+{
+    Image image{
+        .data = data,
+        .width = width,
+        .height = height,
+        .mipmaps = mipmaps,
+        .format = format,
+    };
+    return MxTextureNative{.handle = LoadTextureFromImage(image)};
+}
+
+void nativeSetTextureSmooth(MxTextureNative* texture, bool enable)
+{
+    const int filter = enable ? TEXTURE_FILTER_BILINEAR : TEXTURE_FILTER_POINT;
+    texture->isSmooth = enable;
+    SetTextureFilter(texture->handle, filter);
+}
+
+MxVec2 nativeTextureSize(const MxTextureNative* texture)
+{
+    const float width = (float)texture->handle.width;
+    const float height = (float)texture->handle.height;
+    return MxVec2{width, height};
+}
+
+bool nativeTextureIsSmooth(const MxTextureNative* texture)
+{
+    return texture->isSmooth;
+}
+
+bool nativeIsValidTexture(const MxTextureNative* texture)
+{
+    return IsTextureValid(texture->handle);
+}
+
+void nativeUnloadTexture(const MxTextureNative* texture)
+{
+    UnloadTexture(texture->handle);
+}
+
+bool isCursorOnScreen()
+{
+    const bool isValid = (GetMousePosition().x > 0 && GetMousePosition().y > 0 && GetMousePosition().x < GetScreenWidth() && // check cursor is outscreen
+                          GetMousePosition().y < GetScreenHeight()) &&
+                         IsCursorOnScreen();
+    return isValid;
+}
+
+MxVec2 windowSize()
+{
+    return MxVec2{(float)GetScreenWidth(), (float)GetScreenHeight()};
+}
+
+void setClipboardText(const std::string& text)
+{
+    SetClipboardText(text.c_str());
+}
+
+std::string getClipboardText()
+{
+    return GetClipboardText();
+}
+
+void beginScissorMode(int x, int y, int width, int height)
+{
+    BeginScissorMode(x, y, width, height);
+}
+
+void endScissorMode()
+{
+    EndScissorMode();
+}
+
+MxVec2 getMousePosition()
+{
+    return toMxVec2(GetMousePosition());
+}
+
+MxVec2 getMouseDelta()
+{
+    return toMxVec2(GetMouseDelta());
+}
+
+float getMouseWheelMove()
+{
+    return GetMouseWheelMove();
+}
+
+bool isMouseButtonPressed(int button)
+{
+    return IsMouseButtonPressed(button);
+}
+
+bool isMouseButtonDown(int button)
+{
+    return IsMouseButtonDown(button);
+}
+
+bool isMouseButtonReleased(int button)
+{
+    return IsMouseButtonReleased(button);
+}
+
+bool isKeyPressed(int key)
+{
+    return IsKeyPressed(key);
+}
+
+bool isKeyDown(int key)
+{
+    return IsKeyDown(key);
+}
+
+bool isKeyReleased(int key)
+{
+    return IsKeyReleased(key);
+}
+
+int getCharPressed()
+{
+    return GetCharPressed();
+}
+
+void drawRectangleLinesEx(MxRect rec, float lineThick, MxColor color)
+{
+    DrawRectangleLinesEx(toRectangle(rec), lineThick, toColor(color));
+}
+
+void drawRectanglePro(MxRect rec, MxVec2 origin, float rotation, MxColor color)
+{
+    DrawRectanglePro(toRectangle(rec), toVector(origin), rotation, toColor(color));
+}
+
+void drawTexturePro(const std::string& textureNameID, MxRect source, MxRect dest, MxVec2 origin, float rotation, MxColor tint)
+{
+    const MxTextureNative* texture = getTexture(textureNameID);
+    if (!IsTextureValid(texture->handle))
+    {
+        DrawText(textureNameID.c_str(), (int)dest.x, (int)dest.y, 10, BLACK);
+        return;
+    }
+    DrawTexturePro(texture->handle, toRectangle(source), toRectangle(dest), toVector(origin), rotation, toColor(tint));
+}
+
+void drawCircle(MxVec2 center, float radius, MxColor color)
+{
+    DrawCircleV(toVector(center), radius, toColor(color));
+}
+
+
+#endif // MXGUI_RAYLIB_HPP
+
+
+// =============end mxgui_raylib.hpp=============
+
+
+
+#elifdef MX_SFML_BACKEND_IMPLEMENTATION
+
+//-----------------------------------------------------------------------------
+// (SECTION) SFML backend
+//-----------------------------------------------------------------------------
+
+
+
+// ==============mxgui_sfml.hpp================
+
+#ifndef MXGUI_SFML_HPP
+#define MXGUI_SFML_HPP
+
+#include <SFML/Graphics.hpp>
+#include <SFML/OpenGL.hpp>
+
+struct MxTextureNative
+{
+    sf::Texture handle{};
+    bool isValid{false};
+};
+
+static std::unique_ptr<sf::Text> s_text;
+static std::unique_ptr<sf::Sprite> s_sprite;
+
+
+struct MxMousePolling
+{
+    bool pressed{false};
+    bool down{false};
+    bool release{false};
+};
+
+static bool s_cursorOnScreen{false};
+
+static sf::RectangleShape s_rectShape;
+static sf::CircleShape s_circleShape;
+static sf::RenderWindow* s_windowRef = nullptr;
+static sf::Clock s_fpsClock{};
+
+static MxVec2 s_mousePosition{};
+static MxVec2 s_mouseDelta{};
+static float s_mouseWheelScrolled{0.0f};
+static MxMousePolling s_mousePolling[5]{
+    MxMousePolling{},
+    MxMousePolling{},
+    MxMousePolling{},
+};
+
+
+inline sf::Vector2f toVectorF(MxVec2 vec)
+{
+    return sf::Vector2f{vec.x, vec.y};
+}
+
+inline sf::Vector2i toVectorI(MxVec2 vec)
+{
+    return sf::Vector2i{(int)vec.x, (int)vec.y};
+}
+
+inline sf::Color toColor(MxColor color)
+{
+    return sf::Color{color.r, color.g, color.b, color.a};
+}
+
+inline MxVec2 toMxVec2(sf::Vector2f vec)
+{
+    return MxVec2{vec.x, vec.y};
+}
+
+inline MxVec2 toMxVec2(sf::Vector2i vec)
+{
+    return MxVec2{(float)vec.x, (float)vec.y};
+}
+
+inline MxVec2 toMxVec2(sf::Vector2u vec)
+{
+    return MxVec2{(float)vec.x, (float)vec.y};
+}
+
+void nativeInit()
+{
+    const MxTextureNative texture;
+    s_sprite = std::make_unique<sf::Sprite>(texture.handle);
+}
+
+MxTextureNative nativeLoadTexture(const std::filesystem::path& path)
+{
+    MxTextureNative texture{};
+    if (texture.handle.loadFromFile(path))
+    {
+        texture.isValid = true;
+    }
+    return texture;
+}
+
+MxTextureNative nativeLoadTextureFromImageData(void* data, int width, int height, int /*mipmaps*/, int format)
+{
+
+    MxTextureNative texture{};
+    std::vector<unsigned char> rgba(width * height * 4);
+
+    const unsigned char* src = (const unsigned char*)data;
+
+    switch (format)
+    {
+        case 2:
+            for (int i = 0; i < width * height; i++)
+            {
+                unsigned char gray = src[i * 2 + 0];
+                unsigned char alpha = src[i * 2 + 1];
+                rgba[i * 4 + 0] = gray;
+                rgba[i * 4 + 1] = gray;
+                rgba[i * 4 + 2] = gray;
+                rgba[i * 4 + 3] = alpha;
+            }
+            break;
+
+        case 1:
+            for (int i = 0; i < width * height; i++)
+            {
+                unsigned char gray = src[i];
+                rgba[i * 4 + 0] = gray;
+                rgba[i * 4 + 1] = gray;
+                rgba[i * 4 + 2] = gray;
+                rgba[i * 4 + 3] = 255;
+            }
+            break;
+
+        case 7: memcpy(rgba.data(), src, rgba.size()); break;
+        default: MX_ASSERT(false, "loadTextureFromImageData: unsupported pixel format for SFML backend"); return texture;
+    }
+
+    sf::Image image({(unsigned int)width, (unsigned int)height}, rgba.data());
+
+    if (texture.handle.loadFromImage(image))
+    {
+        texture.isValid = true;
+    }
+
+    return texture;
+}
+
+void nativeSetTextureSmooth(MxTextureNative* texture, bool enable)
+{
+    texture->handle.setSmooth(enable);
+}
+
+MxVec2 nativeTextureSize(const MxTextureNative* texture)
+{
+    return MxVec2{(float)texture->handle.getSize().x, (float)texture->handle.getSize().y};
+}
+
+bool nativeTextureIsSmooth(const MxTextureNative* texture)
+{
+    return texture->handle.isSmooth();
+}
+
+bool nativeIsValidTexture(const MxTextureNative* texture)
+{
+    return texture->isValid;
+}
+
+void nativeUnloadTexture(const MxTextureNative* /*texture*/)
+{
+}
+
+void windowDisplay(sf::RenderWindow* window)
+{
+    window->display();
+    for (auto& mouse : s_mousePolling)
+    {
+        mouse.pressed = false;
+        mouse.release = false;
+    }
+    s_mouseDelta = MxVec2{};
+    s_mouseWheelScrolled = 0.0f;
+}
+
+std::optional<sf::Event> windowPollEvent(sf::RenderWindow* window)
+{
+
+    const std::optional event = window->pollEvent();
+
+    if (!s_windowRef)
+    {
+        s_windowRef = window;
+    }
+
+    if (!event.has_value())
+    {
+        return event;
+    }
+
+    if (const auto* resized = event->getIf<sf::Event::Resized>())
+    {
+        sf::Vector2f newSize((float)resized->size.x, (float)resized->size.y);
+        window->setView(sf::View(newSize / 2.0f, newSize));
+    }
+
+    if (const auto* mouseMove = event->getIf<sf::Event::MouseMoved>())
+    {
+        s_mouseDelta.x = mouseMove->position.x - s_mousePosition.x;
+        s_mouseDelta.y = mouseMove->position.y - s_mousePosition.y;
+        s_mousePosition = toMxVec2(mouseMove->position);
+    }
+
+    if (const auto* mouseWheelScrolled = event->getIf<sf::Event::MouseWheelScrolled>())
+    {
+        s_mouseWheelScrolled = mouseWheelScrolled->delta;
+    }
+
+    if (const auto* mousePressed = event->getIf<sf::Event::MouseButtonPressed>())
+    {
+        int button = (int)mousePressed->button;
+        s_mousePolling[button].pressed = true;
+        s_mousePolling[button].down = true;
+    }
+
+    if (const auto* mouseReleased = event->getIf<sf::Event::MouseButtonReleased>())
+    {
+
+        int button = (int)mouseReleased->button;
+        s_mousePolling[button].pressed = false;
+        s_mousePolling[button].down = false;
+        s_mousePolling[button].release = true;
+    }
+
+    if (event->is<sf::Event::MouseEntered>())
+    {
+        s_cursorOnScreen = true;
+    }
+
+    if (event->is<sf::Event::MouseLeft>())
+    {
+        s_cursorOnScreen = false;
+    }
+
+    return event;
+}
+
+bool isCursorOnScreen()
+{
+    return s_cursorOnScreen;
+}
+
+MxVec2 windowSize()
+{
+    return toMxVec2(s_windowRef->getSize());
+}
+
+/*
+void setClipboardText(const std::string& text)
+{
+}
+
+std::string getClipboardText()
+{
+    return std::string();
+}
+*/
+
+void beginScissorMode(int x, int y, int width, int height)
+{
+    MX_ASSERT(s_windowRef, "window not reference");
+
+    const sf::Vector2u winSize = s_windowRef->getSize();
+
+    glEnable(GL_SCISSOR_TEST);
+    glScissor(x, (GLint)((float)winSize.y - y - height), width, height);
+}
+
+void endScissorMode()
+{
+    glDisable(GL_SCISSOR_TEST);
+}
+
+
+MxVec2 getMousePosition()
+{
+    return s_mousePosition;
+}
+
+MxVec2 getMouseDelta()
+{
+    return s_mouseDelta;
+}
+
+float getMouseWheelMove()
+{
+    return s_mouseWheelScrolled;
+}
+
+bool isMouseButtonPressed(int button)
+{
+    return s_mousePolling[button].pressed;
+}
+
+bool isMouseButtonDown(int button)
+{
+    return s_mousePolling[button].down;
+}
+
+bool isMouseButtonReleased(int button)
+{
+    return s_mousePolling[button].release;
+}
+
+/*
+bool isKeyPressed(int key)
+{ return false; }
+
+bool isKeyDown(int key)
+{ return false; }
+
+bool isKeyReleased(int key)
+{ return false; }
+
+int getCharPressed()
+{ return 0; } 
+ */
+
+void drawRectangleLinesEx(MxRect rec, float lineThick, MxColor color)
+{
+    s_rectShape.setOutlineThickness(lineThick);
+    s_rectShape.setPosition({rec.x + lineThick, rec.y + lineThick});
+    s_rectShape.setSize({rec.width - lineThick * 2, rec.height - lineThick * 2});
+    s_rectShape.setFillColor(sf::Color::Transparent);
+    s_rectShape.setOutlineColor(toColor(color));
+
+    MX_ASSERT(s_windowRef, "window not reference");
+    s_windowRef->draw(s_rectShape);
+}
+
+void drawRectanglePro(MxRect rec, MxVec2 origin, float rotation, MxColor color)
+{
+    s_rectShape.setOutlineThickness(0);
+    s_rectShape.setPosition({rec.x, rec.y});
+    s_rectShape.setOrigin({origin.x, origin.y});
+    s_rectShape.setRotation(sf::degrees(rotation));
+    s_rectShape.setSize({rec.width, rec.height});
+    s_rectShape.setFillColor(toColor(color));
+
+    MX_ASSERT(s_windowRef, "window not reference");
+    s_windowRef->draw(s_rectShape);
+}
+
+void drawTexturePro(const std::string& textureNameID, MxRect source, MxRect dest, MxVec2 origin, float rotation, MxColor tint)
+{
+
+    if (!s_sprite)
+    {
+        MX_ASSERT(s_sprite, "s_sprite is not valid");
+        return;
+    }
+
+
+    const MxTextureNative* texture = getTexture(textureNameID);
+
+    if (!texture->isValid)
+    {
+        MX_ASSERT(texture->isValid, "texture is not valid");
+        return;
+    }
+
+
+    const sf::IntRect rect({(int)source.x, (int)source.y}, {(int)source.width, (int)source.height});
+    s_sprite->setTexture(texture->handle);
+    s_sprite->setTextureRect(rect);
+
+    // The scale factor must be derived manually from dest size / source size
+    const float scaleX = (source.width != 0.0f) ? (dest.width / source.width) : 1.0f;
+    const float scaleY = (source.height != 0.0f) ? (dest.height / source.height) : 1.0f;
+    s_sprite->setScale({scaleX, scaleY});
+
+    s_sprite->setPosition({dest.x, dest.y});
+    s_sprite->setOrigin({origin.x, origin.y});
+    s_sprite->setRotation(sf::degrees(rotation));
+    s_sprite->setColor(toColor(tint));
+
+
+    MX_ASSERT(s_windowRef, "window not reference");
+    s_windowRef->draw(*s_sprite);
+}
+
+
+void drawCircle(MxVec2 center, float radius, MxColor color)
+{
+    s_circleShape.setRadius(radius);
+    s_circleShape.setPosition(sf::Vector2f{center.x - radius, center.y - radius});
+    s_circleShape.setFillColor(toColor(color));
+
+
+    MX_ASSERT(s_windowRef, "window not reference");
+    s_windowRef->draw(s_circleShape);
+}
+
+
+void drawFPS(float x, float y)
+{
+    static float fps = 0.0f;
+
+    float deltaTime = s_fpsClock.restart().asSeconds();
+    if (deltaTime > 0.0f)
+    {
+        fps = 1.0f / deltaTime;
+    }
+
+    std::string text = std::to_string((int)fps) + " FPS";
+    MxColor color = fps > 30 ? MxColor::Green : MxColor::Yellow;
+
+    const MxFont* font = getFont(MX_FONT_NOTO_ID, 20);
+    drawTextEx(*font, text, MxVec2{x, y}, 20, 0, color);
+}
+
+
+
+#endif // MXGUI_SFML_HPP
+
+
+// =============end mxgui_sfml.hpp=============
+
+
+#else
+
+//-----------------------------------------------------------------------------
+// (SECTION) CUSTOM_BACKEND
+//-----------------------------------------------------------------------------
+
+// Note:  Here you can implement a custom renderer.
+#ifdef MX_CUSTOM_BACKEND_HEADER
+#include MX_CUSTOM_BACKEND_HEADER
+#endif // MX_CUSTOM_BACKEND_HEADER
+
+#endif // MX_XXX_BACKEND_IMPLEMENTATION
+
+
+//-----------------------------------------------------------------------------
+// (SECTION) Managers
+//-----------------------------------------------------------------------------
+
+struct MxFontData
+{
+    unsigned char* fileData{nullptr};
+    int* codepoints{nullptr};
+    int codepointCount{0};
+    std::unordered_map<int, MxFont> fonts{};
+};
+
+
+#define GEN_TEXTURE_NAME_ID(name, id) name + std::to_string(id)
+
+struct MxFontManager
+{
+
+    void init(MxStyle style)
+    {
+        setupDefaultFont(style.textSize);
+        setupFontAwesome(style.iconSize);
+    }
+
+    void loadFromMemory(const std::string& fontNameID, const unsigned char* fileData, int dataSize, int fontSize, const int* codepoints, int codepointCount, bool smooth)
+    {
+        MxFontData fontData{};
+
+        fontData.fileData = (unsigned char*)MX_MALLOC(dataSize * sizeof(unsigned char));
+        memcpy(fontData.fileData, fileData, dataSize * sizeof(unsigned char));
+
+        if (codepoints != NULL)
+        {
+            fontData.codepoints = (int*)MX_MALLOC(codepointCount * sizeof(int));
+            memcpy(fontData.codepoints, codepoints, codepointCount * sizeof(int));
+            fontData.codepointCount = codepointCount;
+        }
+
+        const std::string textureNameID = GEN_TEXTURE_NAME_ID(fontNameID, fontSize);
+        MxFont font = loadFontFromMemoryInternal(textureNameID, fontData.fileData, fontSize, codepoints, codepointCount);
+        setSmoothTexture(font.textureNameID, smooth);
+
+
+        fontData.fonts.insert_or_assign(fontSize, font);
+        m_fonts.insert_or_assign(fontNameID, fontData);
+    }
+
+    void setupDefaultFont(int textSize)
+    {
+        int codepoints[95];
+        for (int i = 0; i < 95; i++)
+        {
+            codepoints[i] = 32 + i; // ASCII: from (32) to ~ (126)
+        }
+
+        loadFromMemory(MX_FONT_NOTO_ID, notosans::data, notosans::size, textSize, codepoints, 95, false);
+    }
+
+    void setupFontAwesome(int iconSize)
+    {
+#if MX_FONT_AWESOME
+        int arrayOriginalSize = 414704;
+        unsigned char* fontAwesomeData = (unsigned char*)MX_MALLOC(arrayOriginalSize);
+        stb_decompress(fontAwesomeData, fa_compressed_data, fa_compressed_size);
+        int count = sizeof(codepointsFontAwesome) / sizeof(codepointsFontAwesome[0]);
+
+        loadFromMemory(MX_FONT_AWESOME_ID, fontAwesomeData, arrayOriginalSize, iconSize, codepointsFontAwesome, count, true);
+        MX_FREE(fontAwesomeData);
+#endif
+    }
+
+    void unload()
+    {
+        for (auto& [idFontName, fontDatas] : m_fonts)
+        {
+            for (auto& [id, font] : fontDatas.fonts)
+            {
+                unloadFont(font);
+            }
+            MX_FREE(fontDatas.fileData);
+            if (fontDatas.codepoints != nullptr)
+            {
+                MX_FREE(fontDatas.codepoints);
+            }
+        }
+        m_fonts.clear();
+    }
+
+    void unloadFont(MxFont font)
+    {
+        if (font.glyphs != NULL)
+        {
+            for (int i = 0; i < font.glyphCount; i++)
+            {
+                if (isValidImage(font.glyphs[i].image))
+                {
+                    MX_FREE(font.glyphs[i].image.data);
+                }
+            }
+            MX_FREE(font.glyphs);
+        }
+
+        unloadTexture(font.textureNameID);
+        MX_FREE(font.recs);
+
+        MX_LOG("INFO: Unloaded font data from RAM and VRAM");
+    }
+
+    MxVec2 measureText(const std::string& fontNameID, const std::string& text, int fontSize, int spacing)
+    {
+        const MxFont* font = getFont(fontNameID, fontSize);
+        return measureTextInternal(*font, text, fontSize, spacing);
+    }
+
+    const MxFont* getFont(const std::string& fontNameID, int size)
+    {
+        static MxFont empty{};
+
+        auto itFontData = m_fonts.find(fontNameID);
+        if (itFontData != m_fonts.end())
+        {
+            auto& fontData = itFontData->second;
+            auto itFont = fontData.fonts.find(size);
+            if (itFont != fontData.fonts.end())
+            {
+                return &itFont->second;
+            }
+
+            const std::string textureNameID = GEN_TEXTURE_NAME_ID(fontNameID, size);
+            MxFont font = loadFontFromMemoryInternal(textureNameID, fontData.fileData, size, fontData.codepoints, fontData.codepointCount);
+            fontData.fonts.insert_or_assign(size, font);
+            return &fontData.fonts.at(size);
+        }
+        return &empty;
+    }
+
+    std::unordered_map<std::string, MxFontData> m_fonts{};
+};
+
+
+struct MxTextureManager
+{
+    void init() { nativeInit(); }
+
+    void loadTexture(const std::filesystem::path& path, const std::string& textureNameID)
+    {
+        auto it = m_textures.find(textureNameID);
+        if (it != m_textures.end())
+        {
+            unloadTexture(textureNameID);
+        }
+        MxTextureNative texture = nativeLoadTexture(path);
+        m_textures.insert_or_assign(textureNameID, texture);
+    }
+
+    void loadTextureFromImageData(const std::string& textureNameID, void* data, int width, int height, int mipmaps, int format)
+    {
+        MxTextureNative texture = nativeLoadTextureFromImageData(data, width, height, mipmaps, format);
+        m_textures.insert_or_assign(textureNameID, texture);
+    }
+
+    MxVec2 getSize(const std::string& textureNameID)
+    {
+        const MxTextureNative* texture = getTexture(textureNameID);
+        return nativeTextureSize(texture);
+    }
+
+    bool isSmooth(const std::string& textureNameID)
+    {
+        const MxTextureNative* texture = getTexture(textureNameID);
+        return nativeTextureIsSmooth(texture);
+    }
+
+    void setSmooth(const std::string& textureNameID, bool enable)
+    {
+        auto it = m_textures.find(textureNameID);
+        if (it != m_textures.end())
+        {
+            nativeSetTextureSmooth(&it->second, enable);
+        }
+    }
+
+    void unload()
+    {
+        for (auto& [textureNameID, texture] : m_textures)
+        {
+            const MxTextureNative* textureNative = getTexture(textureNameID);
+            nativeUnloadTexture(textureNative);
+        }
+        m_textures.clear();
+    }
+    void unloadTexture(const std::string& textureNameID)
+    {
+        const MxTextureNative* texture = getTexture(textureNameID);
+        nativeUnloadTexture(texture);
+        m_textures.erase(textureNameID);
+    }
+
+    const MxTextureNative* getTexture(const std::string& textureNameID)
+    {
+        static MxTextureNative empty{};
+        auto it = m_textures.find(textureNameID);
+        if (it != m_textures.end())
+        {
+            return &it->second;
+        }
+
+        return &empty;
+    }
+
+
+    std::unordered_map<std::string, MxTextureNative> m_textures{};
+};
+
+
+//-----------------------------------------------------------------------------
+// (SECTION) Core state
+//-----------------------------------------------------------------------------
+
+struct MxCore
+{
+    MxGuiContext context{};
+    MxTextEdit textEdit{};
+    std::vector<MxRect> stackScissors{};
+    MxFontManager fontManager{};
+    MxTextureManager textureManager{};
+};
+
+inline MxCore& getCore()
+{
+    static MxCore core{};
+    return core;
+}
+
 
 //-----------------------------------------------------------------------------
 // (Section) Internal functions publics
@@ -14488,8 +15398,6 @@ static unsigned int stb_decompress(unsigned char* output, const unsigned char* i
 //-----------------------------------------------------------------------------
 
 
-static MxTextEdit s_textEdit{};
-
 // Convert a UTF-8 C string into a codepoint string (std::u32string)
 static std::u32string convertUTF8ToU32(const char* text)
 {
@@ -14522,7 +15430,8 @@ static float charWidth(char32_t codepoint)
 {
     int len{0};
     const char* utf8 = codepointToUTF8((int)codepoint, &len);
-    const MxVec2 size = measureTextInternal(*s_textEdit.font, utf8, s_textEdit.fontSize, s_textEdit.spacing);
+    MxTextEdit& textEdit = getCore().textEdit;
+    const MxVec2 size = measureTextInternal(*textEdit.font, utf8, textEdit.fontSize, textEdit.spacing);
     return size.x;
 }
 
@@ -14533,16 +15442,18 @@ static float charWidth(char32_t codepoint)
 
 static void STB_TEXTEDIT_LAYOUTROW(StbTexteditRow* r, std::u32string* obj, int line_start_idx)
 {
+
+    MxTextEdit& textEdit = getCore().textEdit;
     int n = (int)obj->size();
     std::u32string sub = obj->substr(line_start_idx, n - line_start_idx);
     std::string utf8 = convertU32ToUTF8(sub);
-    const MxVec2 size = measureTextInternal(*s_textEdit.font, utf8, s_textEdit.fontSize, s_textEdit.spacing);
+    const MxVec2 size = measureTextInternal(*textEdit.font, utf8, textEdit.fontSize, textEdit.spacing);
     r->num_chars = (int)sub.size();
     r->x0 = 0;
     r->x1 = size.x;
-    r->baseline_y_delta = s_textEdit.fontSize * 1.2f;
+    r->baseline_y_delta = textEdit.fontSize * 1.2f;
     r->ymin = 0;
-    r->ymax = s_textEdit.fontSize;
+    r->ymax = textEdit.fontSize;
 }
 
 
@@ -14721,13 +15632,12 @@ inline MxColor fadeColor(MxColor color, float alpha)
     return result;
 }
 
-static std::vector<MxRect> s_stackScissors{};
 
 MxRect intersectionArea(const MxRect& rect2)
 {
-    if (!s_stackScissors.empty())
+    if (!getCore().stackScissors.empty())
     {
-        return getCollisionRec(s_stackScissors.back(), rect2);
+        return getCollisionRec(getCore().stackScissors.back(), rect2);
     }
 
     return rect2;
@@ -14735,7 +15645,7 @@ MxRect intersectionArea(const MxRect& rect2)
 
 void pushScissor(int x, int y, int width, int height)
 {
-    if (!s_stackScissors.empty())
+    if (!getCore().stackScissors.empty())
     {
         endScissorMode();
     }
@@ -14743,7 +15653,7 @@ void pushScissor(int x, int y, int width, int height)
     MxRect rect{(float)x, (float)y, (float)width, (float)height};
     rect = intersectionArea(rect);
 
-    s_stackScissors.push_back(rect);
+    getCore().stackScissors.push_back(rect);
     beginScissorMode((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height);
 }
 
@@ -14751,14 +15661,14 @@ void popScissor()
 {
     endScissorMode();
 
-    if (!s_stackScissors.empty())
+    if (!getCore().stackScissors.empty())
     {
-        s_stackScissors.pop_back();
+        getCore().stackScissors.pop_back();
     }
 
-    if (!s_stackScissors.empty())
+    if (!getCore().stackScissors.empty())
     {
-        MxRect rect = s_stackScissors.back();
+        MxRect rect = getCore().stackScissors.back();
         beginScissorMode((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height);
     }
 }
@@ -14785,24 +15695,24 @@ MxTransform updateTransformWorld(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor
 namespace mxgui
 {
 
-    static std::unique_ptr<MxGuiContext> s_context{nullptr};
 
     MxGuiContext* createContext(MxStyle style)
     {
-        s_context = std::make_unique<MxGuiContext>();
-        s_context->init(style);
-        return s_context.get();
+        MxGuiContext* context = &getCore().context;
+        context->init(style);
+        return context;
     }
 
     void destroyContext(MxGuiContext* ctx)
     {
         ctx->close();
-        s_context.reset();
+        *ctx = MxGuiContext{};
     }
 
     MxGuiContext* getCurrentContext()
     {
-        return s_context.get();
+        MxGuiContext* context = &getCore().context;
+        return context;
     }
 
     MxStyle getStyle(MxGuiContext* ctx)
@@ -15250,9 +16160,10 @@ namespace mxgui
 
     void guiTextBox(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor)
     {
-        s_textEdit.font = getFont(ctx->m_style.fontName, ctx->m_style.textSize);
-        s_textEdit.fontSize = ctx->m_style.textSize;
-        s_textEdit.spacing = ctx->m_style.textSpacing;
+        MxTextEdit& textEdit = getCore().textEdit;
+        textEdit.font = getFont(ctx->m_style.fontName, ctx->m_style.textSize);
+        textEdit.fontSize = ctx->m_style.textSize;
+        textEdit.spacing = ctx->m_style.textSpacing;
 
         TextBoxComponent& textBoxComponent = *ctx->getTextBoxComponent(tag);
         MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
@@ -15361,10 +16272,11 @@ namespace mxgui
             }
         }
 
+        
         float textX = textEditState.box.x + 6;
-        float textY = textEditState.box.y + (textEditState.box.height - s_textEdit.fontSize) / 2;
+        float textY = textEditState.box.y + (textEditState.box.height - textEdit.fontSize) / 2;
 
-        float cursorX = textX + measureTextInternal(*s_textEdit.font, convertU32ToUTF8(textEditState.text.substr(0, textEditState.state.cursor)).c_str(), s_textEdit.fontSize, s_textEdit.spacing).x;
+        float cursorX = textX + measureTextInternal(*textEdit.font, convertU32ToUTF8(textEditState.text.substr(0, textEditState.state.cursor)).c_str(), textEdit.fontSize, textEdit.spacing).x;
         float offsetX = (textEditState.box.x + textEditState.box.width - 6) - cursorX;
         if (offsetX > 0)
         {
@@ -15402,8 +16314,8 @@ namespace mxgui
             {
                 std::swap(selStart, selEnd);
             }
-            float x0 = textX + offsetX + measureTextInternal(*s_textEdit.font, convertU32ToUTF8(textEditState.text.substr(0, selStart)).c_str(), s_textEdit.fontSize, s_textEdit.spacing).x;
-            float x1 = textX + offsetX + measureTextInternal(*s_textEdit.font, convertU32ToUTF8(textEditState.text.substr(0, selEnd)).c_str(), s_textEdit.fontSize, s_textEdit.spacing).x;
+            float x0 = textX + offsetX + measureTextInternal(*textEdit.font, convertU32ToUTF8(textEditState.text.substr(0, selStart)).c_str(), textEdit.fontSize, textEdit.spacing).x;
+            float x1 = textX + offsetX + measureTextInternal(*textEdit.font, convertU32ToUTF8(textEditState.text.substr(0, selEnd)).c_str(), textEdit.fontSize, textEdit.spacing).x;
             drawRectanglePro(MxRect{x0, textEditState.box.y + 4, (x1 - x0), textEditState.box.height - 8}, MxVec2{}, 0, MxColor::SkyBlue);
         }
 
@@ -15411,7 +16323,7 @@ namespace mxgui
 
         // draw text
         pushScissor(rect.x, rect.y, rect.width, rect.height); // call internal BeginScissorMode();
-        drawTextEx(*s_textEdit.font, utf8Text, MxVec2{textX + offsetX, textY}, s_textEdit.fontSize, s_textEdit.spacing, ctx->m_style.textColor);
+        drawTextEx(*textEdit.font, utf8Text, MxVec2{textX + offsetX, textY}, textEdit.fontSize, textEdit.spacing, ctx->m_style.textColor);
         popScissor();
 
         // draw cursor
@@ -15425,905 +16337,18 @@ namespace mxgui
 
 } // namespace mxgui
 
-/////////////////////////////////////////////////////
-//// Backend Implementations
-////
-////
-////
-/////////////////////////////////////////////////////
-
-#ifdef MX_RAYLIB_BACKEND_IMPLEMENTATION
-
-//-----------------------------------------------------------------------------
-// (SECTION) raylib backend
-//-----------------------------------------------------------------------------
-
-
-
-
-// ==============mxgui_raylib.hpp================
-
-#ifndef MXGUI_RAYLIB_HPP
-#define MXGUI_RAYLIB_HPP
-
-#include <cstdio>
-
-#include "mxgui.hpp"
-#include "raylib.h"
-
-struct MxTextureNative
-{
-    Texture handle{};
-    bool isSmooth{false};
-};
-
-// MxType to Raylib type helper
-inline Vector2 toVector(MxVec2 vec)
-{
-    return Vector2{vec.x, vec.y};
-}
-
-inline Rectangle toRectangle(MxRect rec)
-{
-    return Rectangle{rec.x, rec.y, rec.width, rec.height};
-}
-
-inline Color toColor(MxColor color)
-{
-    return Color{color.r, color.g, color.b, color.a};
-}
-
-inline MxVec2 toMxVec2(Vector2 vec)
-{
-    return MxVec2{vec.x, vec.y};
-}
-
-// Raylib to MxType type helper
-inline MxRect toMxRect(Rectangle rec)
-{
-    return MxRect{rec.x, rec.y, rec.width, rec.height};
-}
-
-inline MxColor toMxColor(Color color)
-{
-    return MxColor{color.r, color.g, color.b, color.a};
-}
-
-void nativeInit()
-{
-}
-
-MxTextureNative nativeLoadTexture(const std::filesystem::path& path)
-{
-    return MxTextureNative{.handle = LoadTexture(path.string().c_str())};
-}
-
-MxTextureNative nativeLoadTextureFromImageData(void* data, int width, int height, int mipmaps, int format)
-{
-    Image image{
-        .data = data,
-        .width = width,
-        .height = height,
-        .mipmaps = mipmaps,
-        .format = format,
-    };
-    return MxTextureNative{.handle = LoadTextureFromImage(image)};
-}
-
-void nativeSetTextureSmooth(MxTextureNative* texture, bool enable)
-{
-    const int filter = enable ? TEXTURE_FILTER_BILINEAR : TEXTURE_FILTER_POINT;
-    texture->isSmooth = enable;
-    SetTextureFilter(texture->handle, filter);
-}
-
-MxVec2 nativeTextureSize(const MxTextureNative* texture)
-{
-    const float width = (float)texture->handle.width;
-    const float height = (float)texture->handle.height;
-    return MxVec2{width, height};
-}
-
-bool nativeTextureIsSmooth(const MxTextureNative* texture)
-{
-    return texture->isSmooth;
-}
-
-bool nativeIsValidTexture(const MxTextureNative* texture)
-{
-    return IsTextureValid(texture->handle);
-}
-
-void nativeUnloadTexture(const MxTextureNative* texture)
-{
-    UnloadTexture(texture->handle);
-}
-
-bool isCursorOnScreen()
-{
-    const bool isValid = (GetMousePosition().x > 0 && GetMousePosition().y > 0 && GetMousePosition().x < GetScreenWidth() && // check cursor is outscreen
-                          GetMousePosition().y < GetScreenHeight()) &&
-                         IsCursorOnScreen();
-    return isValid;
-}
-
-MxVec2 windowSize()
-{
-    return MxVec2{(float)GetScreenWidth(), (float)GetScreenHeight()};
-}
-
-void setClipboardText(const std::string& text)
-{
-    SetClipboardText(text.c_str());
-}
-
-std::string getClipboardText()
-{
-    return GetClipboardText();
-}
-
-void beginScissorMode(int x, int y, int width, int height)
-{
-    BeginScissorMode(x, y, width, height);
-}
-
-void endScissorMode()
-{
-    EndScissorMode();
-}
-
-MxVec2 getMousePosition()
-{
-    return toMxVec2(GetMousePosition());
-}
-
-MxVec2 getMouseDelta()
-{
-    return toMxVec2(GetMouseDelta());
-}
-
-float getMouseWheelMove()
-{
-    return GetMouseWheelMove();
-}
-
-bool isMouseButtonPressed(int button)
-{
-    return IsMouseButtonPressed(button);
-}
-
-bool isMouseButtonDown(int button)
-{
-    return IsMouseButtonDown(button);
-}
-
-bool isMouseButtonReleased(int button)
-{
-    return IsMouseButtonReleased(button);
-}
-
-bool isKeyPressed(int key)
-{
-    return IsKeyPressed(key);
-}
-
-bool isKeyDown(int key)
-{
-    return IsKeyDown(key);
-}
-
-bool isKeyReleased(int key)
-{
-    return IsKeyReleased(key);
-}
-
-int getCharPressed()
-{
-    return GetCharPressed();
-}
-
-void drawRectangleLinesEx(MxRect rec, float lineThick, MxColor color)
-{
-    DrawRectangleLinesEx(toRectangle(rec), lineThick, toColor(color));
-}
-
-void drawRectanglePro(MxRect rec, MxVec2 origin, float rotation, MxColor color)
-{
-    DrawRectanglePro(toRectangle(rec), toVector(origin), rotation, toColor(color));
-}
-
-void drawTexturePro(const std::string& textureNameID, MxRect source, MxRect dest, MxVec2 origin, float rotation, MxColor tint)
-{
-    const MxTextureNative* texture = getTexture(textureNameID);
-    if (!IsTextureValid(texture->handle))
-    {
-        DrawText(textureNameID.c_str(), (int)dest.x, (int)dest.y, 10, BLACK);
-        return;
-    }
-    DrawTexturePro(texture->handle, toRectangle(source), toRectangle(dest), toVector(origin), rotation, toColor(tint));
-}
-
-void drawCircle(MxVec2 center, float radius, MxColor color)
-{
-    DrawCircleV(toVector(center), radius, toColor(color));
-}
-
-
-#endif // MXGUI_RAYLIB_HPP
-
-
-// =============end mxgui_raylib.hpp=============
-
-
-
-#elifdef MX_SFML_BACKEND_IMPLEMENTATION
-
-//-----------------------------------------------------------------------------
-// (SECTION) SFML backend
-//-----------------------------------------------------------------------------
-
-
-
-// ==============mxgui_sfml.hpp================
-
-#ifndef MXGUI_SFML_HPP
-#define MXGUI_SFML_HPP
-
-#include <SFML/Graphics.hpp>
-#include <SFML/OpenGL.hpp>
-
-struct MxTextureNative
-{
-    sf::Texture handle{};
-    bool isValid{false};
-};
-
-static std::unique_ptr<sf::Text> s_text;
-static std::unique_ptr<sf::Sprite> s_sprite;
-
-
-struct MxMousePolling
-{
-    bool pressed{false};
-    bool down{false};
-    bool release{false};
-};
-
-static bool s_cursorOnScreen{false};
-
-static sf::RectangleShape s_rectShape;
-static sf::CircleShape s_circleShape;
-static sf::RenderWindow* s_windowRef = nullptr;
-static sf::Clock s_fpsClock{};
-
-static MxVec2 s_mousePosition{};
-static MxVec2 s_mouseDelta{};
-static float s_mouseWheelScrolled{0.0f};
-static MxMousePolling s_mousePolling[5]{
-    MxMousePolling{},
-    MxMousePolling{},
-    MxMousePolling{},
-};
-
-
-inline sf::Vector2f toVectorF(MxVec2 vec)
-{
-    return sf::Vector2f{vec.x, vec.y};
-}
-
-inline sf::Vector2i toVectorI(MxVec2 vec)
-{
-    return sf::Vector2i{(int)vec.x, (int)vec.y};
-}
-
-inline sf::Color toColor(MxColor color)
-{
-    return sf::Color{color.r, color.g, color.b, color.a};
-}
-
-inline MxVec2 toMxVec2(sf::Vector2f vec)
-{
-    return MxVec2{vec.x, vec.y};
-}
-
-inline MxVec2 toMxVec2(sf::Vector2i vec)
-{
-    return MxVec2{(float)vec.x, (float)vec.y};
-}
-
-inline MxVec2 toMxVec2(sf::Vector2u vec)
-{
-    return MxVec2{(float)vec.x, (float)vec.y};
-}
-
-void nativeInit()
-{
-    const MxTextureNative texture;
-    s_sprite = std::make_unique<sf::Sprite>(texture.handle);
-}
-
-MxTextureNative nativeLoadTexture(const std::filesystem::path& path)
-{
-    MxTextureNative texture{};
-    if (texture.handle.loadFromFile(path))
-    {
-        texture.isValid = true;
-    }
-    return texture;
-}
-
-MxTextureNative nativeLoadTextureFromImageData(void* data, int width, int height, int /*mipmaps*/, int format)
-{
-
-    MxTextureNative texture{};
-    std::vector<unsigned char> rgba(width * height * 4);
-
-    const unsigned char* src = (const unsigned char*)data;
-
-    switch (format)
-    {
-        case 2:
-            for (int i = 0; i < width * height; i++)
-            {
-                unsigned char gray = src[i * 2 + 0];
-                unsigned char alpha = src[i * 2 + 1];
-                rgba[i * 4 + 0] = gray;
-                rgba[i * 4 + 1] = gray;
-                rgba[i * 4 + 2] = gray;
-                rgba[i * 4 + 3] = alpha;
-            }
-            break;
-
-        case 1:
-            for (int i = 0; i < width * height; i++)
-            {
-                unsigned char gray = src[i];
-                rgba[i * 4 + 0] = gray;
-                rgba[i * 4 + 1] = gray;
-                rgba[i * 4 + 2] = gray;
-                rgba[i * 4 + 3] = 255;
-            }
-            break;
-
-        case 7: memcpy(rgba.data(), src, rgba.size()); break;
-        default: MX_ASSERT(false, "loadTextureFromImageData: unsupported pixel format for SFML backend"); return texture;
-    }
-
-    sf::Image image({(unsigned int)width, (unsigned int)height}, rgba.data());
-
-    if (texture.handle.loadFromImage(image))
-    {
-        texture.isValid = true;
-    }
-
-    return texture;
-}
-
-void nativeSetTextureSmooth(MxTextureNative* texture, bool enable)
-{
-    texture->handle.setSmooth(enable);
-}
-
-MxVec2 nativeTextureSize(const MxTextureNative* texture)
-{
-    return MxVec2{(float)texture->handle.getSize().x, (float)texture->handle.getSize().y};
-}
-
-bool nativeTextureIsSmooth(const MxTextureNative* texture)
-{
-    return texture->handle.isSmooth();
-}
-
-bool nativeIsValidTexture(const MxTextureNative* texture)
-{
-    return texture->isValid;
-}
-
-void nativeUnloadTexture(const MxTextureNative* /*texture*/)
-{
-}
-
-void windowDisplay(sf::RenderWindow* window)
-{
-    window->display();
-    for (auto& mouse : s_mousePolling)
-    {
-        mouse.pressed = false;
-        mouse.release = false;
-    }
-    s_mouseDelta = MxVec2{};
-    s_mouseWheelScrolled = 0.0f;
-}
-
-std::optional<sf::Event> windowPollEvent(sf::RenderWindow* window)
-{
-
-    const std::optional event = window->pollEvent();
-
-    if (!s_windowRef)
-    {
-        s_windowRef = window;
-    }
-
-    if (!event.has_value())
-    {
-        return event;
-    }
-
-    if (const auto* resized = event->getIf<sf::Event::Resized>())
-    {
-        sf::Vector2f newSize((float)resized->size.x, (float)resized->size.y);
-        window->setView(sf::View(newSize / 2.0f, newSize));
-    }
-
-    if (const auto* mouseMove = event->getIf<sf::Event::MouseMoved>())
-    {
-        s_mouseDelta.x = mouseMove->position.x - s_mousePosition.x;
-        s_mouseDelta.y = mouseMove->position.y - s_mousePosition.y;
-        s_mousePosition = toMxVec2(mouseMove->position);
-    }
-
-    if (const auto* mouseWheelScrolled = event->getIf<sf::Event::MouseWheelScrolled>())
-    {
-        s_mouseWheelScrolled = mouseWheelScrolled->delta;
-    }
-
-    if (const auto* mousePressed = event->getIf<sf::Event::MouseButtonPressed>())
-    {
-        int button = (int)mousePressed->button;
-        s_mousePolling[button].pressed = true;
-        s_mousePolling[button].down = true;
-    }
-
-    if (const auto* mouseReleased = event->getIf<sf::Event::MouseButtonReleased>())
-    {
-
-        int button = (int)mouseReleased->button;
-        s_mousePolling[button].pressed = false;
-        s_mousePolling[button].down = false;
-        s_mousePolling[button].release = true;
-    }
-
-    if (event->is<sf::Event::MouseEntered>())
-    {
-        s_cursorOnScreen = true;
-    }
-
-    if (event->is<sf::Event::MouseLeft>())
-    {
-        s_cursorOnScreen = false;
-    }
-
-    return event;
-}
-
-bool isCursorOnScreen()
-{
-    return s_cursorOnScreen;
-}
-
-MxVec2 windowSize()
-{
-    return toMxVec2(s_windowRef->getSize());
-}
-
-/*
-void setClipboardText(const std::string& text)
-{
-}
-
-std::string getClipboardText()
-{
-    return std::string();
-}
-*/
-
-void beginScissorMode(int x, int y, int width, int height)
-{
-    MX_ASSERT(s_windowRef, "window not reference");
-
-    const sf::Vector2u winSize = s_windowRef->getSize();
-
-    glEnable(GL_SCISSOR_TEST);
-    glScissor(x, (GLint)((float)winSize.y - y - height), width, height);
-}
-
-void endScissorMode()
-{
-    glDisable(GL_SCISSOR_TEST);
-}
-
-
-MxVec2 getMousePosition()
-{
-    return s_mousePosition;
-}
-
-MxVec2 getMouseDelta()
-{
-    return s_mouseDelta;
-}
-
-float getMouseWheelMove()
-{
-    return s_mouseWheelScrolled;
-}
-
-bool isMouseButtonPressed(int button)
-{
-    return s_mousePolling[button].pressed;
-}
-
-bool isMouseButtonDown(int button)
-{
-    return s_mousePolling[button].down;
-}
-
-bool isMouseButtonReleased(int button)
-{
-    return s_mousePolling[button].release;
-}
-
-/*
-bool isKeyPressed(int key)
-{ return false; }
-
-bool isKeyDown(int key)
-{ return false; }
-
-bool isKeyReleased(int key)
-{ return false; }
-
-int getCharPressed()
-{ return 0; } 
- */
-
-void drawRectangleLinesEx(MxRect rec, float lineThick, MxColor color)
-{
-    s_rectShape.setOutlineThickness(lineThick);
-    s_rectShape.setPosition({rec.x + lineThick, rec.y + lineThick});
-    s_rectShape.setSize({rec.width - lineThick * 2, rec.height - lineThick * 2});
-    s_rectShape.setFillColor(sf::Color::Transparent);
-    s_rectShape.setOutlineColor(toColor(color));
-
-    MX_ASSERT(s_windowRef, "window not reference");
-    s_windowRef->draw(s_rectShape);
-}
-
-void drawRectanglePro(MxRect rec, MxVec2 origin, float rotation, MxColor color)
-{
-    s_rectShape.setOutlineThickness(0);
-    s_rectShape.setPosition({rec.x, rec.y});
-    s_rectShape.setOrigin({origin.x, origin.y});
-    s_rectShape.setRotation(sf::degrees(rotation));
-    s_rectShape.setSize({rec.width, rec.height});
-    s_rectShape.setFillColor(toColor(color));
-
-    MX_ASSERT(s_windowRef, "window not reference");
-    s_windowRef->draw(s_rectShape);
-}
-
-void drawTexturePro(const std::string& textureNameID, MxRect source, MxRect dest, MxVec2 origin, float rotation, MxColor tint)
-{
-
-    if (!s_sprite)
-    {
-        MX_ASSERT(s_sprite, "s_sprite is not valid");
-        return;
-    }
-
-
-    const MxTextureNative* texture = getTexture(textureNameID);
-
-    if (!texture->isValid)
-    {
-        MX_ASSERT(texture->isValid, "texture is not valid");
-        return;
-    }
-
-
-    const sf::IntRect rect({(int)source.x, (int)source.y}, {(int)source.width, (int)source.height});
-    s_sprite->setTexture(texture->handle);
-    s_sprite->setTextureRect(rect);
-
-    // The scale factor must be derived manually from dest size / source size
-    const float scaleX = (source.width != 0.0f) ? (dest.width / source.width) : 1.0f;
-    const float scaleY = (source.height != 0.0f) ? (dest.height / source.height) : 1.0f;
-    s_sprite->setScale({scaleX, scaleY});
-
-    s_sprite->setPosition({dest.x, dest.y});
-    s_sprite->setOrigin({origin.x, origin.y});
-    s_sprite->setRotation(sf::degrees(rotation));
-    s_sprite->setColor(toColor(tint));
-
-
-    MX_ASSERT(s_windowRef, "window not reference");
-    s_windowRef->draw(*s_sprite);
-}
-
-
-void drawCircle(MxVec2 center, float radius, MxColor color)
-{
-    s_circleShape.setRadius(radius);
-    s_circleShape.setPosition(sf::Vector2f{center.x - radius, center.y - radius});
-    s_circleShape.setFillColor(toColor(color));
-
-
-    MX_ASSERT(s_windowRef, "window not reference");
-    s_windowRef->draw(s_circleShape);
-}
-
-
-void drawFPS(float x, float y)
-{
-    static float fps = 0.0f;
-
-    float deltaTime = s_fpsClock.restart().asSeconds();
-    if (deltaTime > 0.0f)
-    {
-        fps = 1.0f / deltaTime;
-    }
-
-    std::string text = std::to_string((int)fps) + " FPS";
-    MxColor color = fps > 30 ? MxColor::Green : MxColor::Yellow;
-
-    const MxFont* font = getFont(MX_FONT_NOTO_ID, 20);
-    drawTextEx(*font, text, MxVec2{x, y}, 20, 0, color);
-}
-
-
-
-#endif // MXGUI_SFML_HPP
-
-
-// =============end mxgui_sfml.hpp=============
-
-
-#else
-
-//-----------------------------------------------------------------------------
-// (SECTION) CUSTOM_BACKEND
-//-----------------------------------------------------------------------------
-
-// Note:  Here you can implement a custom renderer.
-#ifdef MX_CUSTOM_BACKEND_HEADER
-
-#include MX_CUSTOM_BACKEND_HEADER
-
-#endif // MX_CUSTOM_BACKEND_HEADER
-
-#endif // MX_XXX_BACKEND_IMPLEMENTATION
-
-
-//-----------------------------------------------------------------------------
-// (SECTION) Managers
-//-----------------------------------------------------------------------------
-
-struct MxFontData
-{
-    unsigned char* fileData{nullptr};
-    int* codepoints{nullptr};
-    int codepointCount{0};
-    std::unordered_map<int, MxFont> fonts{};
-};
-
-
-#define GEN_TEXTURE_NAME_ID(name, id) name + std::to_string(id)
-
-struct MxFontManager
-{
-
-    void init(MxStyle style)
-    {
-        setupDefaultFont(style.textSize);
-        setupFontAwesome(style.iconSize);
-    }
-
-    void loadFromMemory(const std::string& fontNameID, const unsigned char* fileData, int dataSize, int fontSize, const int* codepoints, int codepointCount, bool smooth)
-    {
-        MxFontData fontData{};
-
-        fontData.fileData = (unsigned char*)MX_MALLOC(dataSize * sizeof(unsigned char));
-        memcpy(fontData.fileData, fileData, dataSize * sizeof(unsigned char));
-
-        if (codepoints != NULL)
-        {
-            fontData.codepoints = (int*)MX_MALLOC(codepointCount * sizeof(int));
-            memcpy(fontData.codepoints, codepoints, codepointCount * sizeof(int));
-            fontData.codepointCount = codepointCount;
-        }
-
-        const std::string textureNameID = GEN_TEXTURE_NAME_ID(fontNameID, fontSize);
-        MxFont font = loadFontFromMemoryInternal(textureNameID, fontData.fileData, fontSize, codepoints, codepointCount);
-        setSmoothTexture(font.textureNameID, smooth);
-
-
-        fontData.fonts.insert_or_assign(fontSize, font);
-        m_fonts.insert_or_assign(fontNameID, fontData);
-    }
-
-    void setupDefaultFont(int textSize)
-    {
-        int codepoints[95];
-        for (int i = 0; i < 95; i++)
-        {
-            codepoints[i] = 32 + i; // ASCII: from (32) to ~ (126)
-        }
-
-        loadFromMemory(MX_FONT_NOTO_ID, notosans::data, notosans::size, textSize, codepoints, 95, false);
-    }
-
-    void setupFontAwesome(int iconSize)
-    {
-#if MX_FONT_AWESOME
-        int arrayOriginalSize = 414704;
-        unsigned char* fontAwesomeData = (unsigned char*)MX_MALLOC(arrayOriginalSize);
-        stb_decompress(fontAwesomeData, fa_compressed_data, fa_compressed_size);
-        int count = sizeof(codepointsFontAwesome) / sizeof(codepointsFontAwesome[0]);
-
-        loadFromMemory(MX_FONT_AWESOME_ID, fontAwesomeData, arrayOriginalSize, iconSize, codepointsFontAwesome, count, true);
-        MX_FREE(fontAwesomeData);
-#endif
-    }
-
-    void unload()
-    {
-        for (auto& [idFontName, fontDatas] : m_fonts)
-        {
-            for (auto& [id, font] : fontDatas.fonts)
-            {
-                unloadFont(font);
-            }
-            MX_FREE(fontDatas.fileData);
-            if (fontDatas.codepoints != nullptr)
-            {
-                MX_FREE(fontDatas.codepoints);
-            }
-        }
-        m_fonts.clear();
-    }
-
-    void unloadFont(MxFont font)
-    {
-        if (font.glyphs != NULL)
-        {
-            for (int i = 0; i < font.glyphCount; i++)
-            {
-                if (isValidImage(font.glyphs[i].image))
-                {
-                    MX_FREE(font.glyphs[i].image.data);
-                }
-            }
-            MX_FREE(font.glyphs);
-        }
-
-        unloadTexture(font.textureNameID);
-        MX_FREE(font.recs);
-
-        MX_LOG("INFO: Unloaded font data from RAM and VRAM");
-    }
-
-    MxVec2 measureText(const std::string& fontNameID, const std::string& text, int fontSize, int spacing)
-    {
-        const MxFont* font = getFont(fontNameID, fontSize);
-        return measureTextInternal(*font, text, fontSize, spacing);
-    }
-
-    const MxFont* getFont(const std::string& fontNameID, int size)
-    {
-        static MxFont empty{};
-
-        auto itFontData = m_fonts.find(fontNameID);
-        if (itFontData != m_fonts.end())
-        {
-            auto& fontData = itFontData->second;
-            auto itFont = fontData.fonts.find(size);
-            if (itFont != fontData.fonts.end())
-            {
-                return &itFont->second;
-            }
-
-            const std::string textureNameID = GEN_TEXTURE_NAME_ID(fontNameID, size);
-            MxFont font = loadFontFromMemoryInternal(textureNameID, fontData.fileData, size, fontData.codepoints, fontData.codepointCount);
-            fontData.fonts.insert_or_assign(size, font);
-            return &fontData.fonts.at(size);
-        }
-        return &empty;
-    }
-
-    std::unordered_map<std::string, MxFontData> m_fonts{};
-};
-
-
-struct MxTextureManager
-{
-    void init() { nativeInit(); }
-
-    void loadTexture(const std::filesystem::path& path, const std::string& textureNameID)
-    {
-        auto it = m_textures.find(textureNameID);
-        if (it != m_textures.end())
-        {
-            unloadTexture(textureNameID);
-        }
-        MxTextureNative texture = nativeLoadTexture(path);
-        m_textures.insert_or_assign(textureNameID, texture);
-    }
-
-    void loadTextureFromImageData(const std::string& textureNameID, void* data, int width, int height, int mipmaps, int format)
-    {
-        MxTextureNative texture = nativeLoadTextureFromImageData(data, width, height, mipmaps, format);
-        m_textures.insert_or_assign(textureNameID, texture);
-    }
-
-    MxVec2 getSize(const std::string& textureNameID)
-    {
-        const MxTextureNative* texture = getTexture(textureNameID);
-        return nativeTextureSize(texture);
-    }
-
-    bool isSmooth(const std::string& textureNameID)
-    {
-        const MxTextureNative* texture = getTexture(textureNameID);
-        return nativeTextureIsSmooth(texture);
-    }
-
-    void setSmooth(const std::string& textureNameID, bool enable)
-    {
-        auto it = m_textures.find(textureNameID);
-        if (it != m_textures.end())
-        {
-            nativeSetTextureSmooth(&it->second, enable);
-        }
-    }
-
-    void unload()
-    {
-        for (auto& [textureNameID, texture] : m_textures)
-        {
-            const MxTextureNative* textureNative = getTexture(textureNameID);
-            nativeUnloadTexture(textureNative);
-        }
-        m_textures.clear();
-    }
-    void unloadTexture(const std::string& textureNameID)
-    {
-        const MxTextureNative* texture = getTexture(textureNameID);
-        nativeUnloadTexture(texture);
-        m_textures.erase(textureNameID);
-    }
-
-    const MxTextureNative* getTexture(const std::string& textureNameID)
-    {
-        static MxTextureNative empty{};
-        auto it = m_textures.find(textureNameID);
-        if (it != m_textures.end())
-        {
-            return &it->second;
-        }
-
-        return &empty;
-    }
-
-
-    std::unordered_map<std::string, MxTextureNative> m_textures{};
-};
-
-
-static MxFontManager s_fontManager;
-static MxTextureManager s_textureManager;
 
 
 void initManagers(MxStyle style)
 {
-    s_fontManager.init(style);
-    s_textureManager.init();
+    getCore().fontManager.init(style);
+    getCore().textureManager.init();
 }
 
 void closeManagers()
 {
-    s_fontManager.unload();
-    s_textureManager.unload();
+    getCore().fontManager.unload();
+    getCore().textureManager.unload();
 }
 
 //-----------------------------------------------------------------------------
@@ -16332,7 +16357,7 @@ void closeManagers()
 
 const MxFont* getFont(const std::string& fontName, int size)
 {
-    const MxFont* font = s_fontManager.getFont(fontName, size);
+    const MxFont* font = getCore().fontManager.getFont(fontName, size);
     return font;
 }
 
@@ -16343,19 +16368,19 @@ void loadFont(const std::string& textureNameID, const std::filesystem::path& pat
     if (fileData != NULL)
     {
         // Loading font from memory data
-        s_fontManager.loadFromMemory(textureNameID, fileData, dataSize, fontSize, codepoints, codepointCount, false);
+        getCore().fontManager.loadFromMemory(textureNameID, fileData, dataSize, fontSize, codepoints, codepointCount, false);
         MX_FREE(fileData);
     }
 }
 
 MxVec2 measureText(const std::string& fontNameID, const std::string& text, int fontSize, int spacing)
 {
-    return s_fontManager.measureText(fontNameID, text, fontSize, spacing);
+    return getCore().fontManager.measureText(fontNameID, text, fontSize, spacing);
 }
 
 void drawText(const std::string& fontNameID, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint)
 {
-    const MxFont* font = s_fontManager.getFont(fontNameID, fontSize);
+    const MxFont* font = getCore().fontManager.getFont(fontNameID, fontSize);
     drawTextEx(*font, text, position, fontSize, spacing, tint);
 }
 
@@ -16364,7 +16389,7 @@ void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size)
     // Convert codepoint to UTF-8 before to draw
     int byteCount = 0;
     const char* icon = codepointToUTF8(codepoint, &byteCount);
-    const MxFont* font = s_fontManager.getFont(MX_FONT_AWESOME_ID, size);
+    const MxFont* font = getCore().fontManager.getFont(MX_FONT_AWESOME_ID, size);
 
     drawTextEx(*font, icon, position, size, 0, color);
 }
@@ -16376,37 +16401,37 @@ void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size)
 
 void loadTexture(const std::filesystem::path& path, const std::string& textureNameID)
 {
-    s_textureManager.loadTexture(path, textureNameID);
+    getCore().textureManager.loadTexture(path, textureNameID);
 }
 
 void unloadTexture(const std::string& textureNameID)
 {
-    s_textureManager.unloadTexture(textureNameID);
+    getCore().textureManager.unloadTexture(textureNameID);
 }
 
 void loadTextureFromMemory(void* data, int width, int height, int format, int mipmaps, const std::string& textureNameID)
 {
-    s_textureManager.loadTextureFromImageData(textureNameID, data, width, height, mipmaps, format);
+    getCore().textureManager.loadTextureFromImageData(textureNameID, data, width, height, mipmaps, format);
 }
 
 MxVec2 getSizeTexture(const std::string& textureNameID)
 {
-    return s_textureManager.getSize(textureNameID);
+    return getCore().textureManager.getSize(textureNameID);
 }
 
 void setSmoothTexture(const std::string& textureNameID, bool enable)
 {
-    s_textureManager.setSmooth(textureNameID, enable);
+    getCore().textureManager.setSmooth(textureNameID, enable);
 }
 
 bool isSmoothTexture(const std::string& textureNameID)
 {
-    return s_textureManager.isSmooth(textureNameID);
+    return getCore().textureManager.isSmooth(textureNameID);
 }
 
 const MxTextureNative* getTexture(const std::string& textureNameID)
 {
-    const MxTextureNative* texture = s_textureManager.getTexture(textureNameID);
+    const MxTextureNative* texture = getCore().textureManager.getTexture(textureNameID);
     return texture;
 }
 

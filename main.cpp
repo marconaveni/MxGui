@@ -37,7 +37,7 @@ int main()
     SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
     InitWindow(800, 600, "GUI");
     SetTextLineSpacing(0);
-     SetTargetFPS(60);
+     // SetTargetFPS(60);
 
 #elif MX_SFML
     sf::RenderWindow window(sf::VideoMode({800, 600}), "GUI");

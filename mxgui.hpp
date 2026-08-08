@@ -617,6 +617,12 @@ void setSmoothTexture(const std::string& textureNameID, bool enable);
 bool isSmoothTexture(const std::string& textureNameID);
 const MxTextureNative* getTexture(const std::string& textureNameID);
 
+// internal helpers used by the managers and by the backends
+static unsigned int stb_decompress(unsigned char* output, const unsigned char* i, unsigned int length);
+MxVec2 measureTextInternal(MxFont font, const std::string& text, float fontSize, float spacing);
+MxFont loadFontFromMemoryInternal(const std::string& textureNameID, const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount);
+void drawTextEx(MxFont font, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint);
+
 //-----------------------------------------------------------------------------
 // macros getters and setters to MxGuiContext
 //-----------------------------------------------------------------------------
@@ -735,6 +741,281 @@ struct MxGuiContext
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Wunused-function"
 #endif
+
+
+/////////////////////////////////////////////////////
+//// Backend Implementations
+////
+////
+////
+/////////////////////////////////////////////////////
+
+#ifdef MX_RAYLIB_BACKEND_IMPLEMENTATION
+
+//-----------------------------------------------------------------------------
+// (SECTION) raylib backend
+//-----------------------------------------------------------------------------
+
+
+#include "mxgui_raylib.hpp"
+
+
+#elifdef MX_SFML_BACKEND_IMPLEMENTATION
+
+//-----------------------------------------------------------------------------
+// (SECTION) SFML backend
+//-----------------------------------------------------------------------------
+
+#include "mxgui_sfml.hpp"
+
+#else
+
+//-----------------------------------------------------------------------------
+// (SECTION) CUSTOM_BACKEND
+//-----------------------------------------------------------------------------
+
+// Note:  Here you can implement a custom renderer.
+#ifdef MX_CUSTOM_BACKEND_HEADER
+#include MX_CUSTOM_BACKEND_HEADER
+#endif // MX_CUSTOM_BACKEND_HEADER
+
+#endif // MX_XXX_BACKEND_IMPLEMENTATION
+
+
+//-----------------------------------------------------------------------------
+// (SECTION) Managers
+//-----------------------------------------------------------------------------
+
+struct MxFontData
+{
+    unsigned char* fileData{nullptr};
+    int* codepoints{nullptr};
+    int codepointCount{0};
+    std::unordered_map<int, MxFont> fonts{};
+};
+
+
+#define GEN_TEXTURE_NAME_ID(name, id) name + std::to_string(id)
+
+struct MxFontManager
+{
+
+    void init(MxStyle style)
+    {
+        setupDefaultFont(style.textSize);
+        setupFontAwesome(style.iconSize);
+    }
+
+    void loadFromMemory(const std::string& fontNameID, const unsigned char* fileData, int dataSize, int fontSize, const int* codepoints, int codepointCount, bool smooth)
+    {
+        MxFontData fontData{};
+
+        fontData.fileData = (unsigned char*)MX_MALLOC(dataSize * sizeof(unsigned char));
+        memcpy(fontData.fileData, fileData, dataSize * sizeof(unsigned char));
+
+        if (codepoints != NULL)
+        {
+            fontData.codepoints = (int*)MX_MALLOC(codepointCount * sizeof(int));
+            memcpy(fontData.codepoints, codepoints, codepointCount * sizeof(int));
+            fontData.codepointCount = codepointCount;
+        }
+
+        const std::string textureNameID = GEN_TEXTURE_NAME_ID(fontNameID, fontSize);
+        MxFont font = loadFontFromMemoryInternal(textureNameID, fontData.fileData, fontSize, codepoints, codepointCount);
+        setSmoothTexture(font.textureNameID, smooth);
+
+
+        fontData.fonts.insert_or_assign(fontSize, font);
+        m_fonts.insert_or_assign(fontNameID, fontData);
+    }
+
+    void setupDefaultFont(int textSize)
+    {
+        int codepoints[95];
+        for (int i = 0; i < 95; i++)
+        {
+            codepoints[i] = 32 + i; // ASCII: from (32) to ~ (126)
+        }
+
+        loadFromMemory(MX_FONT_NOTO_ID, notosans::data, notosans::size, textSize, codepoints, 95, false);
+    }
+
+    void setupFontAwesome(int iconSize)
+    {
+#if MX_FONT_AWESOME
+        int arrayOriginalSize = 414704;
+        unsigned char* fontAwesomeData = (unsigned char*)MX_MALLOC(arrayOriginalSize);
+        stb_decompress(fontAwesomeData, fa_compressed_data, fa_compressed_size);
+        int count = sizeof(codepointsFontAwesome) / sizeof(codepointsFontAwesome[0]);
+
+        loadFromMemory(MX_FONT_AWESOME_ID, fontAwesomeData, arrayOriginalSize, iconSize, codepointsFontAwesome, count, true);
+        MX_FREE(fontAwesomeData);
+#endif
+    }
+
+    void unload()
+    {
+        for (auto& [idFontName, fontDatas] : m_fonts)
+        {
+            for (auto& [id, font] : fontDatas.fonts)
+            {
+                unloadFont(font);
+            }
+            MX_FREE(fontDatas.fileData);
+            if (fontDatas.codepoints != nullptr)
+            {
+                MX_FREE(fontDatas.codepoints);
+            }
+        }
+        m_fonts.clear();
+    }
+
+    void unloadFont(MxFont font)
+    {
+        if (font.glyphs != NULL)
+        {
+            for (int i = 0; i < font.glyphCount; i++)
+            {
+                if (isValidImage(font.glyphs[i].image))
+                {
+                    MX_FREE(font.glyphs[i].image.data);
+                }
+            }
+            MX_FREE(font.glyphs);
+        }
+
+        unloadTexture(font.textureNameID);
+        MX_FREE(font.recs);
+
+        MX_LOG("INFO: Unloaded font data from RAM and VRAM");
+    }
+
+    MxVec2 measureText(const std::string& fontNameID, const std::string& text, int fontSize, int spacing)
+    {
+        const MxFont* font = getFont(fontNameID, fontSize);
+        return measureTextInternal(*font, text, fontSize, spacing);
+    }
+
+    const MxFont* getFont(const std::string& fontNameID, int size)
+    {
+        static MxFont empty{};
+
+        auto itFontData = m_fonts.find(fontNameID);
+        if (itFontData != m_fonts.end())
+        {
+            auto& fontData = itFontData->second;
+            auto itFont = fontData.fonts.find(size);
+            if (itFont != fontData.fonts.end())
+            {
+                return &itFont->second;
+            }
+
+            const std::string textureNameID = GEN_TEXTURE_NAME_ID(fontNameID, size);
+            MxFont font = loadFontFromMemoryInternal(textureNameID, fontData.fileData, size, fontData.codepoints, fontData.codepointCount);
+            fontData.fonts.insert_or_assign(size, font);
+            return &fontData.fonts.at(size);
+        }
+        return &empty;
+    }
+
+    std::unordered_map<std::string, MxFontData> m_fonts{};
+};
+
+
+struct MxTextureManager
+{
+    void init() { nativeInit(); }
+
+    void loadTexture(const std::filesystem::path& path, const std::string& textureNameID)
+    {
+        auto it = m_textures.find(textureNameID);
+        if (it != m_textures.end())
+        {
+            unloadTexture(textureNameID);
+        }
+        MxTextureNative texture = nativeLoadTexture(path);
+        m_textures.insert_or_assign(textureNameID, texture);
+    }
+
+    void loadTextureFromImageData(const std::string& textureNameID, void* data, int width, int height, int mipmaps, int format)
+    {
+        MxTextureNative texture = nativeLoadTextureFromImageData(data, width, height, mipmaps, format);
+        m_textures.insert_or_assign(textureNameID, texture);
+    }
+
+    MxVec2 getSize(const std::string& textureNameID)
+    {
+        const MxTextureNative* texture = getTexture(textureNameID);
+        return nativeTextureSize(texture);
+    }
+
+    bool isSmooth(const std::string& textureNameID)
+    {
+        const MxTextureNative* texture = getTexture(textureNameID);
+        return nativeTextureIsSmooth(texture);
+    }
+
+    void setSmooth(const std::string& textureNameID, bool enable)
+    {
+        auto it = m_textures.find(textureNameID);
+        if (it != m_textures.end())
+        {
+            nativeSetTextureSmooth(&it->second, enable);
+        }
+    }
+
+    void unload()
+    {
+        for (auto& [textureNameID, texture] : m_textures)
+        {
+            const MxTextureNative* textureNative = getTexture(textureNameID);
+            nativeUnloadTexture(textureNative);
+        }
+        m_textures.clear();
+    }
+    void unloadTexture(const std::string& textureNameID)
+    {
+        const MxTextureNative* texture = getTexture(textureNameID);
+        nativeUnloadTexture(texture);
+        m_textures.erase(textureNameID);
+    }
+
+    const MxTextureNative* getTexture(const std::string& textureNameID)
+    {
+        static MxTextureNative empty{};
+        auto it = m_textures.find(textureNameID);
+        if (it != m_textures.end())
+        {
+            return &it->second;
+        }
+
+        return &empty;
+    }
+
+
+    std::unordered_map<std::string, MxTextureNative> m_textures{};
+};
+
+
+//-----------------------------------------------------------------------------
+// (SECTION) Core state
+//-----------------------------------------------------------------------------
+
+struct MxCore
+{
+    MxGuiContext context{};
+    MxTextEdit textEdit{};
+    std::vector<MxRect> stackScissors{};
+    MxFontManager fontManager{};
+    MxTextureManager textureManager{};
+};
+
+inline MxCore& getCore()
+{
+    static MxCore core{};
+    return core;
+}
+
 
 //-----------------------------------------------------------------------------
 // (Section) Internal functions publics
@@ -1648,8 +1929,6 @@ static unsigned int stb_decompress(unsigned char* output, const unsigned char* i
 //-----------------------------------------------------------------------------
 
 
-static MxTextEdit s_textEdit{};
-
 // Convert a UTF-8 C string into a codepoint string (std::u32string)
 static std::u32string convertUTF8ToU32(const char* text)
 {
@@ -1682,7 +1961,8 @@ static float charWidth(char32_t codepoint)
 {
     int len{0};
     const char* utf8 = codepointToUTF8((int)codepoint, &len);
-    const MxVec2 size = measureTextInternal(*s_textEdit.font, utf8, s_textEdit.fontSize, s_textEdit.spacing);
+    MxTextEdit& textEdit = getCore().textEdit;
+    const MxVec2 size = measureTextInternal(*textEdit.font, utf8, textEdit.fontSize, textEdit.spacing);
     return size.x;
 }
 
@@ -1693,16 +1973,18 @@ static float charWidth(char32_t codepoint)
 
 static void STB_TEXTEDIT_LAYOUTROW(StbTexteditRow* r, std::u32string* obj, int line_start_idx)
 {
+
+    MxTextEdit& textEdit = getCore().textEdit;
     int n = (int)obj->size();
     std::u32string sub = obj->substr(line_start_idx, n - line_start_idx);
     std::string utf8 = convertU32ToUTF8(sub);
-    const MxVec2 size = measureTextInternal(*s_textEdit.font, utf8, s_textEdit.fontSize, s_textEdit.spacing);
+    const MxVec2 size = measureTextInternal(*textEdit.font, utf8, textEdit.fontSize, textEdit.spacing);
     r->num_chars = (int)sub.size();
     r->x0 = 0;
     r->x1 = size.x;
-    r->baseline_y_delta = s_textEdit.fontSize * 1.2f;
+    r->baseline_y_delta = textEdit.fontSize * 1.2f;
     r->ymin = 0;
-    r->ymax = s_textEdit.fontSize;
+    r->ymax = textEdit.fontSize;
 }
 
 
@@ -1881,13 +2163,12 @@ inline MxColor fadeColor(MxColor color, float alpha)
     return result;
 }
 
-static std::vector<MxRect> s_stackScissors{};
 
 MxRect intersectionArea(const MxRect& rect2)
 {
-    if (!s_stackScissors.empty())
+    if (!getCore().stackScissors.empty())
     {
-        return getCollisionRec(s_stackScissors.back(), rect2);
+        return getCollisionRec(getCore().stackScissors.back(), rect2);
     }
 
     return rect2;
@@ -1895,7 +2176,7 @@ MxRect intersectionArea(const MxRect& rect2)
 
 void pushScissor(int x, int y, int width, int height)
 {
-    if (!s_stackScissors.empty())
+    if (!getCore().stackScissors.empty())
     {
         endScissorMode();
     }
@@ -1903,7 +2184,7 @@ void pushScissor(int x, int y, int width, int height)
     MxRect rect{(float)x, (float)y, (float)width, (float)height};
     rect = intersectionArea(rect);
 
-    s_stackScissors.push_back(rect);
+    getCore().stackScissors.push_back(rect);
     beginScissorMode((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height);
 }
 
@@ -1911,14 +2192,14 @@ void popScissor()
 {
     endScissorMode();
 
-    if (!s_stackScissors.empty())
+    if (!getCore().stackScissors.empty())
     {
-        s_stackScissors.pop_back();
+        getCore().stackScissors.pop_back();
     }
 
-    if (!s_stackScissors.empty())
+    if (!getCore().stackScissors.empty())
     {
-        MxRect rect = s_stackScissors.back();
+        MxRect rect = getCore().stackScissors.back();
         beginScissorMode((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height);
     }
 }
@@ -1945,24 +2226,24 @@ MxTransform updateTransformWorld(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor
 namespace mxgui
 {
 
-    static std::unique_ptr<MxGuiContext> s_context{nullptr};
 
     MxGuiContext* createContext(MxStyle style)
     {
-        s_context = std::make_unique<MxGuiContext>();
-        s_context->init(style);
-        return s_context.get();
+        MxGuiContext* context = &getCore().context;
+        context->init(style);
+        return context;
     }
 
     void destroyContext(MxGuiContext* ctx)
     {
         ctx->close();
-        s_context.reset();
+        *ctx = MxGuiContext{};
     }
 
     MxGuiContext* getCurrentContext()
     {
-        return s_context.get();
+        MxGuiContext* context = &getCore().context;
+        return context;
     }
 
     MxStyle getStyle(MxGuiContext* ctx)
@@ -2410,9 +2691,10 @@ namespace mxgui
 
     void guiTextBox(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor)
     {
-        s_textEdit.font = getFont(ctx->m_style.fontName, ctx->m_style.textSize);
-        s_textEdit.fontSize = ctx->m_style.textSize;
-        s_textEdit.spacing = ctx->m_style.textSpacing;
+        MxTextEdit& textEdit = getCore().textEdit;
+        textEdit.font = getFont(ctx->m_style.fontName, ctx->m_style.textSize);
+        textEdit.fontSize = ctx->m_style.textSize;
+        textEdit.spacing = ctx->m_style.textSpacing;
 
         TextBoxComponent& textBoxComponent = *ctx->getTextBoxComponent(tag);
         MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
@@ -2521,10 +2803,11 @@ namespace mxgui
             }
         }
 
+        
         float textX = textEditState.box.x + 6;
-        float textY = textEditState.box.y + (textEditState.box.height - s_textEdit.fontSize) / 2;
+        float textY = textEditState.box.y + (textEditState.box.height - textEdit.fontSize) / 2;
 
-        float cursorX = textX + measureTextInternal(*s_textEdit.font, convertU32ToUTF8(textEditState.text.substr(0, textEditState.state.cursor)).c_str(), s_textEdit.fontSize, s_textEdit.spacing).x;
+        float cursorX = textX + measureTextInternal(*textEdit.font, convertU32ToUTF8(textEditState.text.substr(0, textEditState.state.cursor)).c_str(), textEdit.fontSize, textEdit.spacing).x;
         float offsetX = (textEditState.box.x + textEditState.box.width - 6) - cursorX;
         if (offsetX > 0)
         {
@@ -2562,8 +2845,8 @@ namespace mxgui
             {
                 std::swap(selStart, selEnd);
             }
-            float x0 = textX + offsetX + measureTextInternal(*s_textEdit.font, convertU32ToUTF8(textEditState.text.substr(0, selStart)).c_str(), s_textEdit.fontSize, s_textEdit.spacing).x;
-            float x1 = textX + offsetX + measureTextInternal(*s_textEdit.font, convertU32ToUTF8(textEditState.text.substr(0, selEnd)).c_str(), s_textEdit.fontSize, s_textEdit.spacing).x;
+            float x0 = textX + offsetX + measureTextInternal(*textEdit.font, convertU32ToUTF8(textEditState.text.substr(0, selStart)).c_str(), textEdit.fontSize, textEdit.spacing).x;
+            float x1 = textX + offsetX + measureTextInternal(*textEdit.font, convertU32ToUTF8(textEditState.text.substr(0, selEnd)).c_str(), textEdit.fontSize, textEdit.spacing).x;
             drawRectanglePro(MxRect{x0, textEditState.box.y + 4, (x1 - x0), textEditState.box.height - 8}, MxVec2{}, 0, MxColor::SkyBlue);
         }
 
@@ -2571,7 +2854,7 @@ namespace mxgui
 
         // draw text
         pushScissor(rect.x, rect.y, rect.width, rect.height); // call internal BeginScissorMode();
-        drawTextEx(*s_textEdit.font, utf8Text, MxVec2{textX + offsetX, textY}, s_textEdit.fontSize, s_textEdit.spacing, ctx->m_style.textColor);
+        drawTextEx(*textEdit.font, utf8Text, MxVec2{textX + offsetX, textY}, textEdit.fontSize, textEdit.spacing, ctx->m_style.textColor);
         popScissor();
 
         // draw cursor
@@ -2585,276 +2868,18 @@ namespace mxgui
 
 } // namespace mxgui
 
-/////////////////////////////////////////////////////
-//// Backend Implementations
-////
-////
-////
-/////////////////////////////////////////////////////
-
-#ifdef MX_RAYLIB_BACKEND_IMPLEMENTATION
-
-//-----------------------------------------------------------------------------
-// (SECTION) raylib backend
-//-----------------------------------------------------------------------------
-
-
-#include "mxgui_raylib.hpp"
-
-
-#elifdef MX_SFML_BACKEND_IMPLEMENTATION
-
-//-----------------------------------------------------------------------------
-// (SECTION) SFML backend
-//-----------------------------------------------------------------------------
-
-#include "mxgui_sfml.hpp"
-
-#else
-
-//-----------------------------------------------------------------------------
-// (SECTION) CUSTOM_BACKEND
-//-----------------------------------------------------------------------------
-
-// Note:  Here you can implement a custom renderer.
-#ifdef MX_CUSTOM_BACKEND_HEADER
-
-#include MX_CUSTOM_BACKEND_HEADER
-
-#endif // MX_CUSTOM_BACKEND_HEADER
-
-#endif // MX_XXX_BACKEND_IMPLEMENTATION
-
-
-//-----------------------------------------------------------------------------
-// (SECTION) Managers
-//-----------------------------------------------------------------------------
-
-struct MxFontData
-{
-    unsigned char* fileData{nullptr};
-    int* codepoints{nullptr};
-    int codepointCount{0};
-    std::unordered_map<int, MxFont> fonts{};
-};
-
-
-#define GEN_TEXTURE_NAME_ID(name, id) name + std::to_string(id)
-
-struct MxFontManager
-{
-
-    void init(MxStyle style)
-    {
-        setupDefaultFont(style.textSize);
-        setupFontAwesome(style.iconSize);
-    }
-
-    void loadFromMemory(const std::string& fontNameID, const unsigned char* fileData, int dataSize, int fontSize, const int* codepoints, int codepointCount, bool smooth)
-    {
-        MxFontData fontData{};
-
-        fontData.fileData = (unsigned char*)MX_MALLOC(dataSize * sizeof(unsigned char));
-        memcpy(fontData.fileData, fileData, dataSize * sizeof(unsigned char));
-
-        if (codepoints != NULL)
-        {
-            fontData.codepoints = (int*)MX_MALLOC(codepointCount * sizeof(int));
-            memcpy(fontData.codepoints, codepoints, codepointCount * sizeof(int));
-            fontData.codepointCount = codepointCount;
-        }
-
-        const std::string textureNameID = GEN_TEXTURE_NAME_ID(fontNameID, fontSize);
-        MxFont font = loadFontFromMemoryInternal(textureNameID, fontData.fileData, fontSize, codepoints, codepointCount);
-        setSmoothTexture(font.textureNameID, smooth);
-
-
-        fontData.fonts.insert_or_assign(fontSize, font);
-        m_fonts.insert_or_assign(fontNameID, fontData);
-    }
-
-    void setupDefaultFont(int textSize)
-    {
-        int codepoints[95];
-        for (int i = 0; i < 95; i++)
-        {
-            codepoints[i] = 32 + i; // ASCII: from (32) to ~ (126)
-        }
-
-        loadFromMemory(MX_FONT_NOTO_ID, notosans::data, notosans::size, textSize, codepoints, 95, false);
-    }
-
-    void setupFontAwesome(int iconSize)
-    {
-#if MX_FONT_AWESOME
-        int arrayOriginalSize = 414704;
-        unsigned char* fontAwesomeData = (unsigned char*)MX_MALLOC(arrayOriginalSize);
-        stb_decompress(fontAwesomeData, fa_compressed_data, fa_compressed_size);
-        int count = sizeof(codepointsFontAwesome) / sizeof(codepointsFontAwesome[0]);
-
-        loadFromMemory(MX_FONT_AWESOME_ID, fontAwesomeData, arrayOriginalSize, iconSize, codepointsFontAwesome, count, true);
-        MX_FREE(fontAwesomeData);
-#endif
-    }
-
-    void unload()
-    {
-        for (auto& [idFontName, fontDatas] : m_fonts)
-        {
-            for (auto& [id, font] : fontDatas.fonts)
-            {
-                unloadFont(font);
-            }
-            MX_FREE(fontDatas.fileData);
-            if (fontDatas.codepoints != nullptr)
-            {
-                MX_FREE(fontDatas.codepoints);
-            }
-        }
-        m_fonts.clear();
-    }
-
-    void unloadFont(MxFont font)
-    {
-        if (font.glyphs != NULL)
-        {
-            for (int i = 0; i < font.glyphCount; i++)
-            {
-                if (isValidImage(font.glyphs[i].image))
-                {
-                    MX_FREE(font.glyphs[i].image.data);
-                }
-            }
-            MX_FREE(font.glyphs);
-        }
-
-        unloadTexture(font.textureNameID);
-        MX_FREE(font.recs);
-
-        MX_LOG("INFO: Unloaded font data from RAM and VRAM");
-    }
-
-    MxVec2 measureText(const std::string& fontNameID, const std::string& text, int fontSize, int spacing)
-    {
-        const MxFont* font = getFont(fontNameID, fontSize);
-        return measureTextInternal(*font, text, fontSize, spacing);
-    }
-
-    const MxFont* getFont(const std::string& fontNameID, int size)
-    {
-        static MxFont empty{};
-
-        auto itFontData = m_fonts.find(fontNameID);
-        if (itFontData != m_fonts.end())
-        {
-            auto& fontData = itFontData->second;
-            auto itFont = fontData.fonts.find(size);
-            if (itFont != fontData.fonts.end())
-            {
-                return &itFont->second;
-            }
-
-            const std::string textureNameID = GEN_TEXTURE_NAME_ID(fontNameID, size);
-            MxFont font = loadFontFromMemoryInternal(textureNameID, fontData.fileData, size, fontData.codepoints, fontData.codepointCount);
-            fontData.fonts.insert_or_assign(size, font);
-            return &fontData.fonts.at(size);
-        }
-        return &empty;
-    }
-
-    std::unordered_map<std::string, MxFontData> m_fonts{};
-};
-
-
-struct MxTextureManager
-{
-    void init() { nativeInit(); }
-
-    void loadTexture(const std::filesystem::path& path, const std::string& textureNameID)
-    {
-        auto it = m_textures.find(textureNameID);
-        if (it != m_textures.end())
-        {
-            unloadTexture(textureNameID);
-        }
-        MxTextureNative texture = nativeLoadTexture(path);
-        m_textures.insert_or_assign(textureNameID, texture);
-    }
-
-    void loadTextureFromImageData(const std::string& textureNameID, void* data, int width, int height, int mipmaps, int format)
-    {
-        MxTextureNative texture = nativeLoadTextureFromImageData(data, width, height, mipmaps, format);
-        m_textures.insert_or_assign(textureNameID, texture);
-    }
-
-    MxVec2 getSize(const std::string& textureNameID)
-    {
-        const MxTextureNative* texture = getTexture(textureNameID);
-        return nativeTextureSize(texture);
-    }
-
-    bool isSmooth(const std::string& textureNameID)
-    {
-        const MxTextureNative* texture = getTexture(textureNameID);
-        return nativeTextureIsSmooth(texture);
-    }
-
-    void setSmooth(const std::string& textureNameID, bool enable)
-    {
-        auto it = m_textures.find(textureNameID);
-        if (it != m_textures.end())
-        {
-            nativeSetTextureSmooth(&it->second, enable);
-        }
-    }
-
-    void unload()
-    {
-        for (auto& [textureNameID, texture] : m_textures)
-        {
-            const MxTextureNative* textureNative = getTexture(textureNameID);
-            nativeUnloadTexture(textureNative);
-        }
-        m_textures.clear();
-    }
-    void unloadTexture(const std::string& textureNameID)
-    {
-        const MxTextureNative* texture = getTexture(textureNameID);
-        nativeUnloadTexture(texture);
-        m_textures.erase(textureNameID);
-    }
-
-    const MxTextureNative* getTexture(const std::string& textureNameID)
-    {
-        static MxTextureNative empty{};
-        auto it = m_textures.find(textureNameID);
-        if (it != m_textures.end())
-        {
-            return &it->second;
-        }
-
-        return &empty;
-    }
-
-
-    std::unordered_map<std::string, MxTextureNative> m_textures{};
-};
-
-
-static MxFontManager s_fontManager;
-static MxTextureManager s_textureManager;
 
 
 void initManagers(MxStyle style)
 {
-    s_fontManager.init(style);
-    s_textureManager.init();
+    getCore().fontManager.init(style);
+    getCore().textureManager.init();
 }
 
 void closeManagers()
 {
-    s_fontManager.unload();
-    s_textureManager.unload();
+    getCore().fontManager.unload();
+    getCore().textureManager.unload();
 }
 
 //-----------------------------------------------------------------------------
@@ -2863,7 +2888,7 @@ void closeManagers()
 
 const MxFont* getFont(const std::string& fontName, int size)
 {
-    const MxFont* font = s_fontManager.getFont(fontName, size);
+    const MxFont* font = getCore().fontManager.getFont(fontName, size);
     return font;
 }
 
@@ -2874,19 +2899,19 @@ void loadFont(const std::string& textureNameID, const std::filesystem::path& pat
     if (fileData != NULL)
     {
         // Loading font from memory data
-        s_fontManager.loadFromMemory(textureNameID, fileData, dataSize, fontSize, codepoints, codepointCount, false);
+        getCore().fontManager.loadFromMemory(textureNameID, fileData, dataSize, fontSize, codepoints, codepointCount, false);
         MX_FREE(fileData);
     }
 }
 
 MxVec2 measureText(const std::string& fontNameID, const std::string& text, int fontSize, int spacing)
 {
-    return s_fontManager.measureText(fontNameID, text, fontSize, spacing);
+    return getCore().fontManager.measureText(fontNameID, text, fontSize, spacing);
 }
 
 void drawText(const std::string& fontNameID, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint)
 {
-    const MxFont* font = s_fontManager.getFont(fontNameID, fontSize);
+    const MxFont* font = getCore().fontManager.getFont(fontNameID, fontSize);
     drawTextEx(*font, text, position, fontSize, spacing, tint);
 }
 
@@ -2895,7 +2920,7 @@ void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size)
     // Convert codepoint to UTF-8 before to draw
     int byteCount = 0;
     const char* icon = codepointToUTF8(codepoint, &byteCount);
-    const MxFont* font = s_fontManager.getFont(MX_FONT_AWESOME_ID, size);
+    const MxFont* font = getCore().fontManager.getFont(MX_FONT_AWESOME_ID, size);
 
     drawTextEx(*font, icon, position, size, 0, color);
 }
@@ -2907,37 +2932,37 @@ void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size)
 
 void loadTexture(const std::filesystem::path& path, const std::string& textureNameID)
 {
-    s_textureManager.loadTexture(path, textureNameID);
+    getCore().textureManager.loadTexture(path, textureNameID);
 }
 
 void unloadTexture(const std::string& textureNameID)
 {
-    s_textureManager.unloadTexture(textureNameID);
+    getCore().textureManager.unloadTexture(textureNameID);
 }
 
 void loadTextureFromMemory(void* data, int width, int height, int format, int mipmaps, const std::string& textureNameID)
 {
-    s_textureManager.loadTextureFromImageData(textureNameID, data, width, height, mipmaps, format);
+    getCore().textureManager.loadTextureFromImageData(textureNameID, data, width, height, mipmaps, format);
 }
 
 MxVec2 getSizeTexture(const std::string& textureNameID)
 {
-    return s_textureManager.getSize(textureNameID);
+    return getCore().textureManager.getSize(textureNameID);
 }
 
 void setSmoothTexture(const std::string& textureNameID, bool enable)
 {
-    s_textureManager.setSmooth(textureNameID, enable);
+    getCore().textureManager.setSmooth(textureNameID, enable);
 }
 
 bool isSmoothTexture(const std::string& textureNameID)
 {
-    return s_textureManager.isSmooth(textureNameID);
+    return getCore().textureManager.isSmooth(textureNameID);
 }
 
 const MxTextureNative* getTexture(const std::string& textureNameID)
 {
-    const MxTextureNative* texture = s_textureManager.getTexture(textureNameID);
+    const MxTextureNative* texture = getCore().textureManager.getTexture(textureNameID);
     return texture;
 }
 
