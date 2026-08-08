@@ -3,6 +3,7 @@
 
 #include <cstdio>
 
+#include "mxgui.hpp"
 #include "raylib.h"
 
 struct MxTextureNative
@@ -106,6 +107,16 @@ MxVec2 windowSize()
     return MxVec2{(float)GetScreenWidth(), (float)GetScreenHeight()};
 }
 
+void setClipboardText(const std::string& text)
+{
+    SetClipboardText(text.c_str());
+}
+
+std::string getClipboardText()
+{
+    return GetClipboardText();
+}
+
 void beginScissorMode(int x, int y, int width, int height)
 {
     BeginScissorMode(x, y, width, height);
@@ -144,6 +155,26 @@ bool isMouseButtonDown(int button)
 bool isMouseButtonReleased(int button)
 {
     return IsMouseButtonReleased(button);
+}
+
+bool isKeyPressed(int key)
+{
+    return IsKeyPressed(key);
+}
+
+bool isKeyDown(int key)
+{
+    return IsKeyDown(key);
+}
+
+bool isKeyReleased(int key)
+{
+    return IsKeyReleased(key);
+}
+
+int getCharPressed()
+{
+    return GetCharPressed();
 }
 
 void drawRectangleLinesEx(MxRect rec, float lineThick, MxColor color)

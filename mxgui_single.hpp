@@ -357,6 +357,9 @@ namespace notosans
 
 #include "string.h"
 
+#define STB_TEXTEDIT_CHARTYPE char32_t
+#include "stb_textedit.h"
+
 #if defined(MX_LOG_SUPORT) == 1
 #ifndef MX_LOG
 #define MX_LOG(...)      \
@@ -13218,6 +13221,20 @@ struct MxTransform
     MxVec2 anchor{};
 };
 
+struct MxTextEdit
+{
+    const MxFont* font{nullptr};
+    float fontSize{0.0f};
+    float spacing{0.0f};
+};
+
+struct MxTextBoxState
+{
+    std::u32string text{};
+    STB_TexteditState state{};
+    MxRect box{};
+    bool started{false};
+};
 
 struct MxStyle
 {
@@ -13274,6 +13291,12 @@ struct SliderComponent
     float progress{0.5f};
 };
 
+struct TextBoxComponent
+{
+    MxTextBoxState textEditState{};
+    bool isFocus{false};
+};
+
 //-----------------------------------------------------------------------------
 // (SECTION) enums
 //-----------------------------------------------------------------------------
@@ -13292,6 +13315,31 @@ typedef enum
     MX_MOUSE_BUTTON_MIDDLE = 2, // Mouse button middle (pressed wheel)
 } MxMouseButton;
 
+typedef enum
+{
+    MX_KEY_C = 67,
+    MX_KEY_V = 86,
+    MX_KEY_X = 88,
+    MX_KEY_Y = 89,
+    MX_KEY_Z = 90,
+
+    MX_KEY_BACKSPACE = 259,
+    MX_KEY_DELETE = 261,
+    MX_KEY_RIGHT = 262,
+    MX_KEY_LEFT = 263,
+    MX_KEY_DOWN = 264,
+    MX_KEY_UP = 265,
+    MX_KEY_PAGE_UP = 266,
+    MX_KEY_PAGE_DOWN = 267,
+    MX_KEY_HOME = 268,
+    MX_KEY_END = 269,
+
+    MX_KEY_LEFT_SHIFT = 340,
+    MX_KEY_LEFT_CONTROL = 341,
+    MX_KEY_RIGHT_SHIFT = 344,
+    MX_KEY_RIGHT_CONTROL = 345,
+
+} MxKeyboardKey;
 
 //-----------------------------------------------------------------------------
 // (SECTION) public API functions
@@ -13324,6 +13372,7 @@ namespace mxgui
     bool guiIconButton(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size = -1, bool enable = true);
     bool guiCheckBox(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked);
     bool guiToogle(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked);
+    void guiTextBox(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor = MxVec2{0});
 
 } // namespace mxgui
 
@@ -13345,6 +13394,8 @@ void nativeUnloadTexture(const MxTextureNative* texture);
 // window
 bool isCursorOnScreen();
 MxVec2 windowSize();
+void setClipboardText(const std::string& text);
+std::string getClipboardText();
 
 // clip
 void beginScissorMode(int x, int y, int width, int height);
@@ -13357,6 +13408,13 @@ float getMouseWheelMove();
 bool isMouseButtonPressed(int button);
 bool isMouseButtonDown(int button);
 bool isMouseButtonReleased(int button);
+
+// keyboard
+bool isKeyPressed(int key);
+bool isKeyDown(int key);
+bool isKeyReleased(int key);
+int getCharPressed();
+
 
 // draw
 void drawRectangleLinesEx(MxRect rec, float lineThick, MxColor color);
@@ -13371,6 +13429,8 @@ void drawCircle(MxVec2 center, float radius, MxColor color);
 // internal functions publics
 bool isValidFont(const MxFont& font);
 bool isValidImage(const MxImage& image);
+bool isKeyPressedRepeat(int key);
+float getFrameTime();
 
 // mxgui functions
 void pushScissor(int x, int y, int width, int height);
@@ -13443,6 +13503,7 @@ struct MxGuiContext
     COMPONENT(m_panels, PanelComponent);
     COMPONENT(m_scrollPanels, ScrollPanelComponent);
     COMPONENT(m_sliderComponents, SliderComponent);
+    COMPONENT(m_textBoxComponents, TextBoxComponent);
 
     //-----------------------------------------------------------------------------
     // Store the values ​​of the common types from the last invoked component
@@ -13463,6 +13524,7 @@ struct MxGuiContext
     std::unordered_map<MxTag, PanelComponent> m_panels;
     std::unordered_map<MxTag, ScrollPanelComponent> m_scrollPanels;
     std::unordered_map<MxTag, SliderComponent> m_sliderComponents;
+    std::unordered_map<MxTag, TextBoxComponent> m_textBoxComponents;
 
     //-----------------------------------------------------------------------------
     // Shareds positions
@@ -13488,7 +13550,6 @@ struct MxGuiContext
 #endif // MXGUI_HPP
 
 
-// #ifdef MX_GUI_IMPLEMENTATION
 #if defined(MX_GUI_IMPLEMENTATION) && !defined(MXGUI_IMPLEMENTATION_DONE)
 #define MXGUI_IMPLEMENTATION_DONE
 
@@ -13536,6 +13597,47 @@ inline bool isValidImage(const MxImage& image)
                              (image.width > 0) &&    // Validate image width
                              (image.height > 0));    // Validate image height
     return validImage;
+}
+
+inline bool isKeyPressedRepeat(int key)
+{
+    static std::unordered_map<int, float> heldTime;
+    constexpr float initialDelay = 0.4f;
+    constexpr float repeatRate = 0.03f;
+
+    if (isKeyPressed(key))
+    {
+        heldTime[key] = 0.0f;
+        return true;
+    }
+    if (isKeyDown(key))
+    {
+        float& t = heldTime[key];
+        t += getFrameTime();
+        if (t >= initialDelay)
+        {
+            t = initialDelay - repeatRate;
+            return true;
+        }
+    }
+    else
+    {
+        heldTime.erase(key);
+    }
+    return false;
+}
+
+#include <chrono>
+
+float getFrameTime()
+{
+    static auto lastTime = std::chrono::steady_clock::now();
+    auto currentTime = std::chrono::steady_clock::now();
+
+    std::chrono::duration<float> deltaTime = currentTime - lastTime;
+
+    lastTime = currentTime;
+    return deltaTime.count();
 }
 
 
@@ -14185,7 +14287,6 @@ MxFont loadFontFromMemoryInternal(const std::string& textureNameID, const unsign
 //-----------------------------------------------------------------------------
 
 
-
 //-----------------------------------------------------------------------------
 // (SECTION) Decompression code
 //  an algorithm with the sole objective of compressing the matrices to save font size
@@ -14378,7 +14479,7 @@ static unsigned int stb_decompress(unsigned char* output, const unsigned char* i
 
 //-----------------------------------------------------------------------------
 // (SECTION) Text Edit code
-// stb_textedit implements the guts of a text-editing widget; 
+// stb_textedit implements the guts of a text-editing widget;
 // mxgui implement display,
 // insertion/deletion, and stb_textedit will map user inputs into
 // insertions & deletions, plus updates to the cursor position,
@@ -14387,11 +14488,117 @@ static unsigned int stb_decompress(unsigned char* output, const unsigned char* i
 //-----------------------------------------------------------------------------
 
 
+static MxTextEdit s_textEdit{};
 
-// todo implement 
+// Convert a UTF-8 C string into a codepoint string (std::u32string)
+static std::u32string convertUTF8ToU32(const char* text)
+{
+    int count{0};
+    int* codepoints = loadCodepoints(text, &count);
+    std::u32string outText{};
+    outText.reserve(count);
+    for (int i = 0; i < count; i++)
+    {
+        outText.push_back((char32_t)codepoints[i]);
+    }
+    MX_FREE(codepoints);
+    return outText;
+}
+
+// Convert a codepoint string (std::u32string) into a UTF-8 std::string
+static std::string convertU32ToUTF8(const std::u32string& text)
+{
+    std::string outText{};
+    for (char32_t c : text)
+    {
+        int len = 0;
+        const char* utf8 = codepointToUTF8((int)c, &len);
+        outText.append(utf8, len);
+    }
+    return outText;
+}
+
+static float charWidth(char32_t codepoint)
+{
+    int len{0};
+    const char* utf8 = codepointToUTF8((int)codepoint, &len);
+    const MxVec2 size = measureTextInternal(*s_textEdit.font, utf8, s_textEdit.fontSize, s_textEdit.spacing);
+    return size.x;
+}
 
 
+#define STB_TEXTEDIT_STRING std::u32string
+#define STB_TEXTEDIT_NEWLINE U'\n'
 
+
+static void STB_TEXTEDIT_LAYOUTROW(StbTexteditRow* r, std::u32string* obj, int line_start_idx)
+{
+    int n = (int)obj->size();
+    std::u32string sub = obj->substr(line_start_idx, n - line_start_idx);
+    std::string utf8 = convertU32ToUTF8(sub);
+    const MxVec2 size = measureTextInternal(*s_textEdit.font, utf8, s_textEdit.fontSize, s_textEdit.spacing);
+    r->num_chars = (int)sub.size();
+    r->x0 = 0;
+    r->x1 = size.x;
+    r->baseline_y_delta = s_textEdit.fontSize * 1.2f;
+    r->ymin = 0;
+    r->ymax = s_textEdit.fontSize;
+}
+
+
+#define STB_TEXTEDIT_STRINGLEN(obj) ((int)(obj)->size())
+#define STB_TEXTEDIT_GETCHAR(obj, i) ((obj)->at(i))
+#define STB_TEXTEDIT_GETWIDTH(obj, n, i) charWidth((obj)->at((n) + (i)))
+#define STB_TEXTEDIT_KEYTOTEXT(k) ((k) < 0x10000 ? (k) : 0)
+#define STB_TEXTEDIT_IS_SPACE(c) ((c) == U' ')
+#define STB_TEXTEDIT_DELETECHARS(obj, i, n) (obj)->erase((i), (n))
+#define STB_TEXTEDIT_INSERTCHARS(obj, i, chars, n) ((obj)->insert((i), (chars), (n)), 1)
+
+#define STB_TEXTEDIT_K_SHIFT 0x40000000
+#define STB_TEXTEDIT_K_LEFT 0x10000
+#define STB_TEXTEDIT_K_RIGHT 0x10001
+#define STB_TEXTEDIT_K_UP 0x10002
+#define STB_TEXTEDIT_K_DOWN 0x10003
+#define STB_TEXTEDIT_K_LINESTART 0x10004
+#define STB_TEXTEDIT_K_LINEEND 0x10005
+#define STB_TEXTEDIT_K_TEXTSTART 0x10006
+#define STB_TEXTEDIT_K_TEXTEND 0x10007
+#define STB_TEXTEDIT_K_DELETE 0x10008
+#define STB_TEXTEDIT_K_BACKSPACE 0x10009
+#define STB_TEXTEDIT_K_UNDO 0x1000A
+#define STB_TEXTEDIT_K_REDO 0x1000B
+#define STB_TEXTEDIT_K_WORDLEFT 0x1000C
+#define STB_TEXTEDIT_K_WORDRIGHT 0x1000D
+#define STB_TEXTEDIT_K_PGUP 0x1000E
+#define STB_TEXTEDIT_K_PGDOWN 0x1000F
+
+#define STB_TEXTEDIT_IMPLEMENTATION
+#include "stb_textedit.h"
+
+static int mapKey(int mxKey, bool shift, bool ctrl)
+{
+    const int shiftKey = shift ? STB_TEXTEDIT_K_SHIFT : 0;
+    switch (mxKey)
+    {
+        case MX_KEY_LEFT: return (ctrl ? STB_TEXTEDIT_K_WORDLEFT : STB_TEXTEDIT_K_LEFT) | shiftKey;
+        case MX_KEY_RIGHT: return (ctrl ? STB_TEXTEDIT_K_WORDRIGHT : STB_TEXTEDIT_K_RIGHT) | shiftKey;
+        case MX_KEY_UP: return STB_TEXTEDIT_K_UP | shiftKey;
+        case MX_KEY_DOWN: return STB_TEXTEDIT_K_DOWN | shiftKey;
+        case MX_KEY_HOME: return STB_TEXTEDIT_K_LINESTART | shiftKey;
+        case MX_KEY_END: return STB_TEXTEDIT_K_LINEEND | shiftKey;
+        case MX_KEY_PAGE_UP: return STB_TEXTEDIT_K_PGUP | shiftKey;
+        case MX_KEY_PAGE_DOWN: return STB_TEXTEDIT_K_PGDOWN | shiftKey;
+        case MX_KEY_BACKSPACE: return STB_TEXTEDIT_K_BACKSPACE;
+        case MX_KEY_DELETE: return STB_TEXTEDIT_K_DELETE;
+    }
+    return -1;
+}
+
+void mxTextEditInitializeState(MxTextBoxState& textbox)
+{
+    stb_textedit_initialize_state(&textbox.state, 1);
+    textbox.started = true;
+}
 
 //-----------------------------------------------------------------------------
 // (SECTION) Internal functions to MxGui
@@ -15040,10 +15247,189 @@ namespace mxgui
 #endif // MX_FONT_AWESOME
     }
 
+
+    void guiTextBox(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor)
+    {
+        s_textEdit.font = getFont(ctx->m_style.fontName, ctx->m_style.textSize);
+        s_textEdit.fontSize = ctx->m_style.textSize;
+        s_textEdit.spacing = ctx->m_style.textSpacing;
+
+        TextBoxComponent& textBoxComponent = *ctx->getTextBoxComponent(tag);
+        MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
+        MxRect rect = transform.worldBounds;
+
+        MxTextBoxState& textEditState = textBoxComponent.textEditState;
+        if (!textEditState.started)
+        {
+            mxTextEditInitializeState(textEditState);
+            textEditState.started = true;
+        }
+
+        textEditState.box = rect;
+
+
+        MxMouseEvents mouseEvents{};
+
+        mouseEvents.isMouseHover = (checkCollisionPointRect(getMousePosition(), rect));
+        mouseEvents.isMouseRelease = mouseEvents.isMouseHover && isMouseButtonReleased(MX_MOUSE_BUTTON_LEFT);
+        mouseEvents.isMouseDown = mouseEvents.isMouseHover && isMouseButtonDown(MX_MOUSE_BUTTON_LEFT);
+        mouseEvents.isMousePressed = mouseEvents.isMouseHover && isMouseButtonPressed(MX_MOUSE_BUTTON_LEFT);
+
+        if (!textBoxComponent.isFocus && mouseEvents.isMousePressed)
+        {
+            textBoxComponent.isFocus = true;
+        }
+        else if (textBoxComponent.isFocus && isMouseButtonPressed(MX_MOUSE_BUTTON_LEFT))
+        {
+            textBoxComponent.isFocus = false;
+        }
+
+        // MX_LOG("%s", textBoxComponent.isFocus ? "true" : "false");
+
+        if (textBoxComponent.isFocus)
+        {
+            bool shift = isKeyDown(MX_KEY_LEFT_SHIFT) || isKeyDown(MX_KEY_RIGHT_SHIFT);
+            bool ctrl = isKeyDown(MX_KEY_LEFT_CONTROL) || isKeyDown(MX_KEY_RIGHT_CONTROL);
+
+            // specials keys with repeat (arrows, backspace, delete, home/end, pgup/pgdown)
+            static const int repeatableKeys[] = {MX_KEY_LEFT, MX_KEY_RIGHT, MX_KEY_UP, MX_KEY_DOWN, MX_KEY_HOME, MX_KEY_END, MX_KEY_PAGE_UP, MX_KEY_PAGE_DOWN, MX_KEY_BACKSPACE, MX_KEY_DELETE};
+            for (int mxKey : repeatableKeys)
+            {
+                if (isKeyPressedRepeat(mxKey))
+                {
+                    int key = mapKey(mxKey, shift, ctrl);
+                    if (key != -1)
+                    {
+                        stb_textedit_key(&textEditState.text, &textEditState.state, key);
+                    }
+                }
+            }
+
+            // undo / redo (without repeat)
+            if (ctrl && isKeyPressed(MX_KEY_Z))
+            {
+                stb_textedit_key(&textEditState.text, &textEditState.state, STB_TEXTEDIT_K_UNDO);
+            }
+            if (ctrl && isKeyPressed(MX_KEY_Y))
+            {
+                stb_textedit_key(&textEditState.text, &textEditState.state, STB_TEXTEDIT_K_REDO);
+            }
+
+
+            // copy / cut / paste (providered from backend)
+            if (ctrl && isKeyPressed(MX_KEY_C))
+            {
+                int start = textEditState.state.select_start, end = textEditState.state.select_end;
+                if (start != end)
+                {
+                    if (start > end)
+                    {
+                        std::swap(start, end);
+                    }
+                    setClipboardText(convertU32ToUTF8(textEditState.text.substr(start, end - start)));
+                }
+            }
+            if (ctrl && isKeyPressed(MX_KEY_X))
+            {
+                int start = textEditState.state.select_start, end = textEditState.state.select_end;
+                if (start != end)
+                {
+                    if (start > end)
+                    {
+                        std::swap(start, end);
+                    }
+                    setClipboardText(convertU32ToUTF8(textEditState.text.substr(start, end - start)));
+                    stb_textedit_cut(&textEditState.text, &textEditState.state);
+                }
+            }
+            if (ctrl && isKeyPressed(MX_KEY_V))
+            {
+                const std::string clip = getClipboardText();
+                if (!clip.empty())
+                {
+                    std::u32string pasted = convertUTF8ToU32(clip.c_str());
+                    stb_textedit_paste(&textEditState.text, &textEditState.state, pasted.c_str(), (int)pasted.size());
+                }
+            }
+
+
+            // get keys
+            int key{0};
+            while ((key = getCharPressed()) != 0)
+            {
+                stb_textedit_key(&textEditState.text, &textEditState.state, key);
+            }
+        }
+
+        float textX = textEditState.box.x + 6;
+        float textY = textEditState.box.y + (textEditState.box.height - s_textEdit.fontSize) / 2;
+
+        float cursorX = textX + measureTextInternal(*s_textEdit.font, convertU32ToUTF8(textEditState.text.substr(0, textEditState.state.cursor)).c_str(), s_textEdit.fontSize, s_textEdit.spacing).x;
+        float offsetX = (textEditState.box.x + textEditState.box.width - 6) - cursorX;
+        if (offsetX > 0)
+        {
+            offsetX = 0;
+        }
+
+        MxVec2 mouse = getMousePosition();
+        float relativeMouseX = mouse.x - (textX + offsetX);
+        float relativeMouseY = mouse.y - textEditState.box.y;
+
+        if (checkCollisionPointRect(mouse, textEditState.box) && isMouseButtonDown(MX_MOUSE_BUTTON_LEFT))
+        {
+            stb_textedit_drag(&textEditState.text, &textEditState.state, relativeMouseX, relativeMouseY);
+        }
+        if (checkCollisionPointRect(mouse, textEditState.box) && isMouseButtonPressed(MX_MOUSE_BUTTON_LEFT))
+        {
+            stb_textedit_click(&textEditState.text, &textEditState.state, relativeMouseX, relativeMouseY);
+        }
+
+        // draw area
+
+
+        // draw box
+        drawRectanglePro(textEditState.box, MxVec2{}, 0, ctx->m_style.backgroundColor);
+        drawRectangleLinesEx(textEditState.box, ctx->m_style.borderWidth, ctx->m_style.borderColor);
+
+
+        int selStart = textEditState.state.select_start;
+        int selEnd = textEditState.state.select_end;
+
+
+        if (selStart != selEnd)
+        {
+            if (selStart > selEnd)
+            {
+                std::swap(selStart, selEnd);
+            }
+            float x0 = textX + offsetX + measureTextInternal(*s_textEdit.font, convertU32ToUTF8(textEditState.text.substr(0, selStart)).c_str(), s_textEdit.fontSize, s_textEdit.spacing).x;
+            float x1 = textX + offsetX + measureTextInternal(*s_textEdit.font, convertU32ToUTF8(textEditState.text.substr(0, selEnd)).c_str(), s_textEdit.fontSize, s_textEdit.spacing).x;
+            drawRectanglePro(MxRect{x0, textEditState.box.y + 4, (x1 - x0), textEditState.box.height - 8}, MxVec2{}, 0, MxColor::SkyBlue);
+        }
+
+        const std::string utf8Text = convertU32ToUTF8(textEditState.text);
+
+        // draw text
+        pushScissor(rect.x, rect.y, rect.width, rect.height); // call internal BeginScissorMode();
+        drawTextEx(*s_textEdit.font, utf8Text, MxVec2{textX + offsetX, textY}, s_textEdit.fontSize, s_textEdit.spacing, ctx->m_style.textColor);
+        popScissor();
+
+        // draw cursor
+        drawRectanglePro(MxRect{cursorX + offsetX, textEditState.box.y + 4, 1, textEditState.box.height - 4}, MxVec2{}, 0, MxColor::DarkGray);
+
+        // if (((int)(getTime() * 2)) % 2 == 0)
+        // { // pisca
+        //     // DrawLine((int)cursorX + offsetX, (int)tb.box.y + 4, (int)cursorX + offsetX, (int)(tb.box.y + tb.box.height - 4), BLACK);
+        // }
+    }
+
 } // namespace mxgui
 
 /////////////////////////////////////////////////////
-// Backend Implementations
+//// Backend Implementations
+////
+////
+////
 /////////////////////////////////////////////////////
 
 #ifdef MX_RAYLIB_BACKEND_IMPLEMENTATION
@@ -15062,6 +15448,7 @@ namespace mxgui
 
 #include <cstdio>
 
+#include "mxgui.hpp"
 #include "raylib.h"
 
 struct MxTextureNative
@@ -15165,6 +15552,16 @@ MxVec2 windowSize()
     return MxVec2{(float)GetScreenWidth(), (float)GetScreenHeight()};
 }
 
+void setClipboardText(const std::string& text)
+{
+    SetClipboardText(text.c_str());
+}
+
+std::string getClipboardText()
+{
+    return GetClipboardText();
+}
+
 void beginScissorMode(int x, int y, int width, int height)
 {
     BeginScissorMode(x, y, width, height);
@@ -15203,6 +15600,26 @@ bool isMouseButtonDown(int button)
 bool isMouseButtonReleased(int button)
 {
     return IsMouseButtonReleased(button);
+}
+
+bool isKeyPressed(int key)
+{
+    return IsKeyPressed(key);
+}
+
+bool isKeyDown(int key)
+{
+    return IsKeyDown(key);
+}
+
+bool isKeyReleased(int key)
+{
+    return IsKeyReleased(key);
+}
+
+int getCharPressed()
+{
+    return GetCharPressed();
 }
 
 void drawRectangleLinesEx(MxRect rec, float lineThick, MxColor color)
@@ -15490,6 +15907,17 @@ MxVec2 windowSize()
     return toMxVec2(s_windowRef->getSize());
 }
 
+/*
+void setClipboardText(const std::string& text)
+{
+}
+
+std::string getClipboardText()
+{
+    return std::string();
+}
+*/
+
 void beginScissorMode(int x, int y, int width, int height)
 {
     MX_ASSERT(s_windowRef, "window not reference");
@@ -15535,6 +15963,20 @@ bool isMouseButtonReleased(int button)
 {
     return s_mousePolling[button].release;
 }
+
+/*
+bool isKeyPressed(int key)
+{ return false; }
+
+bool isKeyDown(int key)
+{ return false; }
+
+bool isKeyReleased(int key)
+{ return false; }
+
+int getCharPressed()
+{ return 0; } 
+ */
 
 void drawRectangleLinesEx(MxRect rec, float lineThick, MxColor color)
 {

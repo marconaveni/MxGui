@@ -39,6 +39,25 @@ void nativeUnloadTexture(const MxTextureNative* /*texture*/)
 {
 }
 
+bool isCursorOnScreen()
+{
+    return false;
+}
+
+MxVec2 windowSize()
+{
+    return MxVec2{};
+}
+
+void setClipboardText(const std::string& text)
+{
+}
+
+std::string getClipboardText()
+{
+    return std::string();
+}
+
 void beginScissorMode(int x, int y, int width, int height)
 {
 }
@@ -75,6 +94,26 @@ bool isMouseButtonDown(int button)
 bool isMouseButtonReleased(int button)
 {
     return false;
+}
+
+bool isKeyPressed(int key)
+{
+    return false;
+}
+
+bool isKeyDown(int key)
+{
+    return false;
+}
+
+bool isKeyReleased(int key)
+{
+    return false;
+}
+
+int getCharPressed()
+{
+    return 0;
 }
 
 void drawRectangleLinesEx(MxRect rec, float lineThick, MxColor color)
