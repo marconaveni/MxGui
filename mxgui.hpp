@@ -38,6 +38,7 @@
 //  (ToggleEx)                  | Component | stateless |
 //  (CheckBox) -> (ToggleEx)    | Component | stateless |
 //  (Toogle) -> (ToggleEx)      | Component | stateless |
+//  (TextBox)                   | Component | state     |
 //
 //-----------------------------------------------------------------------------
 
@@ -120,7 +121,7 @@
 #include "string.h"
 
 #define STB_TEXTEDIT_CHARTYPE char32_t
-#include "stb_textedit.h"
+#include "stb_textedit.h" // include_filter(1,368)
 
 #if defined(MX_LOG_SUPORT) == 1
 #ifndef MX_LOG
@@ -427,7 +428,7 @@ inline MxStyle MxStyle::Dark{.primaryColor{MxColor::WhiteGray},
 
 
 //-----------------------------------------------------------------------------
-// (SECTION) Structs components
+// (SECTION) Structs primitives components
 //-----------------------------------------------------------------------------
 
 struct PanelComponent
@@ -1018,7 +1019,7 @@ inline MxCore& getCore()
 
 
 //-----------------------------------------------------------------------------
-// (Section) Internal functions publics
+// (SECTION) Internal functions publics
 //-----------------------------------------------------------------------------
 
 
@@ -1083,7 +1084,7 @@ float getFrameTime()
 
 
 //-----------------------------------------------------------------------------
-// (Section) Internal functions privates
+// (SECTION) Internal functions privates
 //-----------------------------------------------------------------------------
 
 //-----------------------------------------------------------------------------
@@ -2015,7 +2016,7 @@ static void STB_TEXTEDIT_LAYOUTROW(StbTexteditRow* r, std::u32string* obj, int l
 #define STB_TEXTEDIT_K_PGDOWN 0x1000F
 
 #define STB_TEXTEDIT_IMPLEMENTATION
-#include "stb_textedit.h"
+#include "stb_textedit.h" // include_filter(369,1429)
 
 static int mapKey(int mxKey, bool shift, bool ctrl)
 {
@@ -2803,7 +2804,7 @@ namespace mxgui
             }
         }
 
-        
+
         float textX = textEditState.box.x + 6;
         float textY = textEditState.box.y + (textEditState.box.height - textEdit.fontSize) / 2;
 
@@ -2867,7 +2868,6 @@ namespace mxgui
     }
 
 } // namespace mxgui
-
 
 
 void initManagers(MxStyle style)
