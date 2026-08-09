@@ -1,16 +1,19 @@
 
-#define MX_LOG(...)                                             \
-    printf("FILE: [%s] LINE: [%d] (", __FILE_NAME__, __LINE__); \
-    printf(__VA_ARGS__);                                        \
-    printf(")\n");
+#define MX_LOG(...)                                                 \
+    do                                                              \
+    {                                                               \
+        printf("FILE: [%s] LINE: [%d] (", __FILE_NAME__, __LINE__); \
+        printf(__VA_ARGS__);                                        \
+        printf(")\n");                                              \
+    } while (0)
 
 
 #define MX_SUPPRESS_WARNINGS 0
 
 
 // #define MX_CUSTOM_BACKEND_HEADER "mxgui_custom_render.hpp"
-// #define MX_RAYLIB_BACKEND_IMPLEMENTATION
-#define MX_SFML_BACKEND_IMPLEMENTATION
+#define MX_RAYLIB_BACKEND_IMPLEMENTATION
+// #define MX_SFML_BACKEND_IMPLEMENTATION
 #define MX_GUI_IMPLEMENTATION
 #include "mxgui.hpp"
 
@@ -39,7 +42,7 @@ int main()
 
     Init();
 
-    loadFont("teste", "/home/marco/Diversos/Inter,Noto_Sans/Inter/static/Inter_28pt-Regular.ttf", 20, NULL, 0);
+    loadFont("teste", "/home/marco/Diversos/Inter,Noto_Sans/Inter/static/Inter_28pt-Regular.ttf", 20, NULL, 255);
     MxStyle style = MxStyle::Light;
     style.iconSize = 28;
     MxGuiContext* ctx = mxgui::createContext(style);
@@ -60,7 +63,7 @@ int main()
         Begin(ctx);
 
         mxgui::beginMx();
-        
+
         anchor = mxgui::guiPanel(ctx, "Canvas1", toMxRect(anchor, MxVec2{width, height}), MxVec2{}, true);
         mxgui::guiPanel(ctx, "Canvas2", MxRect{0, (height - 1), width, width}, anchor, false);
         if (mxgui::guiButton(ctx, "Click", MxRect{10, 35, 75, 35}, anchor, MX_OUTLINE, true))
@@ -70,7 +73,7 @@ int main()
             setSmoothTexture(MX_FONT_AWESOME_ID, !isSmoothTexture(MX_FONT_AWESOME_ID));
         }
         mxgui::guiImage(ctx, "nfsu2", MxRect{220, 35, 180, 180}, anchor);
-        
+
         mxgui::guiIcon(ctx, MxRect{10, 80, 0, 0}, anchor, ICON_FA_CIRCLE_PLAY);
         if (mxgui::guiIconButton(ctx, MxRect{10, 120, 20, 20}, anchor, ICON_FA_CIRCLE_PLAY, 28))
         {
@@ -79,8 +82,8 @@ int main()
         mxgui::pushIconSize(ctx, 50);
         mxgui::guiIcon(ctx, MxRect{10, 160, 0, 0}, anchor, ICON_FA_COPY);
         mxgui::pushIconSize(ctx, 28);
-        
-        
+
+
         mxgui::guiScrollPanelBegin(ctx, "ScrollPanel", MxRect{300, 200, 100, 200}, MxRect{300, 200, 100, 550}, MxVec2{100, 100}, true);
         mxgui::pushTextSize(ctx, 25);
         mxgui::guiLabel(ctx, "hello world", MxVec2{100, 0}, anchor);
@@ -89,30 +92,32 @@ int main()
         mxgui::guiLabel(ctx, "hello world 4", MxVec2{0, 120});
         mxgui::pushTextSize(ctx, 20);
         mxgui::guiScrollPanelEnd(ctx, "ScrollPanel");
-        
-        
+
+
         mxgui::guiCheckBox(ctx, MxRect{100, 100}, MxVec2{}, checked);
         mxgui::guiToogle(ctx, MxRect{150, 100}, MxVec2{}, toogle);
-        
-        //mxgui::guiTextBox(ctx, "textbox", MxRect{200, 300, 150, 22});
-        mxgui::pushTextSize(ctx, 38);
-        mxgui::guiTextBox(ctx, "textbox2", MxRect{200, 400, 150, 22});
+
+        mxgui::guiTextBox(ctx, "textbox", MxRect{200, 300, 150, 0});
+        mxgui::pushFont(ctx, "teste", 20);
+        mxgui::guiTextBox(ctx, "textbox2", MxRect{200, 330, 150, 0});
+
+        mxgui::pushFont(ctx, MX_FONT_NOTO_ID, 20);
         mxgui::pushTextSize(ctx, 20);
-        
-        
+
+
         const float progress = mxgui::guiSlider(ctx, "Slider", MxRect{50, 530, 700, 6}, MxVec2{}, true);
         mxgui::guiLabel(ctx, std::to_string(progress), MxVec2{10, 30});
         mxgui::guiSliderProgress(ctx, MxRect{50, 560, 700, 6}, MxVec2{}, 0.8f);
-        
+
         // MX_LOG("getframetime intern %.6f raylib %.6f", getFrameTime(), GetFrameTime());
-        
+
         // MX_LOG("teste %.2f", progress);
         if (isCursorOnScreen())
         {
             const MxFont* font = getFont(MX_FONT_NOTO_ID, 20);
             const MxFont* font2 = getFont("teste", 30);
             MxColor color = {200, 41, 55, 255};
-            
+
             drawTextEx(*font, "teste \nteste quebra linha", MxVec2{60, 60}, 20, 0, color);
             drawTextEx(*font2, "teste \nteste quebra linha", MxVec2{60, 160}, 30, 0, color);
         }

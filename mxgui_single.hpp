@@ -13576,6 +13576,13 @@ inline MxColor MxColor::Cyan{0, 255, 255, 255};        // Cyan
 inline MxColor MxColor::Black{0, 0, 0, 255};           // Black
 inline MxColor MxColor::Transparent{0, 0, 0, 255};     // Transparent (no color)
 
+struct MxTransform
+{
+    MxRect bounds{};
+    MxRect worldBounds{};
+    MxVec2 anchor{};
+};
+
 struct MxMouseEvents
 {
     bool isMouseHover{false};
@@ -13584,18 +13591,13 @@ struct MxMouseEvents
     bool isMouseDown{false};
 };
 
-struct MxTransform
+struct MxTextBoxEvents
 {
-    MxRect bounds{};
-    MxRect worldBounds{};
-    MxVec2 anchor{};
-};
-
-struct MxTextEdit
-{
-    const MxFont* font{nullptr};
-    float fontSize{0.0f};
-    float spacing{0.0f};
+    bool isTextChange{false};
+    bool isEnter{false};
+    bool isLeave{false};
+    bool isFocus{false};
+    std::string* textValue{nullptr};
 };
 
 struct MxTextBoxState
@@ -13607,6 +13609,13 @@ struct MxTextBoxState
     float offsetX{0.0f};
     bool started{false};
     bool isDrag{false};
+};
+
+struct MxTextEdit
+{
+    const MxFont* font{nullptr};
+    float fontSize{0.0f};
+    float spacing{0.0f};
 };
 
 struct MxStyle
@@ -13731,11 +13740,13 @@ namespace mxgui
 
     MxTransform getCurrentTransform(MxGuiContext* ctx);
     MxMouseEvents getCurrentMouseEvents(MxGuiContext* ctx);
+    MxTextBoxEvents getCurrentTextBoxEvents(MxGuiContext* ctx);
 
     void createImage(const std::filesystem::path& path, const std::string& imageName, bool smooth = true);
 
     void pushTextSize(MxGuiContext* ctx, int newSize);
     void pushIconSize(MxGuiContext* ctx, int newSize);
+    bool pushFont(MxGuiContext* ctx, const std::string& fontName, int newSize);
     MxVec2 guiPanel(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor = MxVec2{0}, bool enableDrag = false);
     void guiImage(MxGuiContext* ctx, const std::string& imageName, MxRect bounds, MxVec2 anchor = MxVec2{0}, MxColor color = MxColor::White);
     bool guiButton(MxGuiContext* ctx, const std::string& text, MxRect bounds, MxVec2 anchor = MxVec2{0}, int buttonStyle = MX_CONTAINED, bool enable = true);
@@ -13748,7 +13759,7 @@ namespace mxgui
     bool guiIconButton(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size = -1, bool enable = true);
     bool guiCheckBox(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked);
     bool guiToogle(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked);
-    void guiTextBox(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor = MxVec2{0});
+    MxTextBoxEvents guiTextBox(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor = MxVec2{0});
 
 } // namespace mxgui
 
@@ -13891,28 +13902,42 @@ struct MxGuiContext
     //-----------------------------------------------------------------------------
     // Store the values ​​of the common types from the last invoked component
     //-----------------------------------------------------------------------------
-    void updateCurrents(MxTransform currentTransform, MxMouseEvents currentMouseEvents)
+    inline constexpr void updateCurrents(MxTransform currentTransform, MxMouseEvents currentMouseEvents)
+    {
+        m_currentTransform = currentTransform;
+        m_currentMouseEvents = currentMouseEvents;   
+    }
+
+    inline constexpr void updateCurrents(MxTransform currentTransform, MxMouseEvents currentMouseEvents, MxTextBoxEvents currentTextboxEvents)
     {
         m_currentTransform = currentTransform;
         m_currentMouseEvents = currentMouseEvents;
+        m_currentTextboxEvents = currentTextboxEvents;
+        if (m_currentTextboxEvents.textValue == NULL)
+        {
+            m_currentTextboxEvents.textValue = &m_currentTextBoxValue;
+        }
+        
     }
 
     MxTransform m_currentTransform{};
     MxMouseEvents m_currentMouseEvents{};
-
+    MxTextBoxEvents m_currentTextboxEvents{};
+    
     //-----------------------------------------------------------------------------
-    // Components pools memory
+    // Components state storaged memory
     //-----------------------------------------------------------------------------
-
+    
     std::unordered_map<MxTag, PanelComponent> m_panels;
     std::unordered_map<MxTag, ScrollPanelComponent> m_scrollPanels;
     std::unordered_map<MxTag, SliderComponent> m_sliderComponents;
     std::unordered_map<MxTag, TextBoxComponent> m_textBoxComponents;
-
+    
     //-----------------------------------------------------------------------------
-    // Shareds positions
+    // Shareds states
     //-----------------------------------------------------------------------------
-
+    
+    std::string m_currentTextBoxValue{};
     MxVec2 m_anchor{0, 0};
     float m_scrollTop{0.0f};
     MxInt32 m_layerMouseEvents{0};
@@ -17300,6 +17325,11 @@ namespace mxgui
         return ctx->m_currentMouseEvents;
     }
 
+    MxTextBoxEvents getCurrentTextBoxEvents(MxGuiContext* ctx)
+    {
+        return ctx->m_currentTextboxEvents;
+    }
+
     void createImage(const std::filesystem::path& path, const std::string& imageName, bool smooth)
     {
         loadTexture(path, imageName);
@@ -17314,6 +17344,19 @@ namespace mxgui
     void pushIconSize(MxGuiContext* ctx, int newSize)
     {
         ctx->m_style.iconSize = newSize;
+    }
+
+    bool pushFont(MxGuiContext* ctx, const std::string& fontName, int newSize)
+    {
+        const MxFont* font = getFont(fontName, newSize);
+        if (!isValidFont(*font))
+        {
+            return false;
+        }
+
+        ctx->m_style.fontName = fontName;
+        ctx->m_style.textSize = newSize;
+        return true;
     }
 
     MxVec2 guiPanel(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor, bool enableDrag)
@@ -17726,24 +17769,28 @@ namespace mxgui
 #endif // MX_FONT_AWESOME
     }
 
-    void guiTextBox(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor)
+    MxTextBoxEvents guiTextBox(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor)
     {
+        bounds.height = mxClamp(bounds.height, ctx->m_style.textSize + 2, bounds.height);
         MxTextEdit& textEdit = getCore().textEdit;
         textEdit.font = getFont(ctx->m_style.fontName, ctx->m_style.textSize);
         textEdit.fontSize = ctx->m_style.textSize;
         textEdit.spacing = ctx->m_style.textSpacing;
 
+        MxTextBoxEvents textBoxEvents{};
+        
         TextBoxComponent& textBoxComponent = *ctx->getTextBoxComponent(tag);
         MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
         MxRect rect = transform.worldBounds;
-
+        
         MxTextBoxState& textEditState = textBoxComponent.textEditState;
         if (!textEditState.started)
         {
             mxTextEditInitializeState(textEditState);
             textEditState.started = true;
         }
-
+        
+        const std::string textPrevious = convertU32ToUTF8(textEditState.text);
         textEditState.box = rect;
 
 
@@ -17832,14 +17879,23 @@ namespace mxgui
             }
         }
 
-        const std::string utf8Text = convertU32ToUTF8(textEditState.text);
+        ctx->m_currentTextBoxValue = convertU32ToUTF8(textEditState.text);
+        textBoxEvents.textValue = &ctx->m_currentTextBoxValue;
+
+        if (textPrevious != ctx->m_currentTextBoxValue)
+        {
+            textBoxEvents.isTextChange = true;
+        }
+        
 
         float textX = textEditState.box.x + 6;
         float textY = textEditState.box.y + (textEditState.box.height - textEdit.fontSize) / 2;
 
-
-        const float cursorX = textX + measureTextInternal(*textEdit.font, utf8Text.substr(0, textEditState.state.cursor), textEdit.fontSize, textEdit.spacing).x;
-        const float textSizeX = measureTextInternal(*textEdit.font, utf8Text, textEdit.fontSize, textEdit.spacing).x;
+        // NOTE: state.cursor is a codepoint index, not a byte index.
+        // Slice the u32 string first, then convert, otherwise multi-byte
+        // characters (ç, ã, é...) get cut in the middle of the UTF-8 sequence.
+        const float cursorX = textX + measureTextInternal(*textEdit.font, convertU32ToUTF8(textEditState.text.substr(0, textEditState.state.cursor)), textEdit.fontSize, textEdit.spacing).x;
+        const float textSizeX = measureTextInternal(*textEdit.font, ctx->m_currentTextBoxValue, textEdit.fontSize, textEdit.spacing).x;
 
         // Horizontal scroll: only moves when the cursor reaches the edges
         const float padding = 6.0f;                                    // same padding used by textX
@@ -17930,7 +17986,7 @@ namespace mxgui
         }
 
         // draw text
-        drawTextEx(*textEdit.font, utf8Text, MxVec2{textX + offsetX, textY}, textEdit.fontSize, textEdit.spacing, ctx->m_style.textColor);
+        drawTextEx(*textEdit.font, ctx->m_currentTextBoxValue, MxVec2{textX + offsetX, textY}, textEdit.fontSize, textEdit.spacing, ctx->m_style.textColor);
 
         // draw cursor
         if (textBoxComponent.isFocus)
@@ -17945,11 +18001,17 @@ namespace mxgui
         if (!textBoxComponent.isFocus && mouseEvents.isMousePressed)
         {
             textBoxComponent.isFocus = true;
+            textBoxEvents.isEnter = true;
         }
         else if (textBoxComponent.isFocus && isMouseButtonPressed(MX_MOUSE_BUTTON_LEFT) && !mouseEvents.isMouseHover)
         {
             textBoxComponent.isFocus = false;
+            textBoxEvents.isLeave = true;
         }
+        textBoxEvents.isFocus = textBoxComponent.isFocus;
+        ctx->updateCurrents(transform, MxMouseEvents{}, textBoxEvents);
+
+        return textBoxEvents;
     }
 
 } // namespace mxgui
