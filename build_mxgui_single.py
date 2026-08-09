@@ -25,28 +25,28 @@ def contain_text(line : str):
 
 def include_file_all(file : str):
     global count
-    print(f"Replaced mxgui line {count} to file {file}")
-    text = f"\n\n// =============={file}================\n\n"
+    print(f"Replaced mxgui line {count + 1} to file {file}")
+    text = f"//////////////////////////////////////////// start {file}////////////////////////////////////////////\n\n"
     with open(file) as new_file:
         for line_header in new_file:
             text += line_header
             count += 1
-    text += f"\n\n// =============end {file}=============\n\n"
-    count += 8
+    text += f"\n\n///////////////////////////////////////////// end {file}////////////////////////////////////////////\n\n"
+    count += 6
     return text
 
 def include_file_filter(file : str, line : str):
     global count
     start, end = get_include_filter_range(line)
-    print(f"Replaced mxgui line {count} to file {file} line ({start} to {end})")
-    text = f"\n\n// =============={file}================\n\n"
+    print(f"Replaced mxgui line {count + 1} to file {file} line ({start} to {end})")
+    text = f"//////////////////////////////////////////// start {file}////////////////////////////////////////////\n\n"
     with open(file) as new_file:
         for i, line_header in enumerate(new_file, start=1):
             if start <= i <= end:
                 text += line_header
                 count = count + 1 
-    text += f"\n\n// =============end {file}=============\n\n"
-    count += 8 
+    text += f"\n\n//////////////////////////////////////////// end {file}////////////////////////////////////////////\n\n"
+    count += 6 
     return text
 
 for line in mxgui:

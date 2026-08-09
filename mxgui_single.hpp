@@ -121,9 +121,7 @@
 #include <unordered_map>
 #include <vector>
 
-
-
-// ==============mxgui_notosans.hpp================
+//////////////////////////////////////////// start mxgui_notosans.hpp////////////////////////////////////////////
 
 #ifndef MXGUI_NOTOSANS_HPP
 #define MXGUI_NOTOSANS_HPP
@@ -358,14 +356,12 @@ namespace notosans
 
 #endif // MXGUI_NOTOSANS_HPP
 
-// =============end mxgui_notosans.hpp=============
+///////////////////////////////////////////// end mxgui_notosans.hpp////////////////////////////////////////////
 
 #include "string.h"
 
 #define STB_TEXTEDIT_CHARTYPE char32_t
-
-
-// ==============stb_textedit.h================
+//////////////////////////////////////////// start stb_textedit.h////////////////////////////////////////////
 
 // stb_textedit.h - v1.14  - public domain - Sean Barrett
 // Development of this library was sponsored by RAD Game Tools
@@ -737,7 +733,7 @@ typedef struct
 
 
 
-// =============end stb_textedit.h=============
+//////////////////////////////////////////// end stb_textedit.h////////////////////////////////////////////
 
 
 #if defined(MX_LOG_SUPORT) == 1
@@ -812,9 +808,7 @@ typedef struct
 
 #define STBTT_STATIC
 #define STB_TRUETYPE_IMPLEMENTATION
-
-
-// ==============stb_truetype.h================
+//////////////////////////////////////////// start stb_truetype.h////////////////////////////////////////////
 
 // stb_truetype.h - v1.26 - public domain
 // authored from 2009-2021 by Sean Barrett / RAD Game Tools
@@ -5897,7 +5891,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 
-// =============end stb_truetype.h=============
+///////////////////////////////////////////// end stb_truetype.h////////////////////////////////////////////
 
 
 #if defined(__GNUC__)      // GCC and Clang
@@ -5909,9 +5903,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //-----------------------------------------------------------------------------
 
 #if MX_FONT_AWESOME
-
-
-// ==============mxgui_font_awesome.h================
+//////////////////////////////////////////// start mxgui_font_awesome.h////////////////////////////////////////////
 
 // File: 'fa-solid-900.otf' (414704 bytes)
 // Exported using binary_to_compressed_c.exe -u8 "fa-solid-900.otf" Font
@@ -10559,11 +10551,9 @@ static const unsigned char fa_compressed_data[250430] =
 
 
 
-// =============end mxgui_font_awesome.h=============
+///////////////////////////////////////////// end mxgui_font_awesome.h////////////////////////////////////////////
 
-
-
-// ==============mxgui_icons_font_awesome7.hpp================
+//////////////////////////////////////////// start mxgui_icons_font_awesome7.hpp////////////////////////////////////////////
 
 #ifndef MXGUI_ICONS_FONT_AWESOME7_HPP
 #define MXGUI_ICONS_FONT_AWESOME7_HPP
@@ -13425,7 +13415,7 @@ inline int codepointsFontAwesome[] = {
 
 #endif // MXGUI_ICONS_FONT_AWESOME7_HPP
 
-// =============end mxgui_icons_font_awesome7.hpp=============
+///////////////////////////////////////////// end mxgui_icons_font_awesome7.hpp////////////////////////////////////////////
 
 #endif
 
@@ -13984,9 +13974,7 @@ struct MxGuiContext
 //-----------------------------------------------------------------------------
 
 
-
-
-// ==============mxgui_raylib.hpp================
+//////////////////////////////////////////// start mxgui_raylib.hpp////////////////////////////////////////////
 
 #ifndef MXGUI_RAYLIB_HPP
 #define MXGUI_RAYLIB_HPP
@@ -14197,7 +14185,7 @@ void drawCircle(MxVec2 center, float radius, MxColor color)
 #endif // MXGUI_RAYLIB_HPP
 
 
-// =============end mxgui_raylib.hpp=============
+///////////////////////////////////////////// end mxgui_raylib.hpp////////////////////////////////////////////
 
 
 
@@ -14207,9 +14195,7 @@ void drawCircle(MxVec2 center, float radius, MxColor color)
 // (SECTION) SFML backend
 //-----------------------------------------------------------------------------
 
-
-
-// ==============mxgui_sfml.hpp================
+//////////////////////////////////////////// start mxgui_sfml.hpp////////////////////////////////////////////
 
 #ifndef MXGUI_SFML_HPP
 #define MXGUI_SFML_HPP
@@ -14268,23 +14254,34 @@ struct MxKeyboardPolling
     bool release{false};
 };
 
-static std::unique_ptr<sf::Text> s_text;
-static std::unique_ptr<sf::Sprite> s_sprite;
 
-static bool s_cursorOnScreen{false};
+struct SFMLCore
+{
 
-static sf::RectangleShape s_rectShape;
-static sf::CircleShape s_circleShape;
-static sf::RenderWindow* s_windowRef{nullptr};
-static sf::Clock s_fpsClock{};
+    std::unique_ptr<sf::Text> text;
+    std::unique_ptr<sf::Sprite> sprite;
 
-static MxVec2 s_mousePosition{};
-static MxVec2 s_mouseDelta{};
-static float s_mouseWheelScrolled{0.0f};
-static std::unordered_map<int, MxMousePolling> s_mousePolling{};
-static std::unordered_map<int, MxKeyboardPolling> s_inputPolling{};
+    bool cursorOnScreen{false};
 
-static std::queue<char32_t> s_charQueue;
+    sf::RectangleShape rectShape{};
+    sf::CircleShape circleShape{};
+    sf::RenderWindow* windowRef{nullptr};
+    sf::Clock fpsClock{};
+
+    MxVec2 mousePosition{};
+    MxVec2 mouseDelta{};
+    float mouseWheelScrolled{0.0f};
+    std::unordered_map<int, MxMousePolling> mousePolling{};
+    std::unordered_map<int, MxKeyboardPolling> inputPolling{};
+
+    std::queue<char32_t> charQueue{};
+};
+
+inline SFMLCore& getSFMLCore()
+{
+    static SFMLCore core{};
+    return core;
+}
 
 
 inline sf::Vector2f toVectorF(MxVec2 vec)
@@ -14320,7 +14317,7 @@ inline MxVec2 toMxVec2(sf::Vector2u vec)
 void nativeInit()
 {
     const MxTextureNative texture;
-    s_sprite = std::make_unique<sf::Sprite>(texture.handle);
+    getSFMLCore().sprite = std::make_unique<sf::Sprite>(texture.handle);
 }
 
 MxTextureNative nativeLoadTexture(const std::filesystem::path& path)
@@ -14407,21 +14404,21 @@ void nativeUnloadTexture(const MxTextureNative* /*texture*/)
 void windowDisplay(sf::RenderWindow* window)
 {
     window->display();
-    for (auto& [it, mouse] : s_mousePolling)
+    for (auto& [it, mouse] : getSFMLCore().mousePolling)
     {
         mouse.pressed = false;
         mouse.release = false;
     }
-    for (auto& [it, input] : s_inputPolling)
+    for (auto& [it, input] : getSFMLCore().inputPolling)
     {
         input.pressed = false;
         input.release = false;
     }
-    s_mouseDelta = MxVec2{};
-    s_mouseWheelScrolled = 0.0f;
-    while (!s_charQueue.empty())
+    getSFMLCore().mouseDelta = MxVec2{};
+    getSFMLCore().mouseWheelScrolled = 0.0f;
+    while (!getSFMLCore().charQueue.empty())
     {
-        s_charQueue.pop();
+        getSFMLCore().charQueue.pop();
     }
 }
 
@@ -14430,9 +14427,9 @@ std::optional<sf::Event> windowPollEvent(sf::RenderWindow* window)
 
     const std::optional event = window->pollEvent();
 
-    if (!s_windowRef)
+    if (!getSFMLCore().windowRef)
     {
-        s_windowRef = window;
+        getSFMLCore().windowRef = window;
     }
 
     if (!event.has_value())
@@ -14448,30 +14445,30 @@ std::optional<sf::Event> windowPollEvent(sf::RenderWindow* window)
 
     if (const auto* mouseMove = event->getIf<sf::Event::MouseMoved>())
     {
-        s_mouseDelta.x = mouseMove->position.x - s_mousePosition.x;
-        s_mouseDelta.y = mouseMove->position.y - s_mousePosition.y;
-        s_mousePosition = toMxVec2(mouseMove->position);
+        getSFMLCore().mouseDelta.x = mouseMove->position.x - getSFMLCore().mousePosition.x;
+        getSFMLCore().mouseDelta.y = mouseMove->position.y - getSFMLCore().mousePosition.y;
+        getSFMLCore().mousePosition = toMxVec2(mouseMove->position);
     }
 
     if (const auto* mouseWheelScrolled = event->getIf<sf::Event::MouseWheelScrolled>())
     {
-        s_mouseWheelScrolled = mouseWheelScrolled->delta;
+        getSFMLCore().mouseWheelScrolled = mouseWheelScrolled->delta;
     }
 
     if (const auto* mousePressed = event->getIf<sf::Event::MouseButtonPressed>())
     {
         int button = (int)mousePressed->button;
-        s_mousePolling[button].pressed = true;
-        s_mousePolling[button].down = true;
+        getSFMLCore().mousePolling[button].pressed = true;
+        getSFMLCore().mousePolling[button].down = true;
     }
 
     if (const auto* mouseReleased = event->getIf<sf::Event::MouseButtonReleased>())
     {
 
         int button = (int)mouseReleased->button;
-        s_mousePolling[button].pressed = false;
-        s_mousePolling[button].down = false;
-        s_mousePolling[button].release = true;
+        getSFMLCore().mousePolling[button].pressed = false;
+        getSFMLCore().mousePolling[button].down = false;
+        getSFMLCore().mousePolling[button].release = true;
     }
 
     if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>())
@@ -14480,8 +14477,8 @@ std::optional<sf::Event> windowPollEvent(sf::RenderWindow* window)
         int mxKey = sfKeyToMxKey(keyPressed->code);
         if (mxKey != -1)
         {
-            s_inputPolling[mxKey].pressed = true;
-            s_inputPolling[mxKey].down = true;
+            getSFMLCore().inputPolling[mxKey].pressed = true;
+            getSFMLCore().inputPolling[mxKey].down = true;
         }
     }
 
@@ -14491,9 +14488,9 @@ std::optional<sf::Event> windowPollEvent(sf::RenderWindow* window)
         int mxKey = sfKeyToMxKey(keyReleased->code);
         if (mxKey != -1)
         {
-            s_inputPolling[mxKey].pressed = false;
-            s_inputPolling[mxKey].down = false;
-            s_inputPolling[mxKey].release = true;
+            getSFMLCore().inputPolling[mxKey].pressed = false;
+            getSFMLCore().inputPolling[mxKey].down = false;
+            getSFMLCore().inputPolling[mxKey].release = true;
         }
     }
 
@@ -14506,18 +14503,18 @@ std::optional<sf::Event> windowPollEvent(sf::RenderWindow* window)
 
         if (!isControl)
         {
-            s_charQueue.push(c);
+            getSFMLCore().charQueue.push(c);
         }
     }
 
     if (event->is<sf::Event::MouseEntered>())
     {
-        s_cursorOnScreen = true;
+        getSFMLCore().cursorOnScreen = true;
     }
 
     if (event->is<sf::Event::MouseLeft>())
     {
-        s_cursorOnScreen = false;
+        getSFMLCore().cursorOnScreen = false;
     }
 
     return event;
@@ -14525,12 +14522,12 @@ std::optional<sf::Event> windowPollEvent(sf::RenderWindow* window)
 
 bool isCursorOnScreen()
 {
-    return s_cursorOnScreen;
+    return getSFMLCore().cursorOnScreen;
 }
 
 MxVec2 windowSize()
 {
-    return toMxVec2(s_windowRef->getSize());
+    return toMxVec2(getSFMLCore().windowRef->getSize());
 }
 
 
@@ -14551,9 +14548,9 @@ std::string getClipboardText()
 
 void beginScissorMode(int x, int y, int width, int height)
 {
-    MX_ASSERT(s_windowRef, "window not reference");
+    MX_ASSERT(getSFMLCore().windowRef, "window not reference");
 
-    const sf::Vector2u winSize = s_windowRef->getSize();
+    const sf::Vector2u winSize = getSFMLCore().windowRef->getSize();
 
     glEnable(GL_SCISSOR_TEST);
     glScissor(x, (GLint)((float)winSize.y - y - height), width, height);
@@ -14567,93 +14564,95 @@ void endScissorMode()
 
 MxVec2 getMousePosition()
 {
-    return s_mousePosition;
+    return getSFMLCore().mousePosition;
 }
 
 MxVec2 getMouseDelta()
 {
-    return s_mouseDelta;
+    return getSFMLCore().mouseDelta;
 }
 
 float getMouseWheelMove()
 {
-    return s_mouseWheelScrolled;
+    return getSFMLCore().mouseWheelScrolled;
 }
 
 bool isMouseButtonPressed(int button)
 {
-    return s_mousePolling[button].pressed;
+    return getSFMLCore().mousePolling[button].pressed;
 }
 
 bool isMouseButtonDown(int button)
 {
-    return s_mousePolling[button].down;
+    return getSFMLCore().mousePolling[button].down;
 }
 
 bool isMouseButtonReleased(int button)
 {
-    return s_mousePolling[button].release;
+    return getSFMLCore().mousePolling[button].release;
 }
 
 
 bool isKeyPressed(int key)
 {
-    return s_inputPolling[key].pressed;
+    return getSFMLCore().inputPolling[key].pressed;
 }
 
 bool isKeyDown(int key)
 {
-    return s_inputPolling[key].down;
+    return getSFMLCore().inputPolling[key].down;
 }
 
 bool isKeyReleased(int key)
 {
-    return s_inputPolling[key].release;
+    return getSFMLCore().inputPolling[key].release;
 }
 
 int getCharPressed()
 {
-    if (s_charQueue.empty())
+    if (getSFMLCore().charQueue.empty())
     {
         return 0;
     }
-    int character = (int)s_charQueue.front();
-    s_charQueue.pop();
+    int character = (int)getSFMLCore().charQueue.front();
+    getSFMLCore().charQueue.pop();
     return character;
 }
 
 
 void drawRectangleLinesEx(MxRect rec, float lineThick, MxColor color)
 {
-    s_rectShape.setOutlineThickness(lineThick);
-    s_rectShape.setPosition({rec.x + lineThick, rec.y + lineThick});
-    s_rectShape.setSize({rec.width - lineThick * 2, rec.height - lineThick * 2});
-    s_rectShape.setFillColor(sf::Color::Transparent);
-    s_rectShape.setOutlineColor(toColor(color));
+    sf::RectangleShape& rectShape = getSFMLCore().rectShape;
+    rectShape.setOutlineThickness(lineThick);
+    rectShape.setPosition({rec.x + lineThick, rec.y + lineThick});
+    rectShape.setSize({rec.width - lineThick * 2, rec.height - lineThick * 2});
+    rectShape.setFillColor(sf::Color::Transparent);
+    rectShape.setOutlineColor(toColor(color));
 
-    MX_ASSERT(s_windowRef, "window not reference");
-    s_windowRef->draw(s_rectShape);
+    MX_ASSERT(getSFMLCore().windowRef, "window not reference");
+    getSFMLCore().windowRef->draw(getSFMLCore().rectShape);
 }
 
 void drawRectanglePro(MxRect rec, MxVec2 origin, float rotation, MxColor color)
 {
-    s_rectShape.setOutlineThickness(0);
-    s_rectShape.setPosition({rec.x, rec.y});
-    s_rectShape.setOrigin({origin.x, origin.y});
-    s_rectShape.setRotation(sf::degrees(rotation));
-    s_rectShape.setSize({rec.width, rec.height});
-    s_rectShape.setFillColor(toColor(color));
+    sf::RectangleShape& rectShape = getSFMLCore().rectShape;
+    rectShape.setOutlineThickness(0);
+    rectShape.setPosition({rec.x, rec.y});
+    rectShape.setOrigin({origin.x, origin.y});
+    rectShape.setRotation(sf::degrees(rotation));
+    rectShape.setSize({rec.width, rec.height});
+    rectShape.setFillColor(toColor(color));
 
-    MX_ASSERT(s_windowRef, "window not reference");
-    s_windowRef->draw(s_rectShape);
+    MX_ASSERT(getSFMLCore().windowRef, "window not reference");
+    getSFMLCore().windowRef->draw(getSFMLCore().rectShape);
 }
 
 void drawTexturePro(const std::string& textureNameID, MxRect source, MxRect dest, MxVec2 origin, float rotation, MxColor tint)
 {
 
-    if (!s_sprite)
+    if (!getSFMLCore().sprite)
     {
-        MX_ASSERT(s_sprite, "s_sprite is not valid");
+        MX_ASSERT(getSFMLCore().sprite, "getSFMLCore().sprite is not valid");
         return;
     }
 
@@ -14666,36 +14665,38 @@ void drawTexturePro(const std::string& textureNameID, MxRect source, MxRect dest
         return;
     }
 
+    sf::Sprite* sprite = getSFMLCore().sprite.get();
 
     const sf::IntRect rect({(int)source.x, (int)source.y}, {(int)source.width, (int)source.height});
-    s_sprite->setTexture(texture->handle);
-    s_sprite->setTextureRect(rect);
+    sprite->setTexture(texture->handle);
+    sprite->setTextureRect(rect);
 
     // The scale factor must be derived manually from dest size / source size
     const float scaleX = (source.width != 0.0f) ? (dest.width / source.width) : 1.0f;
     const float scaleY = (source.height != 0.0f) ? (dest.height / source.height) : 1.0f;
-    s_sprite->setScale({scaleX, scaleY});
+    sprite->setScale({scaleX, scaleY});
 
-    s_sprite->setPosition({dest.x, dest.y});
-    s_sprite->setOrigin({origin.x, origin.y});
-    s_sprite->setRotation(sf::degrees(rotation));
-    s_sprite->setColor(toColor(tint));
+    sprite->setPosition({dest.x, dest.y});
+    sprite->setOrigin({origin.x, origin.y});
+    sprite->setRotation(sf::degrees(rotation));
+    sprite->setColor(toColor(tint));
 
 
-    MX_ASSERT(s_windowRef, "window not reference");
-    s_windowRef->draw(*s_sprite);
+    MX_ASSERT(getSFMLCore().windowRef, "window not reference");
+    getSFMLCore().windowRef->draw(*getSFMLCore().sprite);
 }
 
 
 void drawCircle(MxVec2 center, float radius, MxColor color)
 {
-    s_circleShape.setRadius(radius);
-    s_circleShape.setPosition(sf::Vector2f{center.x - radius, center.y - radius});
-    s_circleShape.setFillColor(toColor(color));
+    sf::CircleShape& circleShape = getSFMLCore().circleShape;
+    circleShape.setRadius(radius);
+    circleShape.setPosition(sf::Vector2f{center.x - radius, center.y - radius});
+    circleShape.setFillColor(toColor(color));
 
 
-    MX_ASSERT(s_windowRef, "window not reference");
-    s_windowRef->draw(s_circleShape);
+    MX_ASSERT(getSFMLCore().windowRef, "window not reference");
+    getSFMLCore().windowRef->draw(circleShape);
 }
 
 
@@ -14703,7 +14704,7 @@ void drawFPS(float x, float y)
 {
     static float fps = 0.0f;
 
-    float deltaTime = s_fpsClock.restart().asSeconds();
+    float deltaTime = getSFMLCore().fpsClock.restart().asSeconds();
     if (deltaTime > 0.0f)
     {
         fps = 1.0f / deltaTime;
@@ -14720,7 +14721,7 @@ void drawFPS(float x, float y)
 #endif // MXGUI_SFML_HPP
 
 
-// =============end mxgui_sfml.hpp=============
+///////////////////////////////////////////// end mxgui_sfml.hpp////////////////////////////////////////////
 
 
 #else
@@ -15971,9 +15972,7 @@ static void STB_TEXTEDIT_LAYOUTROW(StbTexteditRow* r, std::u32string* obj, int l
 #define STB_TEXTEDIT_K_PGDOWN 0x1000F
 
 #define STB_TEXTEDIT_IMPLEMENTATION
-
-
-// ==============stb_textedit.h================
+//////////////////////////////////////////// start stb_textedit.h////////////////////////////////////////////
 
 
 ////////////////////////////////////////////////////////////////////////////
@@ -17038,7 +17037,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 
-// =============end stb_textedit.h=============
+//////////////////////////////////////////// end stb_textedit.h////////////////////////////////////////////
 
 
 static int mapKey(int mxKey, bool shift, bool ctrl)
