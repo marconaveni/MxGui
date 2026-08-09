@@ -38,6 +38,7 @@
 //  (ToggleEx)                  | Component | stateless |
 //  (CheckBox) -> (ToggleEx)    | Component | stateless |
 //  (Toogle) -> (ToggleEx)      | Component | stateless |
+//  (TextBox)                   | Component | state     |
 //
 //-----------------------------------------------------------------------------
 
@@ -88,6 +89,10 @@
 
 #ifndef MX_FONT_AWESOME
 #define MX_FONT_AWESOME 1 // Enable font_awesome (0 - disabled | 1 enabled)
+#endif
+
+#ifndef MX_CUSTOM_FRAME_TIME
+#define MX_CUSTOM_FRAME_TIME 0 // Enable custom frame time (delta time dt) (0 - disabled | 1 enabled)
 #endif
 
 #ifndef MX_SUPPRESS_WARNINGS
@@ -13608,7 +13613,10 @@ struct MxTextBoxState
     std::u32string text{};
     STB_TexteditState state{};
     MxRect box{};
+    MxRect boxSelected{};
+    float offsetX{0.0f};
     bool started{false};
+    bool isDrag{false};
 };
 
 struct MxStyle
@@ -13642,7 +13650,7 @@ inline MxStyle MxStyle::Dark{.primaryColor{MxColor::WhiteGray},
 
 
 //-----------------------------------------------------------------------------
-// (SECTION) Structs components
+// (SECTION) Structs primitives components
 //-----------------------------------------------------------------------------
 
 struct PanelComponent
@@ -13722,6 +13730,9 @@ typedef enum
 
 namespace mxgui
 {
+
+    void beginMx();
+    void endMx();
 
     MxGuiContext* createContext(MxStyle style = MxStyle{});
     void destroyContext(MxGuiContext* ctx);
@@ -13805,6 +13816,7 @@ void drawCircle(MxVec2 center, float radius, MxColor color);
 bool isValidFont(const MxFont& font);
 bool isValidImage(const MxImage& image);
 bool isKeyPressedRepeat(int key);
+void setFrameTime(float customTime);
 float getFrameTime();
 
 // mxgui functions
@@ -14204,16 +14216,43 @@ void drawCircle(MxVec2 center, float radius, MxColor color)
 
 #include <SFML/Graphics.hpp>
 #include <SFML/OpenGL.hpp>
+#include <queue>
+
+int sfKeyToMxKey(sf::Keyboard::Key sfKey)
+{
+    switch (sfKey)
+    {
+        case sf::Keyboard::Key::C: return MX_KEY_C;
+        case sf::Keyboard::Key::V: return MX_KEY_V;
+        case sf::Keyboard::Key::X: return MX_KEY_X;
+        case sf::Keyboard::Key::Y: return MX_KEY_Y;
+        case sf::Keyboard::Key::Z: return MX_KEY_Z;
+
+        case sf::Keyboard::Key::Backspace: return MX_KEY_BACKSPACE;
+        case sf::Keyboard::Key::Delete: return MX_KEY_DELETE;
+        case sf::Keyboard::Key::Right: return MX_KEY_RIGHT;
+        case sf::Keyboard::Key::Left: return MX_KEY_LEFT;
+        case sf::Keyboard::Key::Down: return MX_KEY_DOWN;
+        case sf::Keyboard::Key::Up: return MX_KEY_UP;
+        case sf::Keyboard::Key::PageUp: return MX_KEY_PAGE_UP;
+        case sf::Keyboard::Key::PageDown: return MX_KEY_PAGE_DOWN;
+        case sf::Keyboard::Key::Home: return MX_KEY_HOME;
+        case sf::Keyboard::Key::End: return MX_KEY_END;
+
+        case sf::Keyboard::Key::LShift: return MX_KEY_LEFT_SHIFT;
+        case sf::Keyboard::Key::LControl: return MX_KEY_LEFT_CONTROL;
+        case sf::Keyboard::Key::RShift: return MX_KEY_RIGHT_SHIFT;
+        case sf::Keyboard::Key::RControl: return MX_KEY_RIGHT_CONTROL;
+
+        default: return -1; // no MX_KEY_* correspondent
+    }
+}
 
 struct MxTextureNative
 {
     sf::Texture handle{};
     bool isValid{false};
 };
-
-static std::unique_ptr<sf::Text> s_text;
-static std::unique_ptr<sf::Sprite> s_sprite;
-
 
 struct MxMousePolling
 {
@@ -14222,21 +14261,30 @@ struct MxMousePolling
     bool release{false};
 };
 
+struct MxKeyboardPolling
+{
+    bool pressed{false};
+    bool down{false};
+    bool release{false};
+};
+
+static std::unique_ptr<sf::Text> s_text;
+static std::unique_ptr<sf::Sprite> s_sprite;
+
 static bool s_cursorOnScreen{false};
 
 static sf::RectangleShape s_rectShape;
 static sf::CircleShape s_circleShape;
-static sf::RenderWindow* s_windowRef = nullptr;
+static sf::RenderWindow* s_windowRef{nullptr};
 static sf::Clock s_fpsClock{};
 
 static MxVec2 s_mousePosition{};
 static MxVec2 s_mouseDelta{};
 static float s_mouseWheelScrolled{0.0f};
-static MxMousePolling s_mousePolling[5]{
-    MxMousePolling{},
-    MxMousePolling{},
-    MxMousePolling{},
-};
+static std::unordered_map<int, MxMousePolling> s_mousePolling{};
+static std::unordered_map<int, MxKeyboardPolling> s_inputPolling{};
+
+static std::queue<char32_t> s_charQueue;
 
 
 inline sf::Vector2f toVectorF(MxVec2 vec)
@@ -14359,13 +14407,22 @@ void nativeUnloadTexture(const MxTextureNative* /*texture*/)
 void windowDisplay(sf::RenderWindow* window)
 {
     window->display();
-    for (auto& mouse : s_mousePolling)
+    for (auto& [it, mouse] : s_mousePolling)
     {
         mouse.pressed = false;
         mouse.release = false;
     }
+    for (auto& [it, input] : s_inputPolling)
+    {
+        input.pressed = false;
+        input.release = false;
+    }
     s_mouseDelta = MxVec2{};
     s_mouseWheelScrolled = 0.0f;
+    while (!s_charQueue.empty())
+    {
+        s_charQueue.pop();
+    }
 }
 
 std::optional<sf::Event> windowPollEvent(sf::RenderWindow* window)
@@ -14417,6 +14474,42 @@ std::optional<sf::Event> windowPollEvent(sf::RenderWindow* window)
         s_mousePolling[button].release = true;
     }
 
+    if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>())
+    {
+
+        int mxKey = sfKeyToMxKey(keyPressed->code);
+        if (mxKey != -1)
+        {
+            s_inputPolling[mxKey].pressed = true;
+            s_inputPolling[mxKey].down = true;
+        }
+    }
+
+    if (const auto* keyReleased = event->getIf<sf::Event::KeyReleased>())
+    {
+
+        int mxKey = sfKeyToMxKey(keyReleased->code);
+        if (mxKey != -1)
+        {
+            s_inputPolling[mxKey].pressed = false;
+            s_inputPolling[mxKey].down = false;
+            s_inputPolling[mxKey].release = true;
+        }
+    }
+
+    if (const auto* textEvent = event->getIf<sf::Event::TextEntered>())
+    {
+        char32_t c = textEvent->unicode;
+        // Ignores control characters (backspace, tab, enter, esc, delete, etc.)
+        // range C0: 0x00–0x1F, and DEL (0x7F)
+        bool isControl = (c < 0x20) || (c == 0x7F);
+
+        if (!isControl)
+        {
+            s_charQueue.push(c);
+        }
+    }
+
     if (event->is<sf::Event::MouseEntered>())
     {
         s_cursorOnScreen = true;
@@ -14440,16 +14533,21 @@ MxVec2 windowSize()
     return toMxVec2(s_windowRef->getSize());
 }
 
-/*
+
 void setClipboardText(const std::string& text)
 {
+    sf::Clipboard::setString(sf::String::fromUtf8(text.begin(), text.end()));
 }
 
 std::string getClipboardText()
 {
-    return std::string();
+    sf::String content = sf::Clipboard::getString();
+
+    std::string utf8;
+    sf::Utf32::toUtf8(content.begin(), content.end(), std::back_inserter(utf8));
+    return utf8;
 }
-*/
+
 
 void beginScissorMode(int x, int y, int width, int height)
 {
@@ -14497,19 +14595,33 @@ bool isMouseButtonReleased(int button)
     return s_mousePolling[button].release;
 }
 
-/*
+
 bool isKeyPressed(int key)
-{ return false; }
+{
+    return s_inputPolling[key].pressed;
+}
 
 bool isKeyDown(int key)
-{ return false; }
+{
+    return s_inputPolling[key].down;
+}
 
 bool isKeyReleased(int key)
-{ return false; }
+{
+    return s_inputPolling[key].release;
+}
 
 int getCharPressed()
-{ return 0; } 
- */
+{
+    if (s_charQueue.empty())
+    {
+        return 0;
+    }
+    int character = (int)s_charQueue.front();
+    s_charQueue.pop();
+    return character;
+}
+
 
 void drawRectangleLinesEx(MxRect rec, float lineThick, MxColor color)
 {
@@ -14603,7 +14715,6 @@ void drawFPS(float x, float y)
     const MxFont* font = getFont(MX_FONT_NOTO_ID, 20);
     drawTextEx(*font, text, MxVec2{x, y}, 20, 0, color);
 }
-
 
 
 #endif // MXGUI_SFML_HPP
@@ -14852,6 +14963,7 @@ struct MxCore
     std::vector<MxRect> stackScissors{};
     MxFontManager fontManager{};
     MxTextureManager textureManager{};
+    float frameTime{0.0f};
 };
 
 inline MxCore& getCore()
@@ -14862,7 +14974,7 @@ inline MxCore& getCore()
 
 
 //-----------------------------------------------------------------------------
-// (Section) Internal functions publics
+// (SECTION) Internal functions publics
 //-----------------------------------------------------------------------------
 
 
@@ -14914,20 +15026,20 @@ inline bool isKeyPressedRepeat(int key)
 
 #include <chrono>
 
+
+void setFrameTime(float customTime)
+{
+    getCore().frameTime = customTime;
+}
+
 float getFrameTime()
 {
-    static auto lastTime = std::chrono::steady_clock::now();
-    auto currentTime = std::chrono::steady_clock::now();
-
-    std::chrono::duration<float> deltaTime = currentTime - lastTime;
-
-    lastTime = currentTime;
-    return deltaTime.count();
+    return getCore().frameTime;
 }
 
 
 //-----------------------------------------------------------------------------
-// (Section) Internal functions privates
+// (SECTION) Internal functions privates
 //-----------------------------------------------------------------------------
 
 //-----------------------------------------------------------------------------
@@ -17138,6 +17250,22 @@ MxTransform updateTransformWorld(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor
 namespace mxgui
 {
 
+    void beginMx()
+    {
+#if !MX_CUSTOM_FRAME_TIME
+        static auto lastTime = std::chrono::steady_clock::now();
+        auto currentTime = std::chrono::steady_clock::now();
+
+        std::chrono::duration<float> deltaTime = currentTime - lastTime;
+        lastTime = currentTime;
+
+        getCore().frameTime = deltaTime.count();
+#endif // MX_CUSTOM_FRAME_TIME
+    }
+
+    void endMx()
+    {
+    }
 
     MxGuiContext* createContext(MxStyle style)
     {
@@ -17568,7 +17696,6 @@ namespace mxgui
         mouseEvents.isMouseDown = mouseEvents.isMouseHover && isMouseButtonDown(MX_MOUSE_BUTTON_LEFT);
         mouseEvents.isMousePressed = mouseEvents.isMouseHover && isMouseButtonPressed(MX_MOUSE_BUTTON_LEFT);
 
-
         if (mouseEvents.isMouseRelease)
         {
             checked = !checked;
@@ -17600,7 +17727,6 @@ namespace mxgui
 #endif // MX_FONT_AWESOME
     }
 
-
     void guiTextBox(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor)
     {
         MxTextEdit& textEdit = getCore().textEdit;
@@ -17628,15 +17754,6 @@ namespace mxgui
         mouseEvents.isMouseRelease = mouseEvents.isMouseHover && isMouseButtonReleased(MX_MOUSE_BUTTON_LEFT);
         mouseEvents.isMouseDown = mouseEvents.isMouseHover && isMouseButtonDown(MX_MOUSE_BUTTON_LEFT);
         mouseEvents.isMousePressed = mouseEvents.isMouseHover && isMouseButtonPressed(MX_MOUSE_BUTTON_LEFT);
-
-        if (!textBoxComponent.isFocus && mouseEvents.isMousePressed)
-        {
-            textBoxComponent.isFocus = true;
-        }
-        else if (textBoxComponent.isFocus && isMouseButtonPressed(MX_MOUSE_BUTTON_LEFT))
-        {
-            textBoxComponent.isFocus = false;
-        }
 
         // MX_LOG("%s", textBoxComponent.isFocus ? "true" : "false");
 
@@ -17685,7 +17802,8 @@ namespace mxgui
             }
             if (ctrl && isKeyPressed(MX_KEY_X))
             {
-                int start = textEditState.state.select_start, end = textEditState.state.select_end;
+                int start = textEditState.state.select_start;
+                int end = textEditState.state.select_end;
                 if (start != end)
                 {
                     if (start > end)
@@ -17708,29 +17826,68 @@ namespace mxgui
 
 
             // get keys
-            int key{0};
+            int key = 0;
             while ((key = getCharPressed()) != 0)
             {
                 stb_textedit_key(&textEditState.text, &textEditState.state, key);
             }
         }
 
+        const std::string utf8Text = convertU32ToUTF8(textEditState.text);
 
         float textX = textEditState.box.x + 6;
         float textY = textEditState.box.y + (textEditState.box.height - textEdit.fontSize) / 2;
 
-        float cursorX = textX + measureTextInternal(*textEdit.font, convertU32ToUTF8(textEditState.text.substr(0, textEditState.state.cursor)).c_str(), textEdit.fontSize, textEdit.spacing).x;
-        float offsetX = (textEditState.box.x + textEditState.box.width - 6) - cursorX;
-        if (offsetX > 0)
+
+        const float cursorX = textX + measureTextInternal(*textEdit.font, utf8Text.substr(0, textEditState.state.cursor), textEdit.fontSize, textEdit.spacing).x;
+        const float textSizeX = measureTextInternal(*textEdit.font, utf8Text, textEdit.fontSize, textEdit.spacing).x;
+
+        // Horizontal scroll: only moves when the cursor reaches the edges
+        const float padding = 6.0f;                                    // same padding used by textX
+        const float viewWidth = textEditState.box.width - padding * 2; // visible text area
+        const float cursorLocalX = cursorX - textX;                    // cursor position inside the text, without scroll
+
+        float& offsetX = textEditState.offsetX; // persists between frames
+
+        if (cursorLocalX + offsetX < 0.0f)
         {
-            offsetX = 0;
+            offsetX = -cursorLocalX; // cursor hit the left edge
+        }
+        else if (cursorLocalX + offsetX > viewWidth)
+        {
+            offsetX = viewWidth - cursorLocalX; // cursor hit the right edge
         }
 
-        MxVec2 mouse = getMousePosition();
-        float relativeMouseX = mouse.x - (textX + offsetX);
-        float relativeMouseY = mouse.y - textEditState.box.y;
+        // Keep text anchored: never scroll past the start, no empty gap on the right
+        if (textSizeX <= viewWidth)
+        {
+            offsetX = 0.0f;
+        }
+        else if (offsetX < viewWidth - textSizeX)
+        {
+            offsetX = viewWidth - textSizeX;
+        }
+        else if (offsetX > 0.0f)
+        {
+            offsetX = 0.0f;
+        }
 
-        if (checkCollisionPointRect(mouse, textEditState.box) && isMouseButtonDown(MX_MOUSE_BUTTON_LEFT))
+        const MxVec2 mouse = getMousePosition();
+        const float relativeMouseX = mouse.x - (textX + offsetX);
+        const float relativeMouseY = mouse.y - textEditState.box.y;
+
+
+        if (checkCollisionPointRect(mouse, textEditState.box) && isMouseButtonPressed(MX_MOUSE_BUTTON_LEFT) && textBoxComponent.isFocus)
+        {
+            textEditState.isDrag = true;
+        }
+        else if (isMouseButtonReleased(MX_MOUSE_BUTTON_LEFT))
+        {
+            textEditState.isDrag = false;
+        }
+
+
+        if (textEditState.isDrag)
         {
             stb_textedit_drag(&textEditState.text, &textEditState.state, relativeMouseX, relativeMouseY);
         }
@@ -17739,43 +17896,61 @@ namespace mxgui
             stb_textedit_click(&textEditState.text, &textEditState.state, relativeMouseX, relativeMouseY);
         }
 
-        // draw area
-
-
-        // draw box
-        drawRectanglePro(textEditState.box, MxVec2{}, 0, ctx->m_style.backgroundColor);
-        drawRectangleLinesEx(textEditState.box, ctx->m_style.borderWidth, ctx->m_style.borderColor);
-
-
         int selStart = textEditState.state.select_start;
         int selEnd = textEditState.state.select_end;
 
+        const bool drawSelectedBox = (selStart != selEnd && textBoxComponent.isFocus);
 
-        if (selStart != selEnd)
+        if (drawSelectedBox)
         {
             if (selStart > selEnd)
             {
                 std::swap(selStart, selEnd);
             }
-            float x0 = textX + offsetX + measureTextInternal(*textEdit.font, convertU32ToUTF8(textEditState.text.substr(0, selStart)).c_str(), textEdit.fontSize, textEdit.spacing).x;
-            float x1 = textX + offsetX + measureTextInternal(*textEdit.font, convertU32ToUTF8(textEditState.text.substr(0, selEnd)).c_str(), textEdit.fontSize, textEdit.spacing).x;
-            drawRectanglePro(MxRect{x0, textEditState.box.y + 4, (x1 - x0), textEditState.box.height - 8}, MxVec2{}, 0, MxColor::SkyBlue);
+            const float x0 = textX + offsetX + measureTextInternal(*textEdit.font, convertU32ToUTF8(textEditState.text.substr(0, selStart)).c_str(), textEdit.fontSize, textEdit.spacing).x;
+            const float x1 = textX + offsetX + measureTextInternal(*textEdit.font, convertU32ToUTF8(textEditState.text.substr(0, selEnd)).c_str(), textEdit.fontSize, textEdit.spacing).x;
+            textEditState.boxSelected = MxRect{x0, textEditState.box.y + 4, (x1 - x0), textEditState.box.height - 8};
+        }
+        else
+        {
+            textEditState.boxSelected = MxRect{};
         }
 
-        const std::string utf8Text = convertU32ToUTF8(textEditState.text);
+        // draw area
+
+        // draw box
+        drawRectanglePro(textEditState.box, MxVec2{}, 0, ctx->m_style.backgroundColor);
+        drawRectangleLinesEx(textEditState.box, ctx->m_style.borderWidth, ctx->m_style.borderColor);
+
+        pushScissor(rect.x + 1, rect.y, rect.width - 2, rect.height); // call internal BeginScissorMode();
+
+        if (drawSelectedBox)
+        {
+            // draw selected box
+            drawRectanglePro(textEditState.boxSelected, MxVec2{}, 0, MxColor::SkyBlue);
+        }
 
         // draw text
-        pushScissor(rect.x, rect.y, rect.width, rect.height); // call internal BeginScissorMode();
         drawTextEx(*textEdit.font, utf8Text, MxVec2{textX + offsetX, textY}, textEdit.fontSize, textEdit.spacing, ctx->m_style.textColor);
-        popScissor();
 
         // draw cursor
-        drawRectanglePro(MxRect{cursorX + offsetX, textEditState.box.y + 4, 1, textEditState.box.height - 4}, MxVec2{}, 0, MxColor::DarkGray);
+        if (textBoxComponent.isFocus)
+        {
+            // todo: blink cursor
+            drawRectanglePro(MxRect{cursorX + offsetX, textEditState.box.y + 4, 1, textEditState.box.height - 8}, MxVec2{}, 0, MxColor::Red);
+        }
+        popScissor();
 
-        // if (((int)(getTime() * 2)) % 2 == 0)
-        // { // pisca
-        //     // DrawLine((int)cursorX + offsetX, (int)tb.box.y + 4, (int)cursorX + offsetX, (int)(tb.box.y + tb.box.height - 4), BLACK);
-        // }
+
+        // check focus NOTE: This check happens with a one-frame delay so that the cursor doesn't appear to change position.
+        if (!textBoxComponent.isFocus && mouseEvents.isMousePressed)
+        {
+            textBoxComponent.isFocus = true;
+        }
+        else if (textBoxComponent.isFocus && isMouseButtonPressed(MX_MOUSE_BUTTON_LEFT) && !mouseEvents.isMouseHover)
+        {
+            textBoxComponent.isFocus = false;
+        }
     }
 
 } // namespace mxgui

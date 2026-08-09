@@ -3,16 +3,43 @@
 
 #include <SFML/Graphics.hpp>
 #include <SFML/OpenGL.hpp>
+#include <queue>
+
+int sfKeyToMxKey(sf::Keyboard::Key sfKey)
+{
+    switch (sfKey)
+    {
+        case sf::Keyboard::Key::C: return MX_KEY_C;
+        case sf::Keyboard::Key::V: return MX_KEY_V;
+        case sf::Keyboard::Key::X: return MX_KEY_X;
+        case sf::Keyboard::Key::Y: return MX_KEY_Y;
+        case sf::Keyboard::Key::Z: return MX_KEY_Z;
+
+        case sf::Keyboard::Key::Backspace: return MX_KEY_BACKSPACE;
+        case sf::Keyboard::Key::Delete: return MX_KEY_DELETE;
+        case sf::Keyboard::Key::Right: return MX_KEY_RIGHT;
+        case sf::Keyboard::Key::Left: return MX_KEY_LEFT;
+        case sf::Keyboard::Key::Down: return MX_KEY_DOWN;
+        case sf::Keyboard::Key::Up: return MX_KEY_UP;
+        case sf::Keyboard::Key::PageUp: return MX_KEY_PAGE_UP;
+        case sf::Keyboard::Key::PageDown: return MX_KEY_PAGE_DOWN;
+        case sf::Keyboard::Key::Home: return MX_KEY_HOME;
+        case sf::Keyboard::Key::End: return MX_KEY_END;
+
+        case sf::Keyboard::Key::LShift: return MX_KEY_LEFT_SHIFT;
+        case sf::Keyboard::Key::LControl: return MX_KEY_LEFT_CONTROL;
+        case sf::Keyboard::Key::RShift: return MX_KEY_RIGHT_SHIFT;
+        case sf::Keyboard::Key::RControl: return MX_KEY_RIGHT_CONTROL;
+
+        default: return -1; // no MX_KEY_* correspondent
+    }
+}
 
 struct MxTextureNative
 {
     sf::Texture handle{};
     bool isValid{false};
 };
-
-static std::unique_ptr<sf::Text> s_text;
-static std::unique_ptr<sf::Sprite> s_sprite;
-
 
 struct MxMousePolling
 {
@@ -21,21 +48,30 @@ struct MxMousePolling
     bool release{false};
 };
 
+struct MxKeyboardPolling
+{
+    bool pressed{false};
+    bool down{false};
+    bool release{false};
+};
+
+static std::unique_ptr<sf::Text> s_text;
+static std::unique_ptr<sf::Sprite> s_sprite;
+
 static bool s_cursorOnScreen{false};
 
 static sf::RectangleShape s_rectShape;
 static sf::CircleShape s_circleShape;
-static sf::RenderWindow* s_windowRef = nullptr;
+static sf::RenderWindow* s_windowRef{nullptr};
 static sf::Clock s_fpsClock{};
 
 static MxVec2 s_mousePosition{};
 static MxVec2 s_mouseDelta{};
 static float s_mouseWheelScrolled{0.0f};
-static MxMousePolling s_mousePolling[5]{
-    MxMousePolling{},
-    MxMousePolling{},
-    MxMousePolling{},
-};
+static std::unordered_map<int, MxMousePolling> s_mousePolling{};
+static std::unordered_map<int, MxKeyboardPolling> s_inputPolling{};
+
+static std::queue<char32_t> s_charQueue;
 
 
 inline sf::Vector2f toVectorF(MxVec2 vec)
@@ -158,13 +194,22 @@ void nativeUnloadTexture(const MxTextureNative* /*texture*/)
 void windowDisplay(sf::RenderWindow* window)
 {
     window->display();
-    for (auto& mouse : s_mousePolling)
+    for (auto& [it, mouse] : s_mousePolling)
     {
         mouse.pressed = false;
         mouse.release = false;
     }
+    for (auto& [it, input] : s_inputPolling)
+    {
+        input.pressed = false;
+        input.release = false;
+    }
     s_mouseDelta = MxVec2{};
     s_mouseWheelScrolled = 0.0f;
+    while (!s_charQueue.empty())
+    {
+        s_charQueue.pop();
+    }
 }
 
 std::optional<sf::Event> windowPollEvent(sf::RenderWindow* window)
@@ -216,6 +261,42 @@ std::optional<sf::Event> windowPollEvent(sf::RenderWindow* window)
         s_mousePolling[button].release = true;
     }
 
+    if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>())
+    {
+
+        int mxKey = sfKeyToMxKey(keyPressed->code);
+        if (mxKey != -1)
+        {
+            s_inputPolling[mxKey].pressed = true;
+            s_inputPolling[mxKey].down = true;
+        }
+    }
+
+    if (const auto* keyReleased = event->getIf<sf::Event::KeyReleased>())
+    {
+
+        int mxKey = sfKeyToMxKey(keyReleased->code);
+        if (mxKey != -1)
+        {
+            s_inputPolling[mxKey].pressed = false;
+            s_inputPolling[mxKey].down = false;
+            s_inputPolling[mxKey].release = true;
+        }
+    }
+
+    if (const auto* textEvent = event->getIf<sf::Event::TextEntered>())
+    {
+        char32_t c = textEvent->unicode;
+        // Ignores control characters (backspace, tab, enter, esc, delete, etc.)
+        // range C0: 0x00–0x1F, and DEL (0x7F)
+        bool isControl = (c < 0x20) || (c == 0x7F);
+
+        if (!isControl)
+        {
+            s_charQueue.push(c);
+        }
+    }
+
     if (event->is<sf::Event::MouseEntered>())
     {
         s_cursorOnScreen = true;
@@ -239,16 +320,21 @@ MxVec2 windowSize()
     return toMxVec2(s_windowRef->getSize());
 }
 
-/*
+
 void setClipboardText(const std::string& text)
 {
+    sf::Clipboard::setString(sf::String::fromUtf8(text.begin(), text.end()));
 }
 
 std::string getClipboardText()
 {
-    return std::string();
+    sf::String content = sf::Clipboard::getString();
+
+    std::string utf8;
+    sf::Utf32::toUtf8(content.begin(), content.end(), std::back_inserter(utf8));
+    return utf8;
 }
-*/
+
 
 void beginScissorMode(int x, int y, int width, int height)
 {
@@ -296,19 +382,33 @@ bool isMouseButtonReleased(int button)
     return s_mousePolling[button].release;
 }
 
-/*
+
 bool isKeyPressed(int key)
-{ return false; }
+{
+    return s_inputPolling[key].pressed;
+}
 
 bool isKeyDown(int key)
-{ return false; }
+{
+    return s_inputPolling[key].down;
+}
 
 bool isKeyReleased(int key)
-{ return false; }
+{
+    return s_inputPolling[key].release;
+}
 
 int getCharPressed()
-{ return 0; } 
- */
+{
+    if (s_charQueue.empty())
+    {
+        return 0;
+    }
+    int character = (int)s_charQueue.front();
+    s_charQueue.pop();
+    return character;
+}
+
 
 void drawRectangleLinesEx(MxRect rec, float lineThick, MxColor color)
 {
@@ -402,7 +502,6 @@ void drawFPS(float x, float y)
     const MxFont* font = getFont(MX_FONT_NOTO_ID, 20);
     drawTextEx(*font, text, MxVec2{x, y}, 20, 0, color);
 }
-
 
 
 #endif // MXGUI_SFML_HPP

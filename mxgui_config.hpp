@@ -7,4 +7,5 @@
 #define MX_TEXT_LINE_SPACING 0.0f        // Config \n space in texts
 #define MX_BAR_SIZE 6                    // Bar size scroll
 #define MX_FONT_AWESOME 1                // Enable font_awesome (0 - disabled | 1 enabled)
+#define MX_CUSTOM_FRAME_TIME 0           // Enable custom frame time (delta time dt) (0 - disabled | 1 enabled)
 #define MX_SUPPRESS_WARNINGS 1           // Supress Warnings    (0 - disabled | 1 enabled)
