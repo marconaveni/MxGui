@@ -111,6 +111,7 @@
 // (SECTION) Header and defines
 //-----------------------------------------------------------------------------
 
+#include <chrono>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -161,6 +162,10 @@
 #define MX_ASSERT(condition, msg)
 
 #endif // _DEBUG
+
+#ifndef GEN_TEXTURE_NAME_ID
+#define GEN_TEXTURE_NAME_ID(name, id) name + std::to_string(id)
+#endif // GEN_TEXTURE_NAME_ID
 
 
 //-----------------------------------------------------------------------------
@@ -307,6 +312,14 @@ struct MxFont
     MxGlyphInfo* glyphs{nullptr}; // Glyphs info data
 };
 
+struct MxFontData
+{
+    unsigned char* fileData{nullptr};
+    int* codepoints{nullptr};
+    int codepointCount{0};
+    std::unordered_map<int, MxFont> fonts{};
+};
+
 struct MxColor
 {
     MxUChar8 r{255}; // Color red value
@@ -342,34 +355,6 @@ struct MxColor
     static MxColor Black;       // Black
     static MxColor Transparent; // Transparent (no color)
 };
-
-inline MxColor MxColor::WhiteGray{245, 245, 245, 255}; // Gray (Almost White)
-inline MxColor MxColor::LightGray{200, 200, 200, 255}; // Light Gray
-inline MxColor MxColor::Gray{130, 130, 130, 255};      // Gray
-inline MxColor MxColor::DarkGray{80, 80, 80, 255};     // Dark Gray
-inline MxColor MxColor::Yellow{253, 249, 0, 255};      // Yellow
-inline MxColor MxColor::Gold{255, 203, 0, 255};        // Gold
-inline MxColor MxColor::Orange{255, 161, 0, 255};      // Orange
-inline MxColor MxColor::Pink{255, 109, 194, 255};      // Pink
-inline MxColor MxColor::Red{230, 41, 55, 255};         // Red
-inline MxColor MxColor::Maroon{190, 33, 55, 255};      // Maroon
-inline MxColor MxColor::Green{0, 228, 48, 255};        // Green
-inline MxColor MxColor::Lime{0, 158, 47, 255};         // Lime
-inline MxColor MxColor::DarkGreen{0, 117, 44, 255};    // Dark Green
-inline MxColor MxColor::SkyBlue{102, 191, 255, 255};   // Sky Blue
-inline MxColor MxColor::Blue{0, 121, 241, 255};        // Blue
-inline MxColor MxColor::DarkBlue{0, 82, 172, 255};     // Dark Blue
-inline MxColor MxColor::Purple{200, 122, 255, 255};    // Purple
-inline MxColor MxColor::Violet{135, 60, 190, 255};     // Violet
-inline MxColor MxColor::DarkPurple{112, 31, 126, 255}; // Dark Purple
-inline MxColor MxColor::Beige{211, 176, 131, 255};     // Beige
-inline MxColor MxColor::Brown{127, 106, 79, 255};      // Brown
-inline MxColor MxColor::DarkBrown{76, 63, 47, 255};    // DarkBrown
-inline MxColor MxColor::White{255, 255, 255, 255};     // White
-inline MxColor MxColor::Magenta{255, 0, 255, 255};     // Magenta
-inline MxColor MxColor::Cyan{0, 255, 255, 255};        // Cyan
-inline MxColor MxColor::Black{0, 0, 0, 255};           // Black
-inline MxColor MxColor::Transparent{0, 0, 0, 255};     // Transparent (no color)
 
 struct MxTransform
 {
@@ -429,18 +414,6 @@ struct MxStyle
     static MxStyle Light; // ThemeLight;
     static MxStyle Dark;  // ThemeDark;
 };
-
-inline MxStyle MxStyle::Light{}; // Note: that the default parameters are light theme values.
-inline MxStyle MxStyle::Dark{.primaryColor{MxColor::WhiteGray},
-                             .borderWidth{1},
-                             .borderColor{MxColor::White},
-                             .backgroundColor{MxColor::DarkGray}, // Dark
-                             .textColor{MxColor::White},
-                             .textSize{20},
-                             .textSpacing{0},
-                             .iconSize{20},
-                             .fontName{MX_FONT_NOTO_ID},
-                             .isDarkMode{true}};
 
 
 //-----------------------------------------------------------------------------
@@ -517,6 +490,185 @@ typedef enum
     MX_KEY_RIGHT_CONTROL = 345,
 
 } MxKeyboardKey;
+
+//-----------------------------------------------------------------------------
+// (SECTION) inline functions and parameters
+//-----------------------------------------------------------------------------
+
+template <typename T>
+inline constexpr T mxMax(T min, T max)
+{
+    return (max < min) ? min : max;
+}
+
+template <typename T>
+inline constexpr T mxMin(T min, T max)
+{
+    return (min < max) ? min : max;
+}
+
+template <typename T, typename U, typename V>
+inline constexpr T mxClamp(T value, U min, V max)
+{
+    MX_ASSERT(std::is_signed_v<T> == std::is_signed_v<U> && std::is_signed_v<T> == std::is_signed_v<V>, "Clamp arguments must all be of the same signedness to avoid errors.");
+
+    return (value < min) ? min : (value > max) ? max : value;
+}
+
+inline bool checkCollisionPointRect(MxVec2 point, MxRect rec)
+{
+    const bool collision = ((point.x >= rec.x) && (point.x < (rec.x + rec.width)) && (point.y >= rec.y) && (point.y < (rec.y + rec.height)));
+    return collision;
+}
+
+inline bool checkCollisionPointRectX(MxVec2 point, MxRect rec)
+{
+    const bool collision = ((point.x >= rec.x) && (point.x < (rec.x + rec.width)));
+    return collision;
+}
+
+inline bool checkCollisionPointRectY(MxVec2 point, MxRect rec)
+{
+    const bool collision = ((point.y >= rec.y) && (point.y < (rec.y + rec.height)));
+    return collision;
+}
+
+inline MxRect getCollisionRec(MxRect rect1, MxRect rect2)
+{
+    MxRect overlap{};
+
+    float left = (rect1.x > rect2.x) ? rect1.x : rect2.x;
+    float right1 = rect1.x + rect1.width;
+    float right2 = rect2.x + rect2.width;
+    float right = (right1 < right2) ? right1 : right2;
+    float top = (rect1.y > rect2.y) ? rect1.y : rect2.y;
+    float bottom1 = rect1.y + rect1.height;
+    float bottom2 = rect2.y + rect2.height;
+    float bottom = (bottom1 < bottom2) ? bottom1 : bottom2;
+
+    if ((left < right) && (top < bottom))
+    {
+        overlap.x = left;
+        overlap.y = top;
+        overlap.width = right - left;
+        overlap.height = bottom - top;
+    }
+
+    return overlap;
+}
+
+inline MxColor fadeColor(MxColor color, float alpha)
+{
+    MxColor result = color;
+
+    if (alpha < 0.0f)
+    {
+        alpha = 0.0f;
+    }
+    else if (alpha > 1.0f)
+    {
+        alpha = 1.0f;
+    }
+
+    result.a = (MxUChar8)(255.0f * alpha);
+
+    return result;
+}
+
+
+inline MxColor MxColor::WhiteGray{245, 245, 245, 255}; // Gray (Almost White)
+inline MxColor MxColor::LightGray{200, 200, 200, 255}; // Light Gray
+inline MxColor MxColor::Gray{130, 130, 130, 255};      // Gray
+inline MxColor MxColor::DarkGray{80, 80, 80, 255};     // Dark Gray
+inline MxColor MxColor::Yellow{253, 249, 0, 255};      // Yellow
+inline MxColor MxColor::Gold{255, 203, 0, 255};        // Gold
+inline MxColor MxColor::Orange{255, 161, 0, 255};      // Orange
+inline MxColor MxColor::Pink{255, 109, 194, 255};      // Pink
+inline MxColor MxColor::Red{230, 41, 55, 255};         // Red
+inline MxColor MxColor::Maroon{190, 33, 55, 255};      // Maroon
+inline MxColor MxColor::Green{0, 228, 48, 255};        // Green
+inline MxColor MxColor::Lime{0, 158, 47, 255};         // Lime
+inline MxColor MxColor::DarkGreen{0, 117, 44, 255};    // Dark Green
+inline MxColor MxColor::SkyBlue{102, 191, 255, 255};   // Sky Blue
+inline MxColor MxColor::Blue{0, 121, 241, 255};        // Blue
+inline MxColor MxColor::DarkBlue{0, 82, 172, 255};     // Dark Blue
+inline MxColor MxColor::Purple{200, 122, 255, 255};    // Purple
+inline MxColor MxColor::Violet{135, 60, 190, 255};     // Violet
+inline MxColor MxColor::DarkPurple{112, 31, 126, 255}; // Dark Purple
+inline MxColor MxColor::Beige{211, 176, 131, 255};     // Beige
+inline MxColor MxColor::Brown{127, 106, 79, 255};      // Brown
+inline MxColor MxColor::DarkBrown{76, 63, 47, 255};    // DarkBrown
+inline MxColor MxColor::White{255, 255, 255, 255};     // White
+inline MxColor MxColor::Magenta{255, 0, 255, 255};     // Magenta
+inline MxColor MxColor::Cyan{0, 255, 255, 255};        // Cyan
+inline MxColor MxColor::Black{0, 0, 0, 255};           // Black
+inline MxColor MxColor::Transparent{0, 0, 0, 255};     // Transparent (no color)
+
+inline MxStyle MxStyle::Light{}; // Note: that the default parameters are light theme values.
+inline MxStyle MxStyle::Dark{.primaryColor{MxColor::WhiteGray},
+                             .borderWidth{1},
+                             .borderColor{MxColor::White},
+                             .backgroundColor{MxColor::DarkGray}, // Dark
+                             .textColor{MxColor::White},
+                             .textSize{20},
+                             .textSpacing{0},
+                             .iconSize{20},
+                             .fontName{MX_FONT_NOTO_ID},
+                             .isDarkMode{true}};
+
+//////////////////////////////////
+
+//-----------------------------------------------------------------------------
+// (SECTION) Internal API functions
+//-----------------------------------------------------------------------------
+
+
+// managers functions handle
+void initManagers(MxStyle style);
+void closeManagers();
+
+// font managers functions
+const MxFont* getFont(const std::string& fontNameID, int size);
+void loadFont(const std::string& textureNameID, const std::filesystem::path& path, int fontSize, const int* codepoints, int codepointCount);
+MxVec2 measureText(const std::string& fontNameID, const std::string& text, int fontSize, int spacing);
+void drawText(const std::string& fontNameID, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint);
+void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size);
+
+// texture managers functions
+const MxTextureNative* getTexture(const std::string& textureNameID);
+void loadTexture(const std::filesystem::path& path, const std::string& textureNameID);
+void loadTextureFromMemory(void* data, int width, int height, int format, int mipmaps, const std::string& textureNameID);
+void unloadTexture(const std::string& textureNameID);
+MxVec2 getSizeTexture(const std::string& textureNameID);
+void setSmoothTexture(const std::string& textureNameID, bool enable);
+bool isSmoothTexture(const std::string& textureNameID);
+
+// internal functions 
+bool isValidFont(const MxFont& font);
+bool isValidImage(const MxImage& image);
+bool isKeyPressedRepeat(int key);
+void setFrameTime(float customTime);
+float getFrameTime();
+
+const char* codepointToUTF8(int codepoint, int* utf8Size);
+int getCodepointNext(const char* text, int* codepointSize);
+int* loadCodepoints(const std::string& text, int* count);
+int getGlyphIndex(MxFont font, int codepoint);
+void drawTextCodepoint(MxFont font, int codepoint, MxVec2 position, float fontSize, MxColor tint);
+void drawTextEx(MxFont font, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint);
+MxVec2 measureTextInternal(MxFont font, const std::string& text, float fontSize, float spacing);
+MxGlyphInfo* loadFontData(const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount, int* glyphCount);
+MxImage genImageFontAtlas(const MxGlyphInfo* glyphs, MxRect** glyphRecs, int glyphCount, int fontSize, int padding);
+MxFont loadFontFromMemoryInternal(const std::string& textureNameID, const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount);
+
+static unsigned int stb_decompress(unsigned char* output, const unsigned char* i, unsigned int length);
+
+// mxgui functions
+static unsigned char* loadFileData(const std::filesystem::path& path, int& dataSize);
+MxRect intersectionArea(const MxRect& rect2);
+void pushScissor(int x, int y, int width, int height);
+void popScissor();
+MxTransform updateTransformWorld(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor);
 
 //-----------------------------------------------------------------------------
 // (SECTION) public API functions
@@ -600,7 +752,6 @@ bool isKeyDown(int key);
 bool isKeyReleased(int key);
 int getCharPressed();
 
-
 // draw
 void drawRectangleLinesEx(MxRect rec, float lineThick, MxColor color);
 void drawRectanglePro(MxRect rec, MxVec2 origin, float rotation, MxColor color);
@@ -611,43 +762,12 @@ void drawCircle(MxVec2 center, float radius, MxColor color);
 // (SECTION) Internal forward declarations
 //-----------------------------------------------------------------------------
 
-// internal functions publics
-bool isValidFont(const MxFont& font);
-bool isValidImage(const MxImage& image);
-bool isKeyPressedRepeat(int key);
-void setFrameTime(float customTime);
-float getFrameTime();
 
-// mxgui functions
-void pushScissor(int x, int y, int width, int height);
-void popScissor();
-MxTransform updateTransformWorld(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor);
 
-// managers functions handle
-void initManagers(MxStyle style);
-void closeManagers();
 
-// font managers functions
-const MxFont* getFont(const std::string& fontNameID, int size);
-void loadFont(const std::string& textureNameID, const std::filesystem::path& path, int fontSize, const int* codepoints, int codepointCount);
-MxVec2 measureText(const std::string& fontNameID, const std::string& text, int fontSize, int spacing);
-void drawText(const std::string& fontNameID, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint);
-void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size);
 
-// texture managers functions
-void loadTexture(const std::filesystem::path& path, const std::string& textureNameID);
-void loadTextureFromMemory(void* data, int width, int height, int format, int mipmaps, const std::string& textureNameID);
-void unloadTexture(const std::string& textureNameID);
-MxVec2 getSizeTexture(const std::string& textureNameID);
-void setSmoothTexture(const std::string& textureNameID, bool enable);
-bool isSmoothTexture(const std::string& textureNameID);
-const MxTextureNative* getTexture(const std::string& textureNameID);
 
-// internal helpers used by the managers and by the backends
-static unsigned int stb_decompress(unsigned char* output, const unsigned char* i, unsigned int length);
-MxVec2 measureTextInternal(MxFont font, const std::string& text, float fontSize, float spacing);
-MxFont loadFontFromMemoryInternal(const std::string& textureNameID, const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount);
-void drawTextEx(MxFont font, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint);
+
 
 //-----------------------------------------------------------------------------
 // macros getters and setters to MxGuiContext
@@ -825,16 +945,6 @@ struct MxGuiContext
 // (SECTION) Managers
 //-----------------------------------------------------------------------------
 
-struct MxFontData
-{
-    unsigned char* fileData{nullptr};
-    int* codepoints{nullptr};
-    int codepointCount{0};
-    std::unordered_map<int, MxFont> fonts{};
-};
-
-
-#define GEN_TEXTURE_NAME_ID(name, id) name + std::to_string(id)
 
 struct MxFontManager
 {
@@ -1056,9 +1166,105 @@ inline MxCore& getCore()
     return core;
 }
 
+void initManagers(MxStyle style)
+{
+    getCore().fontManager.init(style);
+    getCore().textureManager.init();
+}
+
+void closeManagers()
+{
+    getCore().fontManager.unload();
+    getCore().textureManager.unload();
+}
 
 //-----------------------------------------------------------------------------
-// (SECTION) Internal functions publics
+// Font manager functions
+//-----------------------------------------------------------------------------
+
+const MxFont* getFont(const std::string& fontName, int size)
+{
+    const MxFont* font = getCore().fontManager.getFont(fontName, size);
+    return font;
+}
+
+void loadFont(const std::string& textureNameID, const std::filesystem::path& path, int fontSize, const int* codepoints, int codepointCount)
+{
+    int dataSize = 0;
+    unsigned char* fileData = loadFileData(path, dataSize);
+    if (fileData != NULL)
+    {
+        // Loading font from memory data
+        getCore().fontManager.loadFromMemory(textureNameID, fileData, dataSize, fontSize, codepoints, codepointCount, false);
+        MX_FREE(fileData);
+    }
+}
+
+MxVec2 measureText(const std::string& fontNameID, const std::string& text, int fontSize, int spacing)
+{
+    return getCore().fontManager.measureText(fontNameID, text, fontSize, spacing);
+}
+
+void drawText(const std::string& fontNameID, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint)
+{
+    const MxFont* font = getCore().fontManager.getFont(fontNameID, fontSize);
+    drawTextEx(*font, text, position, fontSize, spacing, tint);
+}
+
+void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size)
+{
+    // Convert codepoint to UTF-8 before to draw
+    int byteCount = 0;
+    const char* icon = codepointToUTF8(codepoint, &byteCount);
+    const MxFont* font = getCore().fontManager.getFont(MX_FONT_AWESOME_ID, size);
+
+    drawTextEx(*font, icon, position, size, 0, color);
+}
+
+
+//-----------------------------------------------------------------------------
+// Texture manager functions
+//-----------------------------------------------------------------------------
+
+const MxTextureNative* getTexture(const std::string& textureNameID)
+{
+    const MxTextureNative* texture = getCore().textureManager.getTexture(textureNameID);
+    return texture;
+}
+
+void loadTexture(const std::filesystem::path& path, const std::string& textureNameID)
+{
+    getCore().textureManager.loadTexture(path, textureNameID);
+}
+
+void unloadTexture(const std::string& textureNameID)
+{
+    getCore().textureManager.unloadTexture(textureNameID);
+}
+
+void loadTextureFromMemory(void* data, int width, int height, int format, int mipmaps, const std::string& textureNameID)
+{
+    getCore().textureManager.loadTextureFromImageData(textureNameID, data, width, height, mipmaps, format);
+}
+
+MxVec2 getSizeTexture(const std::string& textureNameID)
+{
+    return getCore().textureManager.getSize(textureNameID);
+}
+
+void setSmoothTexture(const std::string& textureNameID, bool enable)
+{
+    getCore().textureManager.setSmooth(textureNameID, enable);
+}
+
+bool isSmoothTexture(const std::string& textureNameID)
+{
+    return getCore().textureManager.isSmooth(textureNameID);
+}
+
+
+//-----------------------------------------------------------------------------
+// (SECTION) Internal functions 
 //-----------------------------------------------------------------------------
 
 
@@ -1108,8 +1314,6 @@ inline bool isKeyPressedRepeat(int key)
     return false;
 }
 
-#include <chrono>
-
 
 void setFrameTime(float customTime)
 {
@@ -1121,10 +1325,6 @@ float getFrameTime()
     return getCore().frameTime;
 }
 
-
-//-----------------------------------------------------------------------------
-// (SECTION) Internal functions privates
-//-----------------------------------------------------------------------------
 
 //-----------------------------------------------------------------------------
 // (SECTION) Draw and Text Funtions
@@ -1362,7 +1562,6 @@ void drawTextEx(MxFont font, const std::string& text, MxVec2 position, float fon
     }
 }
 
-
 MxVec2 measureTextInternal(MxFont font, const std::string& text, float fontSize, float spacing)
 {
     MxVec2 textSize{};
@@ -1582,7 +1781,6 @@ MxGlyphInfo* loadFontData(const unsigned char* fileData, int fontSize, const int
     *glyphCount = glyphCounter;
     return glyphs;
 }
-
 
 MxImage genImageFontAtlas(const MxGlyphInfo* glyphs, MxRect** glyphRecs, int glyphCount, int fontSize, int padding)
 {
@@ -1907,7 +2105,6 @@ static unsigned int stb_adler32(unsigned int adler32, unsigned char* buffer, uns
     return (unsigned int)(s2 << 16) + (unsigned int)s1;
 }
 
-
 static unsigned int stb_decompress(unsigned char* output, const unsigned char* i, unsigned int /*length*/)
 {
     if (stb__in4(0) != 0x57bC0000)
@@ -2123,87 +2320,6 @@ static unsigned char* loadFileData(const std::filesystem::path& path, int& dataS
     return data;
 }
 
-template <typename T>
-inline constexpr T mxMax(T min, T max)
-{
-    return (max < min) ? min : max;
-}
-
-template <typename T>
-inline constexpr T mxMin(T min, T max)
-{
-    return (min < max) ? min : max;
-}
-
-template <typename T, typename U, typename V>
-inline constexpr T mxClamp(T value, U min, V max)
-{
-    MX_ASSERT(std::is_signed_v<T> == std::is_signed_v<U> && std::is_signed_v<T> == std::is_signed_v<V>, "Clamp arguments must all be of the same signedness to avoid errors.");
-
-    return (value < min) ? min : (value > max) ? max : value;
-}
-
-inline bool checkCollisionPointRect(MxVec2 point, MxRect rec)
-{
-    const bool collision = ((point.x >= rec.x) && (point.x < (rec.x + rec.width)) && (point.y >= rec.y) && (point.y < (rec.y + rec.height)));
-    return collision;
-}
-
-inline bool checkCollisionPointRectX(MxVec2 point, MxRect rec)
-{
-    const bool collision = ((point.x >= rec.x) && (point.x < (rec.x + rec.width)));
-    return collision;
-}
-
-inline bool checkCollisionPointRectY(MxVec2 point, MxRect rec)
-{
-    const bool collision = ((point.y >= rec.y) && (point.y < (rec.y + rec.height)));
-    return collision;
-}
-
-inline MxRect getCollisionRec(MxRect rect1, MxRect rect2)
-{
-    MxRect overlap{};
-
-    float left = (rect1.x > rect2.x) ? rect1.x : rect2.x;
-    float right1 = rect1.x + rect1.width;
-    float right2 = rect2.x + rect2.width;
-    float right = (right1 < right2) ? right1 : right2;
-    float top = (rect1.y > rect2.y) ? rect1.y : rect2.y;
-    float bottom1 = rect1.y + rect1.height;
-    float bottom2 = rect2.y + rect2.height;
-    float bottom = (bottom1 < bottom2) ? bottom1 : bottom2;
-
-    if ((left < right) && (top < bottom))
-    {
-        overlap.x = left;
-        overlap.y = top;
-        overlap.width = right - left;
-        overlap.height = bottom - top;
-    }
-
-    return overlap;
-}
-
-inline MxColor fadeColor(MxColor color, float alpha)
-{
-    MxColor result = color;
-
-    if (alpha < 0.0f)
-    {
-        alpha = 0.0f;
-    }
-    else if (alpha > 1.0f)
-    {
-        alpha = 1.0f;
-    }
-
-    result.a = (MxUChar8)(255.0f * alpha);
-
-    return result;
-}
-
-
 MxRect intersectionArea(const MxRect& rect2)
 {
     if (!getCore().stackScissors.empty())
@@ -2260,7 +2376,7 @@ MxTransform updateTransformWorld(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor
 }
 
 //-----------------------------------------------------------------------------
-// APIS functions
+// (SECTION) public API functions
 //-----------------------------------------------------------------------------
 
 namespace mxgui
@@ -2421,7 +2537,6 @@ namespace mxgui
         drawText(style.fontName, text, MxVec2{std::round(rect.x), std::round(rect.y)}, style.textSize, style.textSpacing, style.textColor);
         ctx->updateCurrents(transform, MxMouseEvents{});
     }
-
 
     bool guiButton(MxGuiContext* ctx, const std::string& text, MxRect bounds, MxVec2 anchor, int buttonStyle, bool enable)
     {
@@ -2715,7 +2830,6 @@ namespace mxgui
         return mouseEvents.isMousePressed;
     }
 
-
     bool guiToogleEx(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked, int codeEnable, int codeDisable)
     {
         bounds.width = ctx->m_style.iconSize;
@@ -2879,7 +2993,7 @@ namespace mxgui
             textBoxEvents.isTextChange = true;
         }
 
-        constexpr float padding = 6.0f;                                    
+        constexpr float padding = 6.0f;
         float textX = textEditState.box.x + padding;
         float textY = textEditState.box.y + (textEditState.box.height - textEdit.fontSize) / 2;
 
@@ -3005,110 +3119,12 @@ namespace mxgui
         return textBoxEvents;
     }
 
-
     MxVec2 getWindowSize()
     {
         return windowSize();
     }
 
 } // namespace mxgui
-
-
-void initManagers(MxStyle style)
-{
-    getCore().fontManager.init(style);
-    getCore().textureManager.init();
-}
-
-void closeManagers()
-{
-    getCore().fontManager.unload();
-    getCore().textureManager.unload();
-}
-
-//-----------------------------------------------------------------------------
-// Font manager functions
-//-----------------------------------------------------------------------------
-
-const MxFont* getFont(const std::string& fontName, int size)
-{
-    const MxFont* font = getCore().fontManager.getFont(fontName, size);
-    return font;
-}
-
-void loadFont(const std::string& textureNameID, const std::filesystem::path& path, int fontSize, const int* codepoints, int codepointCount)
-{
-    int dataSize = 0;
-    unsigned char* fileData = loadFileData(path, dataSize);
-    if (fileData != NULL)
-    {
-        // Loading font from memory data
-        getCore().fontManager.loadFromMemory(textureNameID, fileData, dataSize, fontSize, codepoints, codepointCount, false);
-        MX_FREE(fileData);
-    }
-}
-
-MxVec2 measureText(const std::string& fontNameID, const std::string& text, int fontSize, int spacing)
-{
-    return getCore().fontManager.measureText(fontNameID, text, fontSize, spacing);
-}
-
-void drawText(const std::string& fontNameID, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint)
-{
-    const MxFont* font = getCore().fontManager.getFont(fontNameID, fontSize);
-    drawTextEx(*font, text, position, fontSize, spacing, tint);
-}
-
-void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size)
-{
-    // Convert codepoint to UTF-8 before to draw
-    int byteCount = 0;
-    const char* icon = codepointToUTF8(codepoint, &byteCount);
-    const MxFont* font = getCore().fontManager.getFont(MX_FONT_AWESOME_ID, size);
-
-    drawTextEx(*font, icon, position, size, 0, color);
-}
-
-
-//-----------------------------------------------------------------------------
-// Texture manager functions
-//-----------------------------------------------------------------------------
-
-void loadTexture(const std::filesystem::path& path, const std::string& textureNameID)
-{
-    getCore().textureManager.loadTexture(path, textureNameID);
-}
-
-void unloadTexture(const std::string& textureNameID)
-{
-    getCore().textureManager.unloadTexture(textureNameID);
-}
-
-void loadTextureFromMemory(void* data, int width, int height, int format, int mipmaps, const std::string& textureNameID)
-{
-    getCore().textureManager.loadTextureFromImageData(textureNameID, data, width, height, mipmaps, format);
-}
-
-MxVec2 getSizeTexture(const std::string& textureNameID)
-{
-    return getCore().textureManager.getSize(textureNameID);
-}
-
-void setSmoothTexture(const std::string& textureNameID, bool enable)
-{
-    getCore().textureManager.setSmooth(textureNameID, enable);
-}
-
-bool isSmoothTexture(const std::string& textureNameID)
-{
-    return getCore().textureManager.isSmooth(textureNameID);
-}
-
-const MxTextureNative* getTexture(const std::string& textureNameID)
-{
-    const MxTextureNative* texture = getCore().textureManager.getTexture(textureNameID);
-    return texture;
-}
 
 
 #if defined(__GNUC__) && (MX_SUPPRESS_WARNINGS == 1) // GCC and Clang
