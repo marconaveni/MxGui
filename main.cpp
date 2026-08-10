@@ -105,9 +105,9 @@ int main()
         mxgui::pushTextSize(ctx, 20);
 
 
-        const float progress = mxgui::guiSlider(ctx, "Slider", MxRect{50, 530, 700, 6}, MxVec2{}, true);
+        const float progress = mxgui::guiSlider(ctx, "Slider", MxRect{50, 530, mxgui::getWindowSize().x - 100, 6}, MxVec2{}, true);
         mxgui::guiLabel(ctx, std::to_string(progress), MxVec2{10, 30});
-        mxgui::guiSliderProgress(ctx, MxRect{50, 560, 700, 6}, MxVec2{}, 0.8f);
+        mxgui::guiSliderProgress(ctx, MxRect{50, 560, mxgui::getWindowSize().x - 100, 6}, MxVec2{}, 0.8f);
 
         // MX_LOG("getframetime intern %.6f raylib %.6f", getFrameTime(), GetFrameTime());
 

@@ -542,6 +542,7 @@ namespace mxgui
     void pushTextSize(MxGuiContext* ctx, int newSize);
     void pushIconSize(MxGuiContext* ctx, int newSize);
     bool pushFont(MxGuiContext* ctx, const std::string& fontName, int newSize);
+
     MxVec2 guiPanel(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor = MxVec2{0}, bool enableDrag = false);
     void guiImage(MxGuiContext* ctx, const std::string& imageName, MxRect bounds, MxVec2 anchor = MxVec2{0}, MxColor color = MxColor::White);
     bool guiButton(MxGuiContext* ctx, const std::string& text, MxRect bounds, MxVec2 anchor = MxVec2{0}, int buttonStyle = MX_CONTAINED, bool enable = true);
@@ -555,6 +556,8 @@ namespace mxgui
     bool guiCheckBox(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked);
     bool guiToogle(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked);
     MxTextBoxEvents guiTextBox(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor = MxVec2{0});
+
+    MxVec2 getWindowSize();
 
 } // namespace mxgui
 
@@ -700,7 +703,7 @@ struct MxGuiContext
     inline constexpr void updateCurrents(MxTransform currentTransform, MxMouseEvents currentMouseEvents)
     {
         m_currentTransform = currentTransform;
-        m_currentMouseEvents = currentMouseEvents;   
+        m_currentMouseEvents = currentMouseEvents;
     }
 
     inline constexpr void updateCurrents(MxTransform currentTransform, MxMouseEvents currentMouseEvents, MxTextBoxEvents currentTextboxEvents)
@@ -712,26 +715,25 @@ struct MxGuiContext
         {
             m_currentTextboxEvents.textValue = &m_currentTextBoxValue;
         }
-        
     }
 
     MxTransform m_currentTransform{};
     MxMouseEvents m_currentMouseEvents{};
     MxTextBoxEvents m_currentTextboxEvents{};
-    
+
     //-----------------------------------------------------------------------------
     // Components state storaged memory
     //-----------------------------------------------------------------------------
-    
+
     std::unordered_map<MxTag, PanelComponent> m_panels;
     std::unordered_map<MxTag, ScrollPanelComponent> m_scrollPanels;
     std::unordered_map<MxTag, SliderComponent> m_sliderComponents;
     std::unordered_map<MxTag, TextBoxComponent> m_textBoxComponents;
-    
+
     //-----------------------------------------------------------------------------
     // Shareds states
     //-----------------------------------------------------------------------------
-    
+
     std::string m_currentTextBoxValue{};
     MxVec2 m_anchor{0, 0};
     float m_scrollTop{0.0f};
@@ -2768,18 +2770,18 @@ namespace mxgui
         textEdit.spacing = ctx->m_style.textSpacing;
 
         MxTextBoxEvents textBoxEvents{};
-        
+
         TextBoxComponent& textBoxComponent = *ctx->getTextBoxComponent(tag);
         MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
         MxRect rect = transform.worldBounds;
-        
+
         MxTextBoxState& textEditState = textBoxComponent.textEditState;
         if (!textEditState.started)
         {
             mxTextEditInitializeState(textEditState);
             textEditState.started = true;
         }
-        
+
         const std::string textPrevious = convertU32ToUTF8(textEditState.text);
         textEditState.box = rect;
 
@@ -2876,9 +2878,9 @@ namespace mxgui
         {
             textBoxEvents.isTextChange = true;
         }
-        
 
-        float textX = textEditState.box.x + 6;
+        constexpr float padding = 6.0f;                                    
+        float textX = textEditState.box.x + padding;
         float textY = textEditState.box.y + (textEditState.box.height - textEdit.fontSize) / 2;
 
         // NOTE: state.cursor is a codepoint index, not a byte index.
@@ -2888,7 +2890,6 @@ namespace mxgui
         const float textSizeX = measureTextInternal(*textEdit.font, ctx->m_currentTextBoxValue, textEdit.fontSize, textEdit.spacing).x;
 
         // Horizontal scroll: only moves when the cursor reaches the edges
-        const float padding = 6.0f;                                    // same padding used by textX
         const float viewWidth = textEditState.box.width - padding * 2; // visible text area
         const float cursorLocalX = cursorX - textX;                    // cursor position inside the text, without scroll
 
@@ -3002,6 +3003,12 @@ namespace mxgui
         ctx->updateCurrents(transform, MxMouseEvents{}, textBoxEvents);
 
         return textBoxEvents;
+    }
+
+
+    MxVec2 getWindowSize()
+    {
+        return windowSize();
     }
 
 } // namespace mxgui
