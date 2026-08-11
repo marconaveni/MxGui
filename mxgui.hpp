@@ -96,7 +96,7 @@
 #endif
 
 #ifndef MX_SUPPRESS_WARNINGS
-#define MX_SUPPRESS_WARNINGS 1 // Supress Warnings    (0 - disabled | 1 enabled)
+#define MX_SUPPRESS_WARNINGS 1 // Supress Warnings (0 - disabled | 1 enabled)
 #endif
 
 
@@ -223,11 +223,35 @@
 // (SECTION) Structs Forward declarations
 //-----------------------------------------------------------------------------
 
-struct MxFontManager;
-struct MxTextureNative;
-struct MxGuiContext;
-struct MxFont;
+// types
 struct MxVec2;
+struct MxRect;
+struct MxImage;
+struct MxGlyphInfo;
+struct MxFont;
+struct MxFontData;
+struct MxColor;
+struct MxTransform;
+struct MxMouseEvents;
+struct MxTextBoxEvents;
+struct MxTextBoxState;
+struct MxTextEdit;
+struct MxStyle;
+struct MxTextureNative; // NOTE: Its implementation takes place on the backend and can change on demand.
+
+// components
+struct PanelComponent;
+struct ScrollPanelComponent;
+struct SliderComponent;
+struct TextBoxComponent;
+
+// Managers
+struct MxGuiContext;
+struct MxFontManager;
+struct MxTextureManager;
+
+// Core
+struct MxCore;
 
 //-----------------------------------------------------------------------------
 // (SECTION) basic types
@@ -242,6 +266,13 @@ typedef signed int MxInt32;          // 32-bit signed integer == int
 typedef unsigned int MxUInt32;       // 32-bit unsigned integer
 typedef signed long long MxInt64;    // 64-bit signed integer
 typedef unsigned long long MxUInt64; // 64-bit unsigned integer
+
+namespace mxgui
+{
+    typedef ::MxVec2 MxVec2;
+    typedef ::MxRect MxRect;
+} // namespace mxgui
+
 
 //-----------------------------------------------------------------------------
 // (SECTION) Structs types
@@ -261,26 +292,6 @@ struct MxRect
     float width{0.0f};
     float height{0.0f};
 };
-
-inline constexpr MxVec2 toMxVec2(const MxRect& rec)
-{
-    return MxVec2{rec.x, rec.y};
-}
-
-inline constexpr MxRect toMxRect(const MxVec2& vec)
-{
-    return MxRect{vec.x, vec.y, 0, 0};
-}
-
-inline constexpr MxRect toMxRect(const MxVec2& vec, const MxRect& rec)
-{
-    return MxRect{vec.x, vec.y, rec.width, rec.height};
-}
-
-inline constexpr MxRect toMxRect(const MxVec2& vec, const MxVec2& vec2)
-{
-    return MxRect{vec.x, vec.y, vec2.x, vec2.y};
-}
 
 struct MxImage
 {
@@ -415,38 +426,6 @@ struct MxStyle
     static MxStyle Dark;  // ThemeDark;
 };
 
-
-//-----------------------------------------------------------------------------
-// (SECTION) Structs primitives components
-//-----------------------------------------------------------------------------
-
-struct PanelComponent
-{
-    MxVec2 Offset{};
-    bool isDrag{false};
-};
-
-struct ScrollPanelComponent
-{
-    bool isDrag{false};
-    MxTransform transformCanvas{};
-    float scrollTop{0.0f};
-    MxRect scrollBarThumb{};
-    float pointDrag{0.0f};
-};
-
-struct SliderComponent
-{
-    bool isDrag{false};
-    float progress{0.5f};
-};
-
-struct TextBoxComponent
-{
-    MxTextBoxState textEditState{};
-    bool isFocus{false};
-};
-
 //-----------------------------------------------------------------------------
 // (SECTION) enums
 //-----------------------------------------------------------------------------
@@ -495,6 +474,28 @@ typedef enum
 // (SECTION) inline functions and parameters
 //-----------------------------------------------------------------------------
 
+// converters
+inline constexpr MxVec2 toMxVec2(const MxRect& rec)
+{
+    return MxVec2{rec.x, rec.y};
+}
+
+inline constexpr MxRect toMxRect(const MxVec2& vec)
+{
+    return MxRect{vec.x, vec.y, 0, 0};
+}
+
+inline constexpr MxRect toMxRect(const MxVec2& vec, const MxRect& rec)
+{
+    return MxRect{vec.x, vec.y, rec.width, rec.height};
+}
+
+inline constexpr MxRect toMxRect(const MxVec2& vec, const MxVec2& vec2)
+{
+    return MxRect{vec.x, vec.y, vec2.x, vec2.y};
+}
+
+// maths
 template <typename T>
 inline constexpr T mxMax(T min, T max)
 {
@@ -616,62 +617,40 @@ inline MxStyle MxStyle::Dark{.primaryColor{MxColor::WhiteGray},
                              .fontName{MX_FONT_NOTO_ID},
                              .isDarkMode{true}};
 
-//////////////////////////////////
 
 //-----------------------------------------------------------------------------
-// (SECTION) Internal API functions
+// (SECTION) Structs primitives components
 //-----------------------------------------------------------------------------
 
+struct PanelComponent
+{
+    MxVec2 Offset{};
+    bool isDrag{false};
+};
 
-// managers functions handle
-void initManagers(MxStyle style);
-void closeManagers();
+struct ScrollPanelComponent
+{
+    bool isDrag{false};
+    MxTransform transformCanvas{};
+    float scrollTop{0.0f};
+    MxRect scrollBarThumb{};
+    float pointDrag{0.0f};
+};
 
-// font managers functions
-const MxFont* getFont(const std::string& fontNameID, int size);
-void loadFont(const std::string& textureNameID, const std::filesystem::path& path, int fontSize, const int* codepoints, int codepointCount);
-MxVec2 measureText(const std::string& fontNameID, const std::string& text, int fontSize, int spacing);
-void drawText(const std::string& fontNameID, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint);
-void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size);
+struct SliderComponent
+{
+    bool isDrag{false};
+    float progress{0.5f};
+};
 
-// texture managers functions
-const MxTextureNative* getTexture(const std::string& textureNameID);
-void loadTexture(const std::filesystem::path& path, const std::string& textureNameID);
-void loadTextureFromMemory(void* data, int width, int height, int format, int mipmaps, const std::string& textureNameID);
-void unloadTexture(const std::string& textureNameID);
-MxVec2 getSizeTexture(const std::string& textureNameID);
-void setSmoothTexture(const std::string& textureNameID, bool enable);
-bool isSmoothTexture(const std::string& textureNameID);
-
-// internal functions 
-bool isValidFont(const MxFont& font);
-bool isValidImage(const MxImage& image);
-bool isKeyPressedRepeat(int key);
-void setFrameTime(float customTime);
-float getFrameTime();
-
-const char* codepointToUTF8(int codepoint, int* utf8Size);
-int getCodepointNext(const char* text, int* codepointSize);
-int* loadCodepoints(const std::string& text, int* count);
-int getGlyphIndex(MxFont font, int codepoint);
-void drawTextCodepoint(MxFont font, int codepoint, MxVec2 position, float fontSize, MxColor tint);
-void drawTextEx(MxFont font, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint);
-MxVec2 measureTextInternal(MxFont font, const std::string& text, float fontSize, float spacing);
-MxGlyphInfo* loadFontData(const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount, int* glyphCount);
-MxImage genImageFontAtlas(const MxGlyphInfo* glyphs, MxRect** glyphRecs, int glyphCount, int fontSize, int padding);
-MxFont loadFontFromMemoryInternal(const std::string& textureNameID, const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount);
-
-static unsigned int stb_decompress(unsigned char* output, const unsigned char* i, unsigned int length);
-
-// mxgui functions
-static unsigned char* loadFileData(const std::filesystem::path& path, int& dataSize);
-MxRect intersectionArea(const MxRect& rect2);
-void pushScissor(int x, int y, int width, int height);
-void popScissor();
-MxTransform updateTransformWorld(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor);
+struct TextBoxComponent
+{
+    MxTextBoxState textEditState{};
+    bool isFocus{false};
+};
 
 //-----------------------------------------------------------------------------
-// (SECTION) public API functions
+// (SECTION) public forward declarations
 //-----------------------------------------------------------------------------
 
 namespace mxgui
@@ -715,7 +694,7 @@ namespace mxgui
 
 
 //-----------------------------------------------------------------------------
-// (SECTION) back-end functions
+// (SECTION) back-end forward declarations
 // Note: These functions need to be implemented if CUSTOM_BACKEND is used.
 //-----------------------------------------------------------------------------
 
@@ -758,15 +737,57 @@ void drawRectanglePro(MxRect rec, MxVec2 origin, float rotation, MxColor color);
 void drawTexturePro(const std::string& textureNameID, MxRect source, MxRect dest, MxVec2 origin, float rotation, MxColor tint);
 void drawCircle(MxVec2 center, float radius, MxColor color);
 
+
 //-----------------------------------------------------------------------------
 // (SECTION) Internal forward declarations
 //-----------------------------------------------------------------------------
 
+// managers functions handle
+void initManagers(MxStyle style);
+void closeManagers();
 
+// font managers functions
+const MxFont* getFont(const std::string& fontNameID, int size);
+void loadFont(const std::string& textureNameID, const std::filesystem::path& path, int fontSize, const int* codepoints, int codepointCount);
+MxVec2 measureText(const std::string& fontNameID, const std::string& text, int fontSize, int spacing);
+void drawText(const std::string& fontNameID, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint);
+void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size);
 
+// texture managers functions
+const MxTextureNative* getTexture(const std::string& textureNameID);
+void loadTexture(const std::filesystem::path& path, const std::string& textureNameID);
+void loadTextureFromMemory(void* data, int width, int height, int format, int mipmaps, const std::string& textureNameID);
+void unloadTexture(const std::string& textureNameID);
+MxVec2 getSizeTexture(const std::string& textureNameID);
+void setSmoothTexture(const std::string& textureNameID, bool enable);
+bool isSmoothTexture(const std::string& textureNameID);
 
+// internal functions
+bool isValidFont(const MxFont& font);
+bool isValidImage(const MxImage& image);
+bool isKeyPressedRepeat(int key);
+void setFrameTime(float customTime);
+float getFrameTime();
 
+const char* codepointToUTF8(int codepoint, int* utf8Size);
+int getCodepointNext(const char* text, int* codepointSize);
+int* loadCodepoints(const std::string& text, int* count);
+int getGlyphIndex(MxFont font, int codepoint);
+void drawTextCodepoint(MxFont font, int codepoint, MxVec2 position, float fontSize, MxColor tint);
+void drawTextEx(MxFont font, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint);
+MxVec2 measureTextInternal(MxFont font, const std::string& text, float fontSize, float spacing);
+MxGlyphInfo* loadFontData(const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount, int* glyphCount);
+MxImage genImageFontAtlas(const MxGlyphInfo* glyphs, MxRect** glyphRecs, int glyphCount, int fontSize, int padding);
+MxFont loadFontFromMemoryInternal(const std::string& textureNameID, const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount);
 
+static unsigned int stb_decompress(unsigned char* output, const unsigned char* i, unsigned int length);
+
+// mxgui functions
+static unsigned char* loadFileData(const std::filesystem::path& path, int& dataSize);
+MxRect intersectionArea(const MxRect& rect2);
+void pushScissor(int x, int y, int width, int height);
+void popScissor();
+MxTransform updateTransformWorld(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor);
 
 
 //-----------------------------------------------------------------------------
@@ -1264,7 +1285,7 @@ bool isSmoothTexture(const std::string& textureNameID)
 
 
 //-----------------------------------------------------------------------------
-// (SECTION) Internal functions 
+// (SECTION) Internal functions
 //-----------------------------------------------------------------------------
 
 
