@@ -17,6 +17,7 @@
 #define MX_GUI_IMPLEMENTATION
 #include "mxgui.hpp"
 
+
 #if MX_SFML
 static sf::RenderWindow* s_window = nullptr;
 #endif
@@ -43,12 +44,12 @@ int main()
     Init();
 
     loadFont("teste", "/home/marco/Diversos/Inter,Noto_Sans/Inter/static/Inter_28pt-Regular.ttf", 20, NULL, 255);
-    MxStyle style = MxStyle::Light;
+    MxStyle style = MxStyle::MxGui;
     style.iconSize = 28;
     MxGuiContext* ctx = mxgui::createContext(style);
 
 
-    mxgui::createImage("/home/marco/Imagens/icons/nfsu2.png", "nfsu2");
+    mxgui::createTexture("/home/marco/Imagens/icons/nfsu2.png", "nfsu2");
 
     const float width = 400;
     const float height = 25;
@@ -79,30 +80,31 @@ int main()
         {
             MX_LOG("Clicked Icon");
         }
-        mxgui::pushIconSize(ctx, 50);
+        mxgui::iconSize(ctx, 50);
         mxgui::guiIcon(ctx, MxRect{10, 160, 0, 0}, anchor, ICON_FA_COPY);
-        mxgui::pushIconSize(ctx, 28);
+        mxgui::iconSize(ctx, 28);
 
 
         mxgui::guiScrollPanelBegin(ctx, "ScrollPanel", MxRect{300, 200, 100, 200}, MxRect{300, 200, 100, 550}, MxVec2{100, 100}, true);
-        mxgui::pushTextSize(ctx, 25);
+        mxgui::textSize(ctx, 25);
         mxgui::guiLabel(ctx, "hello world", MxVec2{100, 0}, anchor);
         mxgui::guiLabel(ctx, "hello world 2", MxVec2{0, 80});
         mxgui::guiLabel(ctx, "hello world 3", MxVec2{0, 100});
         mxgui::guiLabel(ctx, "hello world 4", MxVec2{0, 120});
-        mxgui::pushTextSize(ctx, 20);
+        mxgui::textSize(ctx, 20);
         mxgui::guiScrollPanelEnd(ctx, "ScrollPanel");
 
 
         mxgui::guiCheckBox(ctx, MxRect{100, 100}, MxVec2{}, checked);
         mxgui::guiToogle(ctx, MxRect{150, 100}, MxVec2{}, toogle);
 
+
         mxgui::guiTextBox(ctx, "textbox", MxRect{200, 300, 150, 0});
         mxgui::pushFont(ctx, "teste", 20);
         mxgui::guiTextBox(ctx, "textbox2", MxRect{200, 330, 150, 0});
 
         mxgui::pushFont(ctx, MX_FONT_NOTO_ID, 20);
-        mxgui::pushTextSize(ctx, 20);
+        mxgui::textSize(ctx, 20);
 
 
         const float progress = mxgui::guiSlider(ctx, "Slider", MxRect{50, 530, mxgui::getWindowSize().x - 100, 6}, MxVec2{}, true);
@@ -143,7 +145,7 @@ void Init()
     SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
     InitWindow(800, 600, "GUI");
     SetTextLineSpacing(0);
-    SetTargetFPS(60);
+    // SetTargetFPS(60);
 #elif MX_SFML
     static sf::RenderWindow window(sf::VideoMode({800, 600}), "GUI");
     s_window = &window;

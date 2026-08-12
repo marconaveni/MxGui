@@ -96,7 +96,7 @@
 #endif
 
 #ifndef MX_SUPPRESS_WARNINGS
-#define MX_SUPPRESS_WARNINGS 1 // Supress Warnings    (0 - disabled | 1 enabled)
+#define MX_SUPPRESS_WARNINGS 1 // Supress Warnings (0 - disabled | 1 enabled)
 #endif
 
 
@@ -111,11 +111,13 @@
 // (SECTION) Header and defines
 //-----------------------------------------------------------------------------
 
+#include <algorithm> // std::remove_if
 #include <chrono>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <list>
 #include <memory>
 #include <string>
 #include <type_traits>
@@ -13462,7 +13464,6 @@ struct MxCore;
 // (SECTION) basic types
 //-----------------------------------------------------------------------------
 
-typedef std::string MxTag;
 typedef signed char MxChar8;         // 8-bit signed integer
 typedef unsigned char MxUChar8;      // 8-bit unsigned integer
 typedef signed short MxShort16;      // 16-bit signed integer
@@ -13471,6 +13472,9 @@ typedef signed int MxInt32;          // 32-bit signed integer == int
 typedef unsigned int MxUInt32;       // 32-bit unsigned integer
 typedef signed long long MxInt64;    // 64-bit signed integer
 typedef unsigned long long MxUInt64; // 64-bit unsigned integer
+
+typedef std::string MxTag;    // Components ID
+typedef std::string MxNameID; // Texture Manager ID and Font Manager ID
 
 namespace mxgui
 {
@@ -13629,6 +13633,7 @@ struct MxStyle
 
     static MxStyle Light; // ThemeLight;
     static MxStyle Dark;  // ThemeDark;
+    static MxStyle MxGui; // Own Theme Default;
 };
 
 //-----------------------------------------------------------------------------
@@ -13812,15 +13817,25 @@ inline MxColor MxColor::Transparent{0, 0, 0, 255};     // Transparent (no color)
 
 inline MxStyle MxStyle::Light{}; // Note: that the default parameters are light theme values.
 inline MxStyle MxStyle::Dark{.primaryColor{MxColor::WhiteGray},
-                             .borderWidth{1},
+                             .borderWidth = 1,
                              .borderColor{MxColor::White},
                              .backgroundColor{MxColor::DarkGray}, // Dark
                              .textColor{MxColor::White},
-                             .textSize{20},
-                             .textSpacing{0},
-                             .iconSize{20},
+                             .textSize = 20,
+                             .textSpacing = 0,
+                             .iconSize = 20,
                              .fontName{MX_FONT_NOTO_ID},
-                             .isDarkMode{true}};
+                             .isDarkMode = true};
+inline MxStyle MxStyle::MxGui{.primaryColor{MxColor::WhiteGray},
+                              .borderWidth = 1,
+                              .borderColor{MxColor::White},
+                              .backgroundColor{MxColor{48, 54, 62}}, 
+                              .textColor{MxColor::White},
+                              .textSize = 20,
+                              .textSpacing = 0,
+                              .iconSize = 20,
+                              .fontName{MX_FONT_NOTO_ID},
+                              .isDarkMode = true};
 
 
 //-----------------------------------------------------------------------------
@@ -13866,32 +13881,34 @@ namespace mxgui
 
     MxGuiContext* createContext(MxStyle style = MxStyle{});
     void destroyContext(MxGuiContext* ctx);
-    MxGuiContext* getCurrentContext();
+
+    void setStyle(MxGuiContext* ctx, MxStyle style);
     MxStyle getStyle(MxGuiContext* ctx);
 
     MxTransform getCurrentTransform(MxGuiContext* ctx);
     MxMouseEvents getCurrentMouseEvents(MxGuiContext* ctx);
     MxTextBoxEvents getCurrentTextBoxEvents(MxGuiContext* ctx);
 
-    void createImage(const std::filesystem::path& path, const std::string& imageName, bool smooth = true);
+    void createTexture(const std::filesystem::path& path, const MxNameID& textureNameID, bool smooth = true);
+    void createTextureFromData(const MxNameID& textureNameID, void* data, int width, int height, int format, int mipmaps);
 
-    void pushTextSize(MxGuiContext* ctx, int newSize);
-    void pushIconSize(MxGuiContext* ctx, int newSize);
-    bool pushFont(MxGuiContext* ctx, const std::string& fontName, int newSize);
+    void textSize(MxGuiContext* ctx, int newSize);
+    void iconSize(MxGuiContext* ctx, int newSize);
+    bool pushFont(MxGuiContext* ctx, const MxNameID& fontName, int newSize);
 
-    MxVec2 guiPanel(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor = MxVec2{0}, bool enableDrag = false);
-    void guiImage(MxGuiContext* ctx, const std::string& imageName, MxRect bounds, MxVec2 anchor = MxVec2{0}, MxColor color = MxColor::White);
+    MxVec2 guiPanel(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor = MxVec2{0}, bool enableDrag = false);
+    void guiImage(MxGuiContext* ctx, const MxNameID& textureNameID, MxRect bounds, MxVec2 anchor = MxVec2{0}, MxColor color = MxColor::White);
     bool guiButton(MxGuiContext* ctx, const std::string& text, MxRect bounds, MxVec2 anchor = MxVec2{0}, int buttonStyle = MX_CONTAINED, bool enable = true);
     void guiLabel(MxGuiContext* ctx, const std::string& text, MxVec2 bounds, MxVec2 anchor = MxVec2{0});
-    void guiScrollPanelBegin(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxRect scrollBounds, MxVec2 anchor = MxVec2{0}, bool enable = true);
-    void guiScrollPanelEnd(MxGuiContext* ctx, MxTag tag);
-    float guiSlider(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor, bool enable);
+    void guiScrollPanelBegin(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxRect scrollBounds, MxVec2 anchor = MxVec2{0}, bool enable = true);
+    void guiScrollPanelEnd(MxGuiContext* ctx, const MxTag& tag);
+    float guiSlider(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor, bool enable);
     void guiSliderProgress(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, float progress);
     void guiIcon(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size = -1);
     bool guiIconButton(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size = -1, bool enable = true);
     bool guiCheckBox(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked);
     bool guiToogle(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked);
-    MxTextBoxEvents guiTextBox(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor = MxVec2{0});
+    MxTextBoxEvents guiTextBox(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor = MxVec2{0});
 
     MxVec2 getWindowSize();
 
@@ -13939,7 +13956,7 @@ int getCharPressed();
 // draw
 void drawRectangleLinesEx(MxRect rec, float lineThick, MxColor color);
 void drawRectanglePro(MxRect rec, MxVec2 origin, float rotation, MxColor color);
-void drawTexturePro(const std::string& textureNameID, MxRect source, MxRect dest, MxVec2 origin, float rotation, MxColor tint);
+void drawTexturePro(const MxNameID& textureNameID, MxRect source, MxRect dest, MxVec2 origin, float rotation, MxColor tint);
 void drawCircle(MxVec2 center, float radius, MxColor color);
 
 
@@ -13952,20 +13969,20 @@ void initManagers(MxStyle style);
 void closeManagers();
 
 // font managers functions
-const MxFont* getFont(const std::string& fontNameID, int size);
-void loadFont(const std::string& textureNameID, const std::filesystem::path& path, int fontSize, const int* codepoints, int codepointCount);
-MxVec2 measureText(const std::string& fontNameID, const std::string& text, int fontSize, int spacing);
-void drawText(const std::string& fontNameID, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint);
+const MxFont* getFont(const MxNameID& fontNameID, int size);
+void loadFont(const MxNameID& fontNameID, const std::filesystem::path& path, int fontSize, const int* codepoints, int codepointCount);
+MxVec2 measureText(const MxNameID& fontNameID, const std::string& text, int fontSize, int spacing);
+void drawText(const MxNameID& fontNameID, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint);
 void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size);
 
 // texture managers functions
-const MxTextureNative* getTexture(const std::string& textureNameID);
-void loadTexture(const std::filesystem::path& path, const std::string& textureNameID);
-void loadTextureFromMemory(void* data, int width, int height, int format, int mipmaps, const std::string& textureNameID);
-void unloadTexture(const std::string& textureNameID);
-MxVec2 getSizeTexture(const std::string& textureNameID);
-void setSmoothTexture(const std::string& textureNameID, bool enable);
-bool isSmoothTexture(const std::string& textureNameID);
+const MxTextureNative* getTexture(const MxNameID& textureNameID);
+void loadTexture(const std::filesystem::path& path, const MxNameID& textureNameID);
+void loadTextureFromData(const MxNameID& textureNameID, void* data, int width, int height, int format, int mipmaps);
+void unloadTexture(const MxNameID& textureNameID);
+MxVec2 getSizeTexture(const MxNameID& textureNameID);
+void setSmoothTexture(const MxNameID& textureNameID, bool enable);
+bool isSmoothTexture(const MxNameID& textureNameID);
 
 // internal functions
 bool isValidFont(const MxFont& font);
@@ -13983,7 +14000,7 @@ void drawTextEx(MxFont font, const std::string& text, MxVec2 position, float fon
 MxVec2 measureTextInternal(MxFont font, const std::string& text, float fontSize, float spacing);
 MxGlyphInfo* loadFontData(const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount, int* glyphCount);
 MxImage genImageFontAtlas(const MxGlyphInfo* glyphs, MxRect** glyphRecs, int glyphCount, int fontSize, int padding);
-MxFont loadFontFromMemoryInternal(const std::string& textureNameID, const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount);
+MxFont loadFontFromMemoryInternal(const MxNameID& textureNameID, const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount);
 
 static unsigned int stb_decompress(unsigned char* output, const unsigned char* i, unsigned int length);
 
@@ -14000,7 +14017,7 @@ MxTransform updateTransformWorld(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor
 //-----------------------------------------------------------------------------
 
 #define INSERT_COMPONENT(componentsList, type)                                            \
-    inline type* insert##type(MxTag tag, type component)                                  \
+    inline type* insert##type(const MxTag& tag, type component)                           \
     {                                                                                     \
         const MxTag hash = "##" + tag;                                                    \
         auto [insertedIt, isInserted] = componentsList.insert_or_assign(hash, component); \
@@ -14008,7 +14025,7 @@ MxTransform updateTransformWorld(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor
     }
 
 #define GET_COMPONENT(componentsList, type)                                    \
-    inline type* get##type(MxTag tag)                                          \
+    inline type* get##type(const MxTag& tag)                                   \
     {                                                                          \
         const MxTag hash = "##" + tag;                                         \
                                                                                \
@@ -14333,7 +14350,7 @@ void drawRectanglePro(MxRect rec, MxVec2 origin, float rotation, MxColor color)
     DrawRectanglePro(toRectangle(rec), toVector(origin), rotation, toColor(color));
 }
 
-void drawTexturePro(const std::string& textureNameID, MxRect source, MxRect dest, MxVec2 origin, float rotation, MxColor tint)
+void drawTexturePro(const MxNameID& textureNameID, MxRect source, MxRect dest, MxVec2 origin, float rotation, MxColor tint)
 {
     const MxTextureNative* texture = getTexture(textureNameID);
     if (!IsTextureValid(texture->handle))
@@ -14910,7 +14927,9 @@ void drawFPS(float x, float y)
 // (SECTION) Managers
 //-----------------------------------------------------------------------------
 
-
+//-----------------------------------------------------------------------------
+// Font Manager
+//-----------------------------------------------------------------------------
 struct MxFontManager
 {
 
@@ -14936,8 +14955,8 @@ struct MxFontManager
 
         const std::string textureNameID = GEN_TEXTURE_NAME_ID(fontNameID, fontSize);
         MxFont font = loadFontFromMemoryInternal(textureNameID, fontData.fileData, fontSize, codepoints, codepointCount);
-        setSmoothTexture(font.textureNameID, smooth);
 
+        setSmoothTexture(font.textureNameID, smooth);
 
         fontData.fonts.insert_or_assign(fontSize, font);
         m_fonts.insert_or_assign(fontNameID, fontData);
@@ -14997,7 +15016,6 @@ struct MxFontManager
             }
             MX_FREE(font.glyphs);
         }
-
         unloadTexture(font.textureNameID);
         MX_FREE(font.recs);
 
@@ -15036,6 +15054,10 @@ struct MxFontManager
 };
 
 
+//-----------------------------------------------------------------------------
+// Texture Manager
+//-----------------------------------------------------------------------------
+
 struct MxTextureManager
 {
     void init() { nativeInit(); }
@@ -15051,7 +15073,7 @@ struct MxTextureManager
         m_textures.insert_or_assign(textureNameID, texture);
     }
 
-    void loadTextureFromImageData(const std::string& textureNameID, void* data, int width, int height, int mipmaps, int format)
+    void loadTextureFromData(const std::string& textureNameID, void* data, int width, int height, int mipmaps, int format)
     {
         MxTextureNative texture = nativeLoadTextureFromImageData(data, width, height, mipmaps, format);
         m_textures.insert_or_assign(textureNameID, texture);
@@ -15117,7 +15139,7 @@ struct MxTextureManager
 
 struct MxCore
 {
-    MxGuiContext context{};
+    std::list<MxGuiContext> contexts{};
     MxTextEdit textEdit{};
     std::vector<MxRect> stackScissors{};
     MxFontManager fontManager{};
@@ -15133,44 +15155,46 @@ inline MxCore& getCore()
 
 void initManagers(MxStyle style)
 {
-    getCore().fontManager.init(style);
-    getCore().textureManager.init();
+    MxCore& core = getCore();
+    core.fontManager.init(style);
+    core.textureManager.init();
 }
 
 void closeManagers()
 {
-    getCore().fontManager.unload();
-    getCore().textureManager.unload();
+    MxCore& core = getCore();
+    core.fontManager.unload();
+    core.textureManager.unload();
 }
 
 //-----------------------------------------------------------------------------
 // Font manager functions
 //-----------------------------------------------------------------------------
 
-const MxFont* getFont(const std::string& fontName, int size)
+const MxFont* getFont(const MxNameID& fontName, int size)
 {
     const MxFont* font = getCore().fontManager.getFont(fontName, size);
     return font;
 }
 
-void loadFont(const std::string& textureNameID, const std::filesystem::path& path, int fontSize, const int* codepoints, int codepointCount)
+void loadFont(const MxNameID& fontNameID, const std::filesystem::path& path, int fontSize, const int* codepoints, int codepointCount)
 {
     int dataSize = 0;
     unsigned char* fileData = loadFileData(path, dataSize);
     if (fileData != NULL)
     {
         // Loading font from memory data
-        getCore().fontManager.loadFromMemory(textureNameID, fileData, dataSize, fontSize, codepoints, codepointCount, false);
+        getCore().fontManager.loadFromMemory(fontNameID, fileData, dataSize, fontSize, codepoints, codepointCount, false);
         MX_FREE(fileData);
     }
 }
 
-MxVec2 measureText(const std::string& fontNameID, const std::string& text, int fontSize, int spacing)
+MxVec2 measureText(const MxNameID& fontNameID, const std::string& text, int fontSize, int spacing)
 {
     return getCore().fontManager.measureText(fontNameID, text, fontSize, spacing);
 }
 
-void drawText(const std::string& fontNameID, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint)
+void drawText(const MxNameID& fontNameID, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint)
 {
     const MxFont* font = getCore().fontManager.getFont(fontNameID, fontSize);
     drawTextEx(*font, text, position, fontSize, spacing, tint);
@@ -15191,38 +15215,38 @@ void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size)
 // Texture manager functions
 //-----------------------------------------------------------------------------
 
-const MxTextureNative* getTexture(const std::string& textureNameID)
+const MxTextureNative* getTexture(const MxNameID& textureNameID)
 {
     const MxTextureNative* texture = getCore().textureManager.getTexture(textureNameID);
     return texture;
 }
 
-void loadTexture(const std::filesystem::path& path, const std::string& textureNameID)
+void loadTexture(const std::filesystem::path& path, const MxNameID& textureNameID)
 {
     getCore().textureManager.loadTexture(path, textureNameID);
 }
 
-void unloadTexture(const std::string& textureNameID)
+void unloadTexture(const MxNameID& textureNameID)
 {
     getCore().textureManager.unloadTexture(textureNameID);
 }
 
-void loadTextureFromMemory(void* data, int width, int height, int format, int mipmaps, const std::string& textureNameID)
+void loadTextureFromData(const MxNameID& textureNameID, void* data, int width, int height, int format, int mipmaps)
 {
-    getCore().textureManager.loadTextureFromImageData(textureNameID, data, width, height, mipmaps, format);
+    getCore().textureManager.loadTextureFromData(textureNameID, data, width, height, mipmaps, format);
 }
 
-MxVec2 getSizeTexture(const std::string& textureNameID)
+MxVec2 getSizeTexture(const MxNameID& textureNameID)
 {
     return getCore().textureManager.getSize(textureNameID);
 }
 
-void setSmoothTexture(const std::string& textureNameID, bool enable)
+void setSmoothTexture(const MxNameID& textureNameID, bool enable)
 {
     getCore().textureManager.setSmooth(textureNameID, enable);
 }
 
-bool isSmoothTexture(const std::string& textureNameID)
+bool isSmoothTexture(const MxNameID& textureNameID)
 {
     return getCore().textureManager.isSmooth(textureNameID);
 }
@@ -15885,7 +15909,7 @@ MxImage genImageFontAtlas(const MxGlyphInfo* glyphs, MxRect** glyphRecs, int gly
     return atlas;
 }
 
-MxFont loadFontFromMemoryInternal(const std::string& textureNameID, const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount)
+MxFont loadFontFromMemoryInternal(const MxNameID& textureNameID, const unsigned char* fileData, int fontSize, const int* codepoints, int codepointCount)
 {
     MxFont font{};
 
@@ -15902,7 +15926,7 @@ MxFont loadFontFromMemoryInternal(const std::string& textureNameID, const unsign
         if ((atlas.width != 0) && (atlas.height != 0))
         {
             // Note: The texture atlas is stored in the TextureManager; we only keep the reference ID.
-            loadTextureFromMemory(atlas.data, atlas.width, atlas.height, atlas.format, atlas.mipmaps, textureNameID);
+            loadTextureFromData(textureNameID, atlas.data, atlas.width, atlas.height, atlas.format, atlas.mipmaps);
             font.textureNameID = textureNameID;
         }
 
@@ -17432,21 +17456,34 @@ namespace mxgui
 
     MxGuiContext* createContext(MxStyle style)
     {
-        MxGuiContext* context = &getCore().context;
-        context->init(style);
-        return context;
+        MxCore& core = getCore();
+        core.contexts.push_back(MxGuiContext{});
+        MxGuiContext* ctx = &core.contexts.back();
+        ctx->init(style);
+        return ctx;
     }
 
     void destroyContext(MxGuiContext* ctx)
     {
         ctx->close();
-        *ctx = MxGuiContext{};
+        MxCore& core = getCore();
+        auto& contexts = core.contexts;
+        auto pred = [ctx](const MxGuiContext& ctxArr)
+        {
+            return &ctxArr == ctx;
+        };
+
+        auto it = std::find_if(contexts.begin(), contexts.end(), pred);
+
+        if (it != contexts.end())
+        {
+            contexts.erase(it);
+        }
     }
 
-    MxGuiContext* getCurrentContext()
+    void setStyle(MxGuiContext* ctx, MxStyle style)
     {
-        MxGuiContext* context = &getCore().context;
-        return context;
+        ctx->m_style = style;
     }
 
     MxStyle getStyle(MxGuiContext* ctx)
@@ -17469,23 +17506,29 @@ namespace mxgui
         return ctx->m_currentTextboxEvents;
     }
 
-    void createImage(const std::filesystem::path& path, const std::string& imageName, bool smooth)
+    void createTexture(const std::filesystem::path& path, const MxNameID& textureNameID, bool smooth)
     {
-        loadTexture(path, imageName);
-        setSmoothTexture(imageName, smooth);
+        MxCore& core = getCore();
+        core.textureManager.loadTexture(path, textureNameID);
+        core.textureManager.setSmooth(textureNameID, smooth);
     }
 
-    void pushTextSize(MxGuiContext* ctx, int newSize)
+    void createTextureFromData(const MxNameID& textureNameID, void* data, int width, int height, int format, int mipmaps)
+    {
+        getCore().textureManager.loadTextureFromData(textureNameID, data, width, height, mipmaps, format);
+    }
+
+    void textSize(MxGuiContext* ctx, int newSize)
     {
         ctx->m_style.textSize = newSize;
     }
 
-    void pushIconSize(MxGuiContext* ctx, int newSize)
+    void iconSize(MxGuiContext* ctx, int newSize)
     {
         ctx->m_style.iconSize = newSize;
     }
 
-    bool pushFont(MxGuiContext* ctx, const std::string& fontName, int newSize)
+    bool pushFont(MxGuiContext* ctx, const MxNameID& fontName, int newSize)
     {
         const MxFont* font = getFont(fontName, newSize);
         if (!isValidFont(*font))
@@ -17498,7 +17541,7 @@ namespace mxgui
         return true;
     }
 
-    MxVec2 guiPanel(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor, bool enableDrag)
+    MxVec2 guiPanel(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor, bool enableDrag)
     {
 
         PanelComponent& canvas = *ctx->getPanelComponent(tag);
@@ -17544,18 +17587,18 @@ namespace mxgui
         return MxVec2{transform.bounds.x, transform.bounds.y};
     }
 
-    void guiImage(MxGuiContext* ctx, const std::string& imageName, MxRect bounds, MxVec2 anchor, MxColor color)
+    void guiImage(MxGuiContext* ctx, const MxNameID& textureNameID, MxRect bounds, MxVec2 anchor, MxColor color)
     {
         MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
         MxRect rect = transform.worldBounds;
-        const MxVec2 texture = getSizeTexture(imageName);
+        const MxVec2 texture = getSizeTexture(textureNameID);
         const MxVec2 scale = (rect.width > 0 && rect.height > 0) ? MxVec2{rect.width, rect.height} : texture;
 
 
         const MxRect source = {0.0f, 0.0f, texture.x, texture.y};
         const MxRect dest = {rect.x, rect.y, scale.x, scale.y};
 
-        drawTexturePro(imageName, source, dest, MxVec2{0, 0}, 0, color);
+        drawTexturePro(textureNameID, source, dest, MxVec2{0, 0}, 0, color);
         ctx->updateCurrents(transform, MxMouseEvents{});
     }
 
@@ -17631,7 +17674,7 @@ namespace mxgui
         return mouseEvents.isMousePressed;
     }
 
-    void guiScrollPanelBegin(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxRect scrollBounds, MxVec2 anchor, bool enable)
+    void guiScrollPanelBegin(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxRect scrollBounds, MxVec2 anchor, bool enable)
     {
         ScrollPanelComponent& scrollPanel = *ctx->getScrollPanelComponent(tag);
         MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
@@ -17715,14 +17758,14 @@ namespace mxgui
         }
 
         drawRectangleLinesEx(rect, ctx->m_style.borderWidth, ctx->m_style.borderColor);
-        pushScissor(rect.x, rect.y, rect.width, rect.height); // call internal BeginScissorMode();
+        pushScissor((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height); // call internal BeginScissorMode();
 
         drawRectanglePro(rectCanvas, MxVec2{}, 0, fadeColor(MxColor::LightGray, 0.5f)); // debug visual feedback
 
         ctx->updateCurrents(transform, MxMouseEvents{});
     }
 
-    void guiScrollPanelEnd(MxGuiContext* ctx, MxTag tag)
+    void guiScrollPanelEnd(MxGuiContext* ctx, const MxTag& tag)
     {
 
         popScissor(); // call internal EndScissorMode();
@@ -17738,7 +17781,7 @@ namespace mxgui
         drawRectanglePro(rect, MxVec2{}, 0, ctx->m_style.primaryColor);
     }
 
-    float guiSlider(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor, bool enable)
+    float guiSlider(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor, bool enable)
     {
         SliderComponent& slider = *ctx->getSliderComponent(tag);
 
@@ -17906,7 +17949,7 @@ namespace mxgui
 #endif // MX_FONT_AWESOME
     }
 
-    MxTextBoxEvents guiTextBox(MxGuiContext* ctx, MxTag tag, MxRect bounds, MxVec2 anchor)
+    MxTextBoxEvents guiTextBox(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor)
     {
         bounds.height = mxClamp(bounds.height, ctx->m_style.textSize + 2, bounds.height);
         MxTextEdit& textEdit = getCore().textEdit;
@@ -18113,7 +18156,7 @@ namespace mxgui
         drawRectanglePro(textEditState.box, MxVec2{}, 0, ctx->m_style.backgroundColor);
         drawRectangleLinesEx(textEditState.box, ctx->m_style.borderWidth, ctx->m_style.borderColor);
 
-        pushScissor(rect.x + 1, rect.y, rect.width - 2, rect.height); // call internal BeginScissorMode();
+        pushScissor((int)(rect.x + padding), (int)rect.y, (int)(rect.width - (padding * 2)), (int)rect.height); // call internal BeginScissorMode();
 
         if (drawSelectedBox)
         {
@@ -18124,13 +18167,14 @@ namespace mxgui
         // draw text
         drawTextEx(*textEdit.font, ctx->m_currentTextBoxValue, MxVec2{textX + offsetX, textY}, textEdit.fontSize, textEdit.spacing, ctx->m_style.textColor);
 
+        popScissor();
+
         // draw cursor
         if (textBoxComponent.isFocus)
         {
             // todo: blink cursor
             drawRectanglePro(MxRect{cursorX + offsetX, textEditState.box.y + 4, 1, textEditState.box.height - 8}, MxVec2{}, 0, MxColor::Red);
         }
-        popScissor();
 
 
         // check focus NOTE: This check happens with a one-frame delay so that the cursor doesn't appear to change position.

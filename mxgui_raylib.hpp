@@ -187,7 +187,7 @@ void drawRectanglePro(MxRect rec, MxVec2 origin, float rotation, MxColor color)
     DrawRectanglePro(toRectangle(rec), toVector(origin), rotation, toColor(color));
 }
 
-void drawTexturePro(const std::string& textureNameID, MxRect source, MxRect dest, MxVec2 origin, float rotation, MxColor tint)
+void drawTexturePro(const MxNameID& textureNameID, MxRect source, MxRect dest, MxVec2 origin, float rotation, MxColor tint)
 {
     const MxTextureNative* texture = getTexture(textureNameID);
     if (!IsTextureValid(texture->handle))
