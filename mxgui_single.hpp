@@ -13911,6 +13911,9 @@ namespace mxgui
     void createTexture(const std::filesystem::path& path, const MxNameID& textureNameID, bool smooth = true);
     void createTextureFromData(const MxNameID& textureNameID, void* data, int width, int height, int format, int mipmaps);
 
+    void createFont(const MxNameID& fontNameID, const std::filesystem::path& path, int fontSize, const int* codepoints = NULL, int codepointCount = 0, bool smooth = false);
+    void createFromData(const std::string& fontNameID, const unsigned char* fileData, int dataSize, int fontSize, const int* codepoints = NULL, int codepointCount = 0, bool smooth = false);
+
     void textSize(MxGuiContext* ctx, int newSize);
     void iconSize(MxGuiContext* ctx, int newSize);
     bool pushFont(MxGuiContext* ctx, const MxNameID& fontName, int newSize);
@@ -13989,7 +13992,8 @@ void closeManagers();
 
 // font managers functions
 const MxFont* getFont(const MxNameID& fontNameID, int size);
-void loadFont(const MxNameID& fontNameID, const std::filesystem::path& path, int fontSize, const int* codepoints, int codepointCount);
+void loadFont(const MxNameID& fontNameID, const std::filesystem::path& path, int fontSize, const int* codepoints, int codepointCount, bool smooth);
+void loadFontFromData(const std::string& fontNameID, const unsigned char* fileData, int dataSize, int fontSize, const int* codepoints, int codepointCount, bool smooth);
 MxVec2 measureText(const MxNameID& fontNameID, const std::string& text, int fontSize, int spacing);
 void drawText(const MxNameID& fontNameID, const std::string& text, MxVec2 position, float fontSize, float spacing, MxColor tint);
 void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size);
@@ -15196,16 +15200,21 @@ const MxFont* getFont(const MxNameID& fontName, int size)
     return font;
 }
 
-void loadFont(const MxNameID& fontNameID, const std::filesystem::path& path, int fontSize, const int* codepoints, int codepointCount)
+void loadFont(const MxNameID& fontNameID, const std::filesystem::path& path, int fontSize, const int* codepoints, int codepointCount, bool smooth)
 {
     int dataSize = 0;
     unsigned char* fileData = loadFileData(path, dataSize);
     if (fileData != NULL)
     {
         // Loading font from memory data
-        getCore().fontManager.loadFromMemory(fontNameID, fileData, dataSize, fontSize, codepoints, codepointCount, false);
+        loadFontFromData(fontNameID, fileData, dataSize, fontSize, codepoints, codepointCount, smooth);
         MX_FREE(fileData);
     }
+}
+
+void loadFontFromData(const std::string& fontNameID, const unsigned char* fileData, int dataSize, int fontSize, const int* codepoints, int codepointCount, bool smooth)
+{
+    getCore().fontManager.loadFromMemory(fontNameID, fileData, dataSize, fontSize, codepoints, codepointCount, smooth);
 }
 
 MxVec2 measureText(const MxNameID& fontNameID, const std::string& text, int fontSize, int spacing)
@@ -17535,6 +17544,16 @@ namespace mxgui
     void createTextureFromData(const MxNameID& textureNameID, void* data, int width, int height, int format, int mipmaps)
     {
         getCore().textureManager.loadTextureFromData(textureNameID, data, width, height, mipmaps, format);
+    }
+
+    void createFont(const MxNameID& fontNameID, const std::filesystem::path& path, int fontSize, const int* codepoints, int codepointCount, bool smooth)
+    {
+        loadFont(fontNameID, path, fontSize, codepoints, codepointCount, smooth);
+    }
+
+    void createFromData(const std::string& fontNameID, const unsigned char* fileData, int dataSize, int fontSize, const int* codepoints, int codepointCount, bool smooth)
+    {
+        loadFontFromData(fontNameID, fileData, dataSize, fontSize, codepoints, codepointCount, smooth);
     }
 
     void textSize(MxGuiContext* ctx, int newSize)

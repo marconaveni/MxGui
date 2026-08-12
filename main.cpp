@@ -43,7 +43,6 @@ int main()
 
     Init();
 
-    loadFont("teste", "/home/marco/Diversos/Inter,Noto_Sans/Inter/static/Inter_28pt-Regular.ttf", 20, NULL, 255);
     MxStyle styleMxGui = MxStyle::MxGui;
     MxStyle styleLight = MxStyle::Light;
     MxStyle styleDark = MxStyle::Dark;
@@ -51,9 +50,9 @@ int main()
     styleLight.iconSize = 28;
     styleDark.iconSize = 28;
     MxGuiContext* ctx = mxgui::createContext(styleLight);
-
-
-    mxgui::createTexture("/home/marco/Imagens/icons/nfsu2.png", "nfsu2");
+    
+    mxgui::createFont("inter", "assets/inter.ttf", 20, NULL, 255, false);
+    mxgui::createTexture("assets/test.png", "testpng");
 
     const float width = 400;
     const float height = 25;
@@ -97,7 +96,7 @@ int main()
         mxgui::guiButton(ctx, "Click", MxRect{95, 35, 75, 35}, anchor, MX_BUTTON_OUTLINE_FILL, true);
         mxgui::guiButton(ctx, "Click", MxRect{10, 85, 75, 35}, anchor, MX_BUTTON_CONTAINED, true);
 
-        mxgui::guiImage(ctx, "nfsu2", MxRect{210, 35, 180, 180}, anchor);
+        mxgui::guiImage(ctx, "testpng", MxRect{210, 35, 180, 180}, anchor);
 
         if (mxgui::guiIconButton(ctx, MxRect{10, 140, 20, 20}, anchor, ICON_FA_CIRCLE_PLAY, 28))
         {
@@ -111,8 +110,8 @@ int main()
 
 
         mxgui::guiScrollPanelBegin(ctx, "ScrollPanel", MxRect{300, 200, 100, 200}, MxRect{300, 200, 100, 550}, MxVec2{100, 100}, true);
-        mxgui::textSize(ctx, 25);
-        mxgui::guiLabel(ctx, "hello world", MxVec2{100, 0}, anchor);
+        mxgui::textSize(ctx, 20);
+        mxgui::guiLabel(ctx, "hello world 1", MxVec2{100, 0}, anchor);
         mxgui::guiLabel(ctx, "hello world 2", MxVec2{0, 80});
         mxgui::guiLabel(ctx, "hello world 3", MxVec2{0, 100});
         mxgui::guiLabel(ctx, "hello world 4", MxVec2{0, 120});
@@ -125,7 +124,7 @@ int main()
 
 
         mxgui::guiTextBox(ctx, "textbox", MxRect{200, 300, 150, 0});
-        mxgui::pushFont(ctx, "teste", 20);
+        mxgui::pushFont(ctx, "inter", 20);
         mxgui::guiTextBox(ctx, "textbox2", MxRect{200, 330, 150, 0});
 
         mxgui::pushFont(ctx, MX_FONT_NOTO_ID, 20);
@@ -136,18 +135,6 @@ int main()
         mxgui::guiLabel(ctx, std::to_string(progress), MxVec2{10, 30});
         mxgui::guiSliderProgress(ctx, MxRect{50, 560, mxgui::getWindowSize().x - 100, 6}, MxVec2{}, 0.8f);
 
-        // MX_LOG("getframetime intern %.6f raylib %.6f", getFrameTime(), GetFrameTime());
-
-        // MX_LOG("teste %.2f", progress);
-        // if (isCursorOnScreen())
-        // {
-        //     const MxFont* font = getFont(MX_FONT_NOTO_ID, 20);
-        //     const MxFont* font2 = getFont("teste", 30);
-        //     MxColor color = {200, 41, 55, 255};
-
-        //     drawTextEx(*font, "teste \nteste quebra linha", MxVec2{60, 60}, 20, 0, color);
-        //     drawTextEx(*font2, "teste \nteste quebra linha", MxVec2{60, 160}, 30, 0, color);
-        // }
 
         mxgui::endMx();
 
@@ -204,7 +191,7 @@ void Begin(MxGuiContext* ctx)
     }
     sf::Color backgroundColor = sf::Color{color.r, color.g, color.b, color.a};
     s_window->clear(backgroundColor);
-    
+
 #endif
 }
 
