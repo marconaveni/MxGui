@@ -99,6 +99,14 @@
 #define MX_SUPPRESS_WARNINGS 1 // Supress Warnings (0 - disabled | 1 enabled)
 #endif
 
+#ifndef MX_FADE_HOVER
+#define MX_FADE_HOVER 18 // Fade (button/button icon) hover
+#endif
+
+#ifndef MX_FADE_PRESSED
+#define MX_FADE_PRESSED 30 // (Pressed/Down) (button/button icon) hover
+#endif
+
 
 // warnings headers
 #if defined(__GNUC__) && (MX_SUPPRESS_WARNINGS == 1) // GCC and Clang
@@ -415,10 +423,14 @@ struct MxTextEdit
 
 struct MxStyle
 {
+
+    MxColor backgroundColor{MxColor::WhiteGray};
     MxColor primaryColor{MxColor::Gray};
     MxInt32 borderWidth{1};
     MxColor borderColor{MxColor::DarkGray};
-    MxColor backgroundColor{MxColor::LightGray};
+    MxColor panelColor{MxColor::LightGray};
+    MxColor panelSecondaryColor{MxColor{170, 170, 170, 255}};
+    MxColor textBoxColor{MxColor::Transparent};
     MxColor textColor{MxColor::DarkGray};
     MxInt32 textSize{20};
     MxInt32 textSpacing{0};
@@ -437,9 +449,10 @@ struct MxStyle
 
 typedef enum
 {
-    MX_NONE = 0,
-    MX_CONTAINED = 1,
-    MX_OUTLINE = 2,
+    MX_BUTTON_NONE = 0,
+    MX_BUTTON_CONTAINED = 1,
+    MX_BUTTON_OUTLINE = 2,
+    MX_BUTTON_OUTLINE_FILL = 3,
 } MxButtonStyle;
 
 typedef enum
@@ -611,20 +624,26 @@ inline MxColor MxColor::Black{0, 0, 0, 255};           // Black
 inline MxColor MxColor::Transparent{0, 0, 0, 255};     // Transparent (no color)
 
 inline MxStyle MxStyle::Light{}; // Note: that the default parameters are light theme values.
-inline MxStyle MxStyle::Dark{.primaryColor{MxColor::WhiteGray},
+inline MxStyle MxStyle::Dark{.backgroundColor{MxColor{30, 30, 30}},
+                             .primaryColor{MxColor::WhiteGray},
                              .borderWidth = 1,
                              .borderColor{MxColor::White},
-                             .backgroundColor{MxColor::DarkGray}, // Dark
+                             .panelColor{MxColor::DarkGray}, // Dark
+                             .textBoxColor{MxColor::Transparent},
                              .textColor{MxColor::White},
                              .textSize = 20,
                              .textSpacing = 0,
                              .iconSize = 20,
                              .fontName{MX_FONT_NOTO_ID},
                              .isDarkMode = true};
-inline MxStyle MxStyle::MxGui{.primaryColor{MxColor::WhiteGray},
+
+inline MxStyle MxStyle::MxGui{.backgroundColor{MxColor{48, 54, 62}},
+                              .primaryColor{MxColor{45, 209, 146}},
                               .borderWidth = 1,
-                              .borderColor{MxColor::White},
-                              .backgroundColor{MxColor{48, 54, 62}}, 
+                              .borderColor{MxColor{55, 152, 117}},
+                              .panelColor{MxColor{44, 45, 54}},
+                              .panelSecondaryColor{MxColor{55, 59, 69}},
+                              .textBoxColor{MxColor::Transparent},
                               .textColor{MxColor::White},
                               .textSize = 20,
                               .textSpacing = 0,
@@ -693,7 +712,7 @@ namespace mxgui
 
     MxVec2 guiPanel(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor = MxVec2{0}, bool enableDrag = false);
     void guiImage(MxGuiContext* ctx, const MxNameID& textureNameID, MxRect bounds, MxVec2 anchor = MxVec2{0}, MxColor color = MxColor::White);
-    bool guiButton(MxGuiContext* ctx, const std::string& text, MxRect bounds, MxVec2 anchor = MxVec2{0}, int buttonStyle = MX_CONTAINED, bool enable = true);
+    bool guiButton(MxGuiContext* ctx, const std::string& text, MxRect bounds, MxVec2 anchor = MxVec2{0}, int buttonStyle = MX_BUTTON_CONTAINED, bool enable = true);
     void guiLabel(MxGuiContext* ctx, const std::string& text, MxVec2 bounds, MxVec2 anchor = MxVec2{0});
     void guiScrollPanelBegin(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxRect scrollBounds, MxVec2 anchor = MxVec2{0}, bool enable = true);
     void guiScrollPanelEnd(MxGuiContext* ctx, const MxTag& tag);
@@ -2567,7 +2586,7 @@ namespace mxgui
             }
         }
 
-        MxColor color = ctx->m_style.backgroundColor;
+        MxColor color = ctx->m_style.panelColor;
 
         transform = updateTransformWorld(ctx, transform.bounds, anchor);
 
@@ -2620,11 +2639,11 @@ namespace mxgui
 
             if (mouseEvents.isMouseHover)
             {
-                paint = 50;
+                paint = MX_FADE_HOVER;
             }
             if (mouseEvents.isMouseDown)
             {
-                paint = 80;
+                paint = MX_FADE_PRESSED;
             }
         }
 
@@ -2638,18 +2657,26 @@ namespace mxgui
         borderColor.g = mxClamp(color.g - paint, 0, 255);
         borderColor.b = mxClamp(color.b - paint, 0, 255);
 
-        if (buttonStyle == MX_CONTAINED)
+        const MxStyle style = ctx->m_style;
+        MxColor textColor = borderColor;
+
+
+        if (buttonStyle == MX_BUTTON_CONTAINED)
         {
+            textColor = ctx->m_style.panelColor;
             drawRectanglePro(rect, MxVec2{}, 0, fadeColor(MxColor::Gray, 0.5f));
             drawRectanglePro(rect, MxVec2{}, 0, color);
         }
-        else if (buttonStyle == MX_OUTLINE)
+        else if (buttonStyle == MX_BUTTON_OUTLINE)
+        {
+            drawRectangleLinesEx(rect, ctx->m_style.borderWidth, borderColor);
+        }
+        else if (buttonStyle == MX_BUTTON_OUTLINE_FILL)
         {
             drawRectangleLinesEx(rect, ctx->m_style.borderWidth, borderColor);
             drawRectanglePro(rect, MxVec2{}, 0, fadeColor(color, 0.3f));
         }
 
-        const MxStyle style = ctx->m_style;
 
         const MxVec2 textSize = measureText(style.fontName, text, style.textSize, style.textSpacing);
 
@@ -2657,7 +2684,7 @@ namespace mxgui
         textPosition.x -= (int)ctx->m_anchor.x;
         textPosition.y -= (int)ctx->m_anchor.y;
 
-        drawText(style.fontName, text, MxVec2{std::round(textPosition.x), std::round(textPosition.y)}, style.textSize, style.textSpacing, style.textColor);
+        drawText(style.fontName, text, MxVec2{std::round(textPosition.x), std::round(textPosition.y)}, style.textSize, style.textSpacing, textColor);
 
         ctx->updateCurrents(transform, mouseEvents);
 
@@ -2810,15 +2837,16 @@ namespace mxgui
         }
 
         MxColor color = ctx->m_style.primaryColor;
+        MxColor colorSecondary = ctx->m_style.panelSecondaryColor;
         transformBar.worldBounds.width = slider.progress * transformBar.worldBounds.width;
         ctx->updateCurrents(transform, mouseEvents);
 
         // drawRectanglePro(transformBarCollision.worldBounds, MxVec2{}, 0, fadeColor(MxColor::Blue, 1.0f)); // debug offset
-        drawRectanglePro(transform.worldBounds, MxVec2{}, 0, fadeColor(color, 1.0f));
-        drawRectanglePro(transformBar.worldBounds, MxVec2{}, 0, fadeColor(MxColor::Red, 1.0f));
+        drawRectanglePro(transform.worldBounds, MxVec2{}, 0, fadeColor(colorSecondary, 1.0f));
+        drawRectanglePro(transformBar.worldBounds, MxVec2{}, 0, fadeColor(color, 1.0f));
 
         MxVec2 point{.x = transformBar.worldBounds.x + transformBar.worldBounds.width, .y = transformBar.worldBounds.y + transformBar.worldBounds.height / 2};
-        drawCircle(point, radius, fadeColor(MxColor::Red, 1.0f));
+        drawCircle(point, radius, fadeColor(color, 1.0f));
 
         return slider.progress;
     }
@@ -2831,14 +2859,15 @@ namespace mxgui
         MxTransform transformBar = transform;
 
         MxColor color = ctx->m_style.primaryColor;
+        MxColor colorSecondary = ctx->m_style.panelSecondaryColor;
 
 
         transformBar.worldBounds.width = progress * transformBar.worldBounds.width;
 
         ctx->updateCurrents(transform, MxMouseEvents{});
 
-        drawRectanglePro(transform.worldBounds, MxVec2{}, 0, fadeColor(color, 1.0f));
-        drawRectanglePro(transformBar.worldBounds, MxVec2{}, 0, fadeColor(MxColor::Red, 1.0f));
+        drawRectanglePro(transform.worldBounds, MxVec2{}, 0, fadeColor(colorSecondary, 1.0f));
+        drawRectanglePro(transformBar.worldBounds, MxVec2{}, 0, fadeColor(color, 1.0f));
     }
 
     void guiIcon(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size)
@@ -2873,11 +2902,11 @@ namespace mxgui
 
             if (mouseEvents.isMouseHover)
             {
-                paint = 50;
+                paint = MX_FADE_HOVER;
             }
             if (mouseEvents.isMouseDown)
             {
-                paint = 80;
+                paint = MX_FADE_PRESSED;
             }
         }
 
@@ -3143,7 +3172,7 @@ namespace mxgui
         // draw area
 
         // draw box
-        drawRectanglePro(textEditState.box, MxVec2{}, 0, ctx->m_style.backgroundColor);
+        drawRectanglePro(textEditState.box, MxVec2{}, 0, ctx->m_style.panelColor);
         drawRectangleLinesEx(textEditState.box, ctx->m_style.borderWidth, ctx->m_style.borderColor);
 
         pushScissor((int)(rect.x + padding), (int)rect.y, (int)(rect.width - (padding * 2)), (int)rect.height); // call internal BeginScissorMode();
@@ -3163,7 +3192,7 @@ namespace mxgui
         if (textBoxComponent.isFocus)
         {
             // todo: blink cursor
-            drawRectanglePro(MxRect{cursorX + offsetX, textEditState.box.y + 4, 1, textEditState.box.height - 8}, MxVec2{}, 0, MxColor::Red);
+            drawRectanglePro(MxRect{cursorX + offsetX, textEditState.box.y + 4, 1, textEditState.box.height - 8}, MxVec2{}, 0, ctx->m_style.primaryColor);
         }
 
 

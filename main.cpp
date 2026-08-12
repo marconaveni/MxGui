@@ -12,8 +12,8 @@
 
 
 // #define MX_CUSTOM_BACKEND_HEADER "mxgui_custom_render.hpp"
-#define MX_RAYLIB_BACKEND_IMPLEMENTATION
-// #define MX_SFML_BACKEND_IMPLEMENTATION
+// #define MX_RAYLIB_BACKEND_IMPLEMENTATION
+#define MX_SFML_BACKEND_IMPLEMENTATION
 #define MX_GUI_IMPLEMENTATION
 #include "mxgui.hpp"
 
@@ -44,9 +44,13 @@ int main()
     Init();
 
     loadFont("teste", "/home/marco/Diversos/Inter,Noto_Sans/Inter/static/Inter_28pt-Regular.ttf", 20, NULL, 255);
-    MxStyle style = MxStyle::MxGui;
-    style.iconSize = 28;
-    MxGuiContext* ctx = mxgui::createContext(style);
+    MxStyle styleMxGui = MxStyle::MxGui;
+    MxStyle styleLight = MxStyle::Light;
+    MxStyle styleDark = MxStyle::Dark;
+    styleMxGui.iconSize = 28;
+    styleLight.iconSize = 28;
+    styleDark.iconSize = 28;
+    MxGuiContext* ctx = mxgui::createContext(styleLight);
 
 
     mxgui::createTexture("/home/marco/Imagens/icons/nfsu2.png", "nfsu2");
@@ -56,6 +60,8 @@ int main()
     MxVec2 anchor{10, 10};
     bool checked = false;
     bool toogle = false;
+
+    int themeIndex = 1;
 
 
     while (!ShouldClose())
@@ -67,21 +73,40 @@ int main()
 
         anchor = mxgui::guiPanel(ctx, "Canvas1", toMxRect(anchor, MxVec2{width, height}), MxVec2{}, true);
         mxgui::guiPanel(ctx, "Canvas2", MxRect{0, (height - 1), width, width}, anchor, false);
-        if (mxgui::guiButton(ctx, "Click", MxRect{10, 35, 75, 35}, anchor, MX_OUTLINE, true))
+        if (mxgui::guiButton(ctx, "Click", MxRect{10, 35, 75, 35}, anchor, MX_BUTTON_OUTLINE, true))
         {
+            themeIndex++;
+            if (themeIndex > 3)
+            {
+                themeIndex = 1;
+            }
+            
+            switch (themeIndex)
+            {
+                case 1: mxgui::setStyle(ctx, styleLight); break;
+                case 2: mxgui::setStyle(ctx, styleDark); break;
+                case 3: mxgui::setStyle(ctx, styleMxGui); break;
+                default: break;
+            }
+            
+
             MX_LOG("Clicked");
             setSmoothTexture(MX_FONT_NOTO_ID, !isSmoothTexture(MX_FONT_NOTO_ID));
             setSmoothTexture(MX_FONT_AWESOME_ID, !isSmoothTexture(MX_FONT_AWESOME_ID));
         }
-        mxgui::guiImage(ctx, "nfsu2", MxRect{220, 35, 180, 180}, anchor);
+        mxgui::guiButton(ctx, "Click", MxRect{95, 35, 75, 35}, anchor, MX_BUTTON_OUTLINE_FILL, true);
+        mxgui::guiButton(ctx, "Click", MxRect{10, 85, 75, 35}, anchor, MX_BUTTON_CONTAINED, true);
 
-        mxgui::guiIcon(ctx, MxRect{10, 80, 0, 0}, anchor, ICON_FA_CIRCLE_PLAY);
-        if (mxgui::guiIconButton(ctx, MxRect{10, 120, 20, 20}, anchor, ICON_FA_CIRCLE_PLAY, 28))
+        mxgui::guiImage(ctx, "nfsu2", MxRect{210, 35, 180, 180}, anchor);
+
+        if (mxgui::guiIconButton(ctx, MxRect{10, 140, 20, 20}, anchor, ICON_FA_CIRCLE_PLAY, 28))
         {
             MX_LOG("Clicked Icon");
         }
+        mxgui::guiIcon(ctx, MxRect{10, 180, 0, 0}, anchor, ICON_FA_CIRCLE_PLAY);
+
         mxgui::iconSize(ctx, 50);
-        mxgui::guiIcon(ctx, MxRect{10, 160, 0, 0}, anchor, ICON_FA_COPY);
+        mxgui::guiIcon(ctx, MxRect{10, 260, 0, 0}, anchor, ICON_FA_COPY);
         mxgui::iconSize(ctx, 28);
 
 
@@ -114,15 +139,15 @@ int main()
         // MX_LOG("getframetime intern %.6f raylib %.6f", getFrameTime(), GetFrameTime());
 
         // MX_LOG("teste %.2f", progress);
-        if (isCursorOnScreen())
-        {
-            const MxFont* font = getFont(MX_FONT_NOTO_ID, 20);
-            const MxFont* font2 = getFont("teste", 30);
-            MxColor color = {200, 41, 55, 255};
+        // if (isCursorOnScreen())
+        // {
+        //     const MxFont* font = getFont(MX_FONT_NOTO_ID, 20);
+        //     const MxFont* font2 = getFont("teste", 30);
+        //     MxColor color = {200, 41, 55, 255};
 
-            drawTextEx(*font, "teste \nteste quebra linha", MxVec2{60, 60}, 20, 0, color);
-            drawTextEx(*font2, "teste \nteste quebra linha", MxVec2{60, 160}, 30, 0, color);
-        }
+        //     drawTextEx(*font, "teste \nteste quebra linha", MxVec2{60, 60}, 20, 0, color);
+        //     drawTextEx(*font2, "teste \nteste quebra linha", MxVec2{60, 160}, 30, 0, color);
+        // }
 
         mxgui::endMx();
 
@@ -164,9 +189,11 @@ bool ShouldClose()
 
 void Begin(MxGuiContext* ctx)
 {
+    MxColor color = mxgui::getStyle(ctx).backgroundColor;
 #if MX_RAYLIB
     BeginDrawing();
-    ClearBackground((mxgui::getStyle(ctx).isDarkMode) ? BLACK : RAYWHITE);
+    Color backgroundColor = Color{color.r, color.g, color.b, color.a};
+    ClearBackground(backgroundColor);
 #elif MX_SFML
     while (const std::optional event = windowPollEvent(s_window))
     {
@@ -175,7 +202,9 @@ void Begin(MxGuiContext* ctx)
             s_window->close();
         }
     }
-    s_window->clear((mxgui::getStyle(ctx).isDarkMode) ? sf::Color::Black : sf::Color::White);
+    sf::Color backgroundColor = sf::Color{color.r, color.g, color.b, color.a};
+    s_window->clear(backgroundColor);
+    
 #endif
 }
 

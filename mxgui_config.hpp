@@ -9,3 +9,5 @@
 #define MX_FONT_AWESOME 1                // Enable font_awesome (0 - disabled | 1 enabled)
 #define MX_CUSTOM_FRAME_TIME 0           // Enable custom frame time (delta time dt) (0 - disabled | 1 enabled)
 #define MX_SUPPRESS_WARNINGS 1           // Supress Warnings    (0 - disabled | 1 enabled)
+#define MX_FADE_HOVER 18                 // Fade (button/button icon) hover
+#define MX_FADE_PRESSED 30               // (Pressed/Down) (button/button icon) hover
