@@ -12,8 +12,8 @@
 
 
 // #define MX_CUSTOM_BACKEND_HEADER "mxgui_custom_render.hpp"
-// #define MX_RAYLIB_BACKEND_IMPLEMENTATION
-#define MX_SFML_BACKEND_IMPLEMENTATION
+#define MX_RAYLIB_BACKEND_IMPLEMENTATION
+// #define MX_SFML_BACKEND_IMPLEMENTATION
 #define MX_GUI_IMPLEMENTATION
 #include "mxgui.hpp"
 
@@ -59,6 +59,7 @@ int main()
     MxVec2 anchor{10, 10};
     bool checked = false;
     bool toogle = false;
+    std::string list = "Charmander,Bulbasaur,Squirtle,Pikachu,Eevee,Pidgey";
 
     int themeIndex = 1;
 
@@ -101,6 +102,15 @@ int main()
         if (mxgui::guiIconButton(ctx, MxRect{10, 140, 20, 20}, anchor, ICON_FA_CIRCLE_PLAY, 28))
         {
             MX_LOG("Clicked Icon");
+            if (list == "Charmander,Bulbasaur,Squirtle,Pikachu,Eevee,Pidgey")
+            {
+                //list = "Chikorita,Cyndaquil,Totodile,Pichu,Marill,Hoothoot";
+                list = "Chikorita,Cyndaquil,Totodile,Pichu";
+            }
+            else
+            {
+                list = "Charmander,Bulbasaur,Squirtle,Pikachu,Eevee,Pidgey";
+            }
         }
         mxgui::guiIcon(ctx, MxRect{10, 180, 0, 0}, anchor, ICON_FA_CIRCLE_PLAY);
 
@@ -134,6 +144,8 @@ int main()
         const float progress = mxgui::guiSlider(ctx, "Slider", MxRect{50, 530, mxgui::getWindowSize().x - 100, 6}, MxVec2{}, true);
         mxgui::guiLabel(ctx, std::to_string(progress), MxVec2{10, 30});
         mxgui::guiSliderProgress(ctx, MxRect{50, 560, mxgui::getWindowSize().x - 100, 6}, MxVec2{}, 0.8f);
+
+        mxgui::guiListView(ctx, "guiListView", MxRect{20, 400, 100, 150}, anchor, list);
 
 
         mxgui::endMx();

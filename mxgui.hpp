@@ -26,19 +26,20 @@
 
 //--------------------------------MXGUI----------------------------------------
 //
-//  (Panel)                     | Component | state     |
-//  (Image)                     | Component | stateless |
-//  (Button) -> (Label)         | Component | stateless |
-//  (Label)                     | Component | stateless |
-//  (ScrollPanel)               | Component | state     | Container(begin)(end)
-//  (Slider)                    | Component | state     |
-//  (SliderProgress)            | Component | stateless |
-//  (Icon)                      | Component | stateless |
-//  (ButtonIcon)                | Component | stateless |
-//  (ToggleEx)                  | Component | stateless |
-//  (CheckBox) -> (ToggleEx)    | Component | stateless |
-//  (Toogle) -> (ToggleEx)      | Component | stateless |
-//  (TextBox)                   | Component | state     |
+//  (Panel)                           | Component | state     |
+//  (Image)                           | Component | stateless |
+//  (Button) -> (Label)               | Component | stateless |
+//  (Label)                           | Component | stateless |
+//  (ScrollPanel)                     | Component | state     | Container(begin)(end)
+//  (Slider)                          | Component | state     |
+//  (SliderProgress)                  | Component | stateless |
+//  (Icon)                            | Component | stateless |
+//  (ButtonIcon)                      | Component | stateless |
+//  (ToggleEx)                        | Component | stateless |
+//  (CheckBox) -> (ToggleEx)          | Component | stateless |
+//  (Toogle) -> (ToggleEx)            | Component | stateless |
+//  (ListView) -> (Panel) -> (Label)  | Component | state     |
+//  (TextBox)                         | Component | state     |
 //
 //-----------------------------------------------------------------------------
 
@@ -51,8 +52,9 @@
 // (SECTION) Library version
 //-----------------------------------------------------------------------------
 
-#define MXGUI_VERSION "0.0.1 ALPHA"
+#define MXGUI_VERSION "0.0.1"
 #define MXGUI_VERSION_NUM 0
+#define MXGUI_VERSION_TYPE "DEV"
 
 //-----------------------------------------------------------------------------
 // (SECTION) configs
@@ -513,6 +515,14 @@ inline constexpr MxRect toMxRect(const MxVec2& vec, const MxVec2& vec2)
     return MxRect{vec.x, vec.y, vec2.x, vec2.y};
 }
 
+inline constexpr bool colorIsEquals(const MxColor& color1, const MxColor& color2)
+{
+    return (color1.r == color2.r) && // red
+           (color1.g == color2.g) && // green
+           (color1.b == color2.b) && // blue
+           (color1.a == color2.a);   // alpha
+}
+
 // maths
 template <typename T>
 inline constexpr T mxMax(T min, T max)
@@ -621,7 +631,7 @@ inline MxColor MxColor::White{255, 255, 255, 255};     // White
 inline MxColor MxColor::Magenta{255, 0, 255, 255};     // Magenta
 inline MxColor MxColor::Cyan{0, 255, 255, 255};        // Cyan
 inline MxColor MxColor::Black{0, 0, 0, 255};           // Black
-inline MxColor MxColor::Transparent{0, 0, 0, 255};     // Transparent (no color)
+inline MxColor MxColor::Transparent{0, 0, 0, 0};       // Transparent (no color)
 
 inline MxStyle MxStyle::Light{}; // Note: that the default parameters are light theme values.
 inline MxStyle MxStyle::Dark{.backgroundColor{MxColor{30, 30, 30}},
@@ -683,6 +693,14 @@ struct TextBoxComponent
     bool isFocus{false};
 };
 
+struct ListViewComponent
+{
+    int idActived{-1};
+    std::string previousList{};
+    std::vector<std::string> texts{};
+    float height{0.0f};
+};
+
 //-----------------------------------------------------------------------------
 // (SECTION) public forward declarations
 //-----------------------------------------------------------------------------
@@ -716,7 +734,7 @@ namespace mxgui
     MxVec2 guiPanel(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor = MxVec2{0}, bool enableDrag = false);
     void guiImage(MxGuiContext* ctx, const MxNameID& textureNameID, MxRect bounds, MxVec2 anchor = MxVec2{0}, MxColor color = MxColor::White);
     bool guiButton(MxGuiContext* ctx, const std::string& text, MxRect bounds, MxVec2 anchor = MxVec2{0}, int buttonStyle = MX_BUTTON_CONTAINED, bool enable = true);
-    void guiLabel(MxGuiContext* ctx, const std::string& text, MxVec2 bounds, MxVec2 anchor = MxVec2{0});
+    void guiLabel(MxGuiContext* ctx, const std::string& text, MxVec2 bounds, MxVec2 anchor = MxVec2{0}, MxColor color = MxColor::Transparent);
     void guiScrollPanelBegin(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxRect scrollBounds, MxVec2 anchor = MxVec2{0}, bool enable = true);
     void guiScrollPanelEnd(MxGuiContext* ctx, const MxTag& tag);
     float guiSlider(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor, bool enable);
@@ -725,6 +743,7 @@ namespace mxgui
     bool guiIconButton(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size = -1, bool enable = true);
     bool guiCheckBox(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked);
     bool guiToogle(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked);
+    int guiListView(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor, const std::string& list);
     MxTextBoxEvents guiTextBox(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor = MxVec2{0});
 
     MxVec2 getWindowSize();
@@ -877,6 +896,7 @@ struct MxGuiContext
     COMPONENT(m_scrollPanels, ScrollPanelComponent);
     COMPONENT(m_sliderComponents, SliderComponent);
     COMPONENT(m_textBoxComponents, TextBoxComponent);
+    COMPONENT(m_listViewComponents, ListViewComponent);
 
     //-----------------------------------------------------------------------------
     // Store the values ​​of the common types from the last invoked component
@@ -910,6 +930,7 @@ struct MxGuiContext
     std::unordered_map<MxTag, ScrollPanelComponent> m_scrollPanels;
     std::unordered_map<MxTag, SliderComponent> m_sliderComponents;
     std::unordered_map<MxTag, TextBoxComponent> m_textBoxComponents;
+    std::unordered_map<MxTag, ListViewComponent> m_listViewComponents;
 
     //-----------------------------------------------------------------------------
     // Shareds states
@@ -2630,13 +2651,15 @@ namespace mxgui
         ctx->updateCurrents(transform, MxMouseEvents{});
     }
 
-    void guiLabel(MxGuiContext* ctx, const std::string& text, MxVec2 bounds, MxVec2 anchor)
+    void guiLabel(MxGuiContext* ctx, const std::string& text, MxVec2 bounds, MxVec2 anchor, MxColor color)
     {
         MxTransform transform = updateTransformWorld(ctx, toMxRect(bounds), anchor);
         MxRect rect = transform.worldBounds;
         const MxStyle style = ctx->m_style;
 
-        drawText(style.fontName, text, MxVec2{std::round(rect.x), std::round(rect.y)}, style.textSize, style.textSpacing, style.textColor);
+        color = colorIsEquals(color, MxColor::Transparent) ? ctx->m_style.textColor : color;
+
+        drawText(style.fontName, text, MxVec2{std::round(rect.x), std::round(rect.y)}, style.textSize, style.textSpacing, color);
         ctx->updateCurrents(transform, MxMouseEvents{});
     }
 
@@ -2985,6 +3008,87 @@ namespace mxgui
 #else
         return false;
 #endif // MX_FONT_AWESOME
+    }
+
+    int guiListView(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor, const std::string& list)
+    {
+
+        ListViewComponent& listView = *ctx->getListViewComponent(tag);
+        
+        bounds.height = listView.height; 
+        MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
+        MxRect rect = transform.worldBounds;
+        
+        guiPanel(ctx, tag, bounds, anchor, false);
+        
+        auto& texts = listView.texts;
+        
+        if (!list.empty() && listView.previousList != list)
+        {
+            listView.idActived = -1;
+            texts.clear();
+            listView.previousList = list;
+            
+            static std::string token;
+            for (const auto& c : list)
+            {
+                // Split using ',' as a character delimiter
+                if (c == ',')
+                {
+                    texts.push_back(token);
+                    token = "";
+                    continue;
+                }
+                token += c;
+            }
+            texts.push_back(token);
+            token = "";
+        }
+        
+        
+        constexpr float padding = 2.0f;
+        constexpr float heightPadding = 12.0f;
+        const int size = (int)texts.size();
+        float nextItemY = 0;
+
+        for (int i = 0; i < size; i++)
+        {
+
+            MxVec2 textSize = measureText(ctx->m_style.fontName, texts[i], ctx->m_style.textSize, ctx->m_style.textSpacing);
+            MxRect rectBox = MxRect{rect.x + padding, rect.y + padding + nextItemY, rect.width - padding * 2, textSize.y + heightPadding};
+
+            MxMouseEvents mouseEvents{};
+            mouseEvents.isMouseHover = (checkCollisionPointRect(getMousePosition(), rectBox));
+            mouseEvents.isMouseRelease = mouseEvents.isMouseHover && isMouseButtonReleased(MX_MOUSE_BUTTON_LEFT);
+            mouseEvents.isMouseDown = mouseEvents.isMouseHover && isMouseButtonDown(MX_MOUSE_BUTTON_LEFT);
+            mouseEvents.isMousePressed = mouseEvents.isMouseHover && isMouseButtonPressed(MX_MOUSE_BUTTON_LEFT);
+
+            MxVec2 textPosition = MxVec2{rectBox.x + (rectBox.width - textSize.x) / 2.0f, rectBox.y + (rectBox.height - textSize.y) / 2.0f};
+
+            drawRectangleLinesEx(rectBox, ctx->m_style.borderWidth, fadeColor(ctx->m_style.borderColor, 0.5f));
+            MxColor color = ctx->m_style.textColor;
+
+            if (i == listView.idActived || mouseEvents.isMousePressed)
+            {
+                drawRectanglePro(rectBox, MxVec2{}, 0, fadeColor(ctx->m_style.primaryColor, 1.0f));
+                color = ctx->m_style.panelColor;
+                listView.idActived = i;
+            }
+            else if (mouseEvents.isMouseHover)
+            {
+                drawRectanglePro(rectBox, MxVec2{}, 0, fadeColor(ctx->m_style.primaryColor, 0.3f));
+                color = ctx->m_style.borderColor;
+            }
+
+            guiLabel(ctx, texts[i], textPosition, MxVec2{}, color);
+            nextItemY += rectBox.height + padding / 2.0f;
+     
+        }
+        nextItemY += padding / 2.0f;
+        listView.height = nextItemY + padding; 
+        ctx->updateCurrents(transform, MxMouseEvents{});
+
+        return listView.idActived;
     }
 
     MxTextBoxEvents guiTextBox(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor)
