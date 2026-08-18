@@ -134,11 +134,11 @@
 #include <unordered_map>
 #include <vector>
 
-#include "mxgui_notosans.hpp"
+#include "mxgui_notosans.hpp"  // @mx_build replace_file("mxgui_notosans.hpp")
 #include "string.h"
 
 #define STB_TEXTEDIT_CHARTYPE char32_t
-#include "stb_textedit.h" // include_filter(1,368)
+#include "stb_textedit.h" // @mx_build replace_file_filter("stb_textedit.h",1,368)
 
 #if defined(MX_LOG_SUPORT) == 1
 #ifndef MX_LOG
@@ -216,7 +216,7 @@
 
 #define STBTT_STATIC
 #define STB_TRUETYPE_IMPLEMENTATION
-#include "stb_truetype.h"
+#include "stb_truetype.h" // @mx_build replace_file("stb_truetype.h")
 
 #if defined(__GNUC__)      // GCC and Clang
 #pragma GCC diagnostic pop // "-Wunused-parameter"  "-Wunused-function"
@@ -227,8 +227,8 @@
 //-----------------------------------------------------------------------------
 
 #if MX_FONT_AWESOME
-#include "mxgui_font_awesome.h"
-#include "mxgui_icons_font_awesome7.hpp"
+#include "mxgui_font_awesome.h" // @mx_build replace_file("mxgui_font_awesome.h")
+#include "mxgui_icons_font_awesome7.hpp" // @mx_build replace_file("mxgui_icons_font_awesome7.hpp")
 #endif
 
 //-----------------------------------------------------------------------------
@@ -998,7 +998,7 @@ struct MxGuiContext
 //-----------------------------------------------------------------------------
 
 
-#include "mxgui_raylib.hpp"
+#include "mxgui_raylib.hpp"  // @mx_build  replace_file("mxgui_raylib.hpp")
 
 
 #elifdef MX_SFML_BACKEND_IMPLEMENTATION
@@ -1007,7 +1007,7 @@ struct MxGuiContext
 // (SECTION) SFML backend
 //-----------------------------------------------------------------------------
 
-#include "mxgui_sfml.hpp"
+#include "mxgui_sfml.hpp"  // @mx_build  replace_file("mxgui_sfml.hpp")
 
 #else
 
@@ -2346,7 +2346,7 @@ static void STB_TEXTEDIT_LAYOUTROW(StbTexteditRow* r, std::u32string* obj, int l
 #define STB_TEXTEDIT_K_PGDOWN 0x1000F
 
 #define STB_TEXTEDIT_IMPLEMENTATION
-#include "stb_textedit.h" // include_filter(369,1429)
+#include "stb_textedit.h" // @mx_build replace_file_filter("stb_textedit.h", 369, 1429)
 
 static int mapKey(int mxKey, bool shift, bool ctrl)
 {

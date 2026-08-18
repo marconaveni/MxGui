@@ -102,13 +102,12 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
-set(SCRIPT_MXGUI_SINGLE "${CMAKE_CURRENT_SOURCE_DIR}/build_mxgui_single.py")
-set(OUTPUT_SINGLE "${CMAKE_CURRENT_SOURCE_DIR}/mxgui_single.hpp")
+set(SCRIPT_MX_FILE_NAME "${CMAKE_CURRENT_SOURCE_DIR}/mx_build.py")
 
 add_custom_target(genmxgui
-    COMMAND Python3::Interpreter "${SCRIPT_MXGUI_SINGLE}"
+    COMMAND Python3::Interpreter "${SCRIPT_MX_FILE_NAME}"
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-    COMMENT "Generate mxgui_single.hpp..."
+    COMMENT "Running ..."
     VERBATIM
 )
 
