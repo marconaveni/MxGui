@@ -147,6 +147,8 @@ int main()
 
         mxgui::guiListView(ctx, "guiListView", MxRect{20, 400, 100, 150}, anchor, list);
 
+        mxgui::guiToolTip(ctx, "tooltip" , "test tooltip msg" , MxRect{150, 100, 100, 100});
+
 
         mxgui::endMx();
 

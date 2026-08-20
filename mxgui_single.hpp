@@ -39,6 +39,7 @@
 //  (CheckBox) -> (ToggleEx)          | Component | stateless |
 //  (Toogle) -> (ToggleEx)            | Component | stateless |
 //  (ListView) -> (Panel) -> (Label)  | Component | state     |
+//  (ToolTip)                         | Component | state     |
 //  (TextBox)                         | Component | state     |
 //
 //-----------------------------------------------------------------------------
@@ -13898,6 +13899,12 @@ struct ListViewComponent
     float height{0.0f};
 };
 
+struct ToolTipComponent
+{
+    bool isHover{false};
+    float wait{0.0f};
+};
+
 //-----------------------------------------------------------------------------
 // (SECTION) public forward declarations
 //-----------------------------------------------------------------------------
@@ -13941,6 +13948,7 @@ namespace mxgui
     bool guiCheckBox(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked);
     bool guiToogle(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked);
     int guiListView(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor, const std::string& list);
+    int guiToolTip(MxGuiContext* ctx, const MxTag& tag, const std::string& text, MxRect bounds, float wait = 0.7f);
     MxTextBoxEvents guiTextBox(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor = MxVec2{0});
 
     MxVec2 getWindowSize();
@@ -14094,6 +14102,7 @@ struct MxGuiContext
     COMPONENT(m_sliderComponents, SliderComponent);
     COMPONENT(m_textBoxComponents, TextBoxComponent);
     COMPONENT(m_listViewComponents, ListViewComponent);
+    COMPONENT(m_toolTipComponent, ToolTipComponent);
 
     //-----------------------------------------------------------------------------
     // Store the values ​​of the common types from the last invoked component
@@ -14128,6 +14137,7 @@ struct MxGuiContext
     std::unordered_map<MxTag, SliderComponent> m_sliderComponents;
     std::unordered_map<MxTag, TextBoxComponent> m_textBoxComponents;
     std::unordered_map<MxTag, ListViewComponent> m_listViewComponents;
+    std::unordered_map<MxTag, ToolTipComponent> m_toolTipComponent;
 
     //-----------------------------------------------------------------------------
     // Shareds states
@@ -18010,21 +18020,21 @@ namespace mxgui
     {
 
         ListViewComponent& listView = *ctx->getListViewComponent(tag);
-        
-        bounds.height = listView.height; 
+
+        bounds.height = listView.height;
         MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
         MxRect rect = transform.worldBounds;
-        
+
         guiPanel(ctx, tag, bounds, anchor, false);
-        
+
         auto& texts = listView.texts;
-        
+
         if (!list.empty() && listView.previousList != list)
         {
             listView.idActived = -1;
             texts.clear();
             listView.previousList = list;
-            
+
             static std::string token;
             for (const auto& c : list)
             {
@@ -18040,8 +18050,8 @@ namespace mxgui
             texts.push_back(token);
             token = "";
         }
-        
-        
+
+
         constexpr float padding = 2.0f;
         constexpr float heightPadding = 12.0f;
         const int size = (int)texts.size();
@@ -18078,13 +18088,52 @@ namespace mxgui
 
             guiLabel(ctx, texts[i], textPosition, MxVec2{}, color);
             nextItemY += rectBox.height + padding / 2.0f;
-     
         }
         nextItemY += padding / 2.0f;
-        listView.height = nextItemY + padding; 
+        listView.height = nextItemY + padding;
         ctx->updateCurrents(transform, MxMouseEvents{});
 
         return listView.idActived;
+    }
+
+    int guiToolTip(MxGuiContext* ctx, const MxTag& tag, const std::string& text, MxRect bounds, float wait)
+    {
+
+        ToolTipComponent& tooTip = *ctx->getToolTipComponent(tag);
+
+        if (tooTip.isHover)
+        {
+            tooTip.wait += getFrameTime();
+        }
+        else
+        {
+            tooTip.wait = 0.0f;
+        }
+        
+        
+        MxTransform transform = updateTransformWorld(ctx, bounds, MxVec2{});
+        MxRect rect = transform.worldBounds;
+
+        MxMouseEvents mouseEvents{};
+
+        mouseEvents.isMouseHover = (checkCollisionPointRect(getMousePosition(), rect));
+        tooTip.isHover = mouseEvents.isMouseHover;
+
+        if (mouseEvents.isMouseHover && tooTip.wait > wait)
+        {
+            constexpr float paddingX = 8.0f; 
+            constexpr float paddingY = 4.0f; 
+            constexpr float offset = 28.0f; 
+            MxVec2 mouse = getMousePosition();
+            mouse.x += offset;
+            mouse.y += offset;
+            MxVec2 textSize = measureText(ctx->m_style.fontName, text, ctx->m_style.textSize, ctx->m_style.textSpacing);
+            MxRect rectBox = MxRect{mouse.x - paddingX, mouse.y - paddingY, textSize.x + paddingX * 2, textSize.y + paddingY * 2};
+            drawRectanglePro(rectBox, MxVec2{}, 0, fadeColor(ctx->m_style.primaryColor, 1.0f));
+            guiLabel(ctx, text, mouse, MxVec2{}, ctx->m_style.panelColor);
+        }
+
+        return 0;
     }
 
     MxTextBoxEvents guiTextBox(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor)
