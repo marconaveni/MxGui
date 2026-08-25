@@ -73,8 +73,10 @@ add_executable(${PROJECT_NAME}
 if(MSVC)
     target_compile_options(${PROJECT_NAME}  PRIVATE /W4 $<$<CONFIG:Debug>:/fsanitize=address>)
 else()
-    target_compile_options(${PROJECT_NAME}  PRIVATE -Wall -Wextra -Wempty-body $<$<CONFIG:Debug>:-fsanitize=address -fno-omit-frame-pointer -g>)
-    target_link_options(${PROJECT_NAME}  PRIVATE $<$<CONFIG:Debug>:-fsanitize=address>)
+    if(NOT MINGW)
+        target_compile_options(${PROJECT_NAME}  PRIVATE -Wall -Wextra -Wempty-body $<$<CONFIG:Debug>:-fsanitize=address -fno-omit-frame-pointer -g>)
+        target_link_options(${PROJECT_NAME}  PRIVATE $<$<CONFIG:Debug>:-fsanitize=address>)
+    endif()
 endif()
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE 
