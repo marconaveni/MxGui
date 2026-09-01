@@ -58,7 +58,7 @@ int main()
     const float height = 25;
     MxVec2 anchor{10, 10};
     bool checked = false;
-    bool toogle = false;
+    bool toggle = false;
     std::string list = "Charmander,Bulbasaur,Squirtle,Pikachu,Eevee,Pidgey";
 
     int themeIndex = 1;
@@ -120,34 +120,33 @@ int main()
 
 
         mxgui::guiScrollPanelBegin(ctx, "ScrollPanel", MxRect{300, 200, 100, 200}, MxRect{300, 200, 100, 550}, MxVec2{100, 100}, true);
-        mxgui::textSize(ctx, 20);
+        //mxgui::textSize(ctx, 20);
         mxgui::guiLabel(ctx, "hello world 1", MxVec2{100, 0}, anchor);
         mxgui::guiLabel(ctx, "hello world 2", MxVec2{0, 80});
         mxgui::guiLabel(ctx, "hello world 3", MxVec2{0, 100});
         mxgui::guiLabel(ctx, "hello world 4", MxVec2{0, 120});
-        mxgui::textSize(ctx, 20);
+        mxgui::guiToolTip(ctx, "tooltip" , "test tooltip msg" , MxRect{0, 120, 100, 100});
+        mxgui::guiListView(ctx, "guiListViewScroll", MxRect{0, 0, 100, 150}, anchor, list);
         mxgui::guiScrollPanelEnd(ctx, "ScrollPanel");
-
-
+        
+        
         mxgui::guiCheckBox(ctx, MxRect{100, 100}, MxVec2{}, checked);
-        mxgui::guiToogle(ctx, MxRect{150, 100}, MxVec2{}, toogle);
-
-
+        mxgui::guiToggle(ctx, MxRect{150, 100}, MxVec2{}, toggle);
+        
+        
+        //mxgui::textSize(ctx, 20);
         mxgui::guiTextBox(ctx, "textbox", MxRect{200, 300, 150, 0});
-        mxgui::pushFont(ctx, "inter", 20);
-        mxgui::guiTextBox(ctx, "textbox2", MxRect{200, 330, 150, 0});
+        mxgui::useFont(ctx, "inter", 20);
+        mxgui::guiTextBox(ctx, "textbox2", MxRect{200, 350, 150, 0});
 
-        mxgui::pushFont(ctx, MX_FONT_NOTO_ID, 20);
-        mxgui::textSize(ctx, 20);
-
+        mxgui::useFont(ctx, MX_FONT_NOTO_ID, 20);
 
         const float progress = mxgui::guiSlider(ctx, "Slider", MxRect{50, 530, mxgui::getWindowSize().x - 100, 6}, MxVec2{}, true);
         mxgui::guiLabel(ctx, std::to_string(progress), MxVec2{10, 30});
         mxgui::guiSliderProgress(ctx, MxRect{50, 560, mxgui::getWindowSize().x - 100, 6}, MxVec2{}, 0.8f);
-
         mxgui::guiListView(ctx, "guiListView", MxRect{20, 400, 100, 150}, anchor, list);
 
-        mxgui::guiToolTip(ctx, "tooltip" , "test tooltip msg" , MxRect{150, 100, 100, 100});
+
 
 
         mxgui::endMx();

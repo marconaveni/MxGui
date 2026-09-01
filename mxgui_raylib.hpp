@@ -3,7 +3,6 @@
 
 #include <cstdio>
 
-#include "mxgui.hpp"
 #include "raylib.h"
 
 struct MxTextureNative

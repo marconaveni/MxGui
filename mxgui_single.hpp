@@ -1,48 +1,94 @@
+/*******************************************************************************************************
+*  LICENSE: zlib/libpng
+*
+*  MxGui - Mini XPerience Gui
+*  Copyright (c) 2026 Marco Naveni
+*
+*  This software is provided "as-is", without any express or implied warranty. In no event
+*  will the authors be held liable for any damages arising from the use of this software.
+*
+*  Permission is granted to anyone to use this software for any purpose, including commercial
+*  applications, and to alter it and redistribute it freely, subject to the following restrictions:
+*
+*    1. The origin of this software must not be misrepresented; you must not claim that you
+*    wrote the original software. If you use this software in a product, an acknowledgment
+*    in the product documentation would be appreciated but is not required.
+*
+*    2. Altered source versions must be plainly marked as such, and must not be misrepresented
+*    as being the original software.
+*
+*    3. This notice may not be removed or altered from any source distribution.
+*
+*
+*  DESCRIPTION:
+*  - MxGui é uma immediate mode GUI API suas inspirações e referencias são
+*  RAYGUI, IMGUI e NUKLEAR, A lib é pensanda para funcionar primeiramente
+*  com a raylib, mas api esta sendo desenvolvida para ser  compativel com outros
+*  frameworks
+
+*  FEATURES:
+*  - Immediate-mode gui, minimal retained-mode
+*  - suporte a customização MxStyle
+*  - suporte a icones providos de https://fontawesome.com/
+*
+*  LIMITATIONS:
+*  - sem gerenciamento de layout, isso fica por conta do usuario posicionar,
+*    a planos ajudar na organização dos componentes.
+*  - sem EditText multi-line word-wraped
+*
+*
+*  NOTES:
+*  - A fonte padrão é notosans apenas com ascii 32..126 , carregue sua propria
+*    fonte createFont(...) conforme sua necessidade
+*  - A lib esta em desenvolvimento e mudanças aconteceram na api
+*
+*
+*  COMPONENTS:
+*
+*  # Basic components provided
+*
+*  (Panel)                           | Component | state     |
+*  (Image)                           | Component | stateless |
+*  (Button) -> (Label)               | Component | stateless |
+*  (Label)                           | Component | stateless |
+*  (ScrollPanel)                     | Component | state     | Container(begin)(end)
+*  (Slider)                          | Component | state     |
+*  (SliderProgress)                  | Component | stateless |
+*  (Icon)                            | Component | stateless |
+*  (ButtonIcon)                      | Component | stateless |
+*  (ToggleEx)                        | Component | stateless |
+*  (CheckBox) -> (ToggleEx)          | Component | stateless |
+*  (Toggle) -> (ToggleEx)            | Component | stateless |
+*  (ListView) -> (Panel) -> (Label)  | Component | state     |
+*  (ToolTip)                         | Component | state     |
+*  (TextBox)                         | Component | state     |
+*
+*  ---------------------------------------------------------------------------
+*
+*  To use this library, you can define it like this:
+*
+*  --------------------------custom backend-----------------------------------
+*
+*  #define MX_GUI_IMPLEMENTATION
+*  #include "mxgui.hpp"
+*
+*  --------------------------with Sfml----------------------------------------
+*
+*  #define MX_SFML_BACKEND_IMPLEMENTATION
+*  #define MX_GUI_IMPLEMENTATION
+*  #include "mxgui.hpp"
+*
+*  --------------------------with raylib--------------------------------------
+*
+*  #define MX_RAYLIB_BACKEND_IMPLEMENTATION
+*  #define MX_GUI_IMPLEMENTATION
+*  #include "mxgui.hpp"
+*
+*  ---------------------------------------------------------------------------
+*******************************************************************************************************/
+
 #ifndef MXGUI_HPP
 #define MXGUI_HPP
-
-//--------------------------- Mini XPerience Gui-------------------------------
-//                                                                            |
-// To use this library, you can define it like this:                          |
-//                                                                            |
-//----------------------------custom backend-----------------------------------
-//                                                                            |
-// #define MX_GUI_IMPLEMENTATION                                              |
-// #include "mxgui.hpp"                                                       |
-//                                                                            |
-//----------------------------with Sfml----------------------------------------
-//                                                                            |
-// #define MX_SFML_BACKEND_IMPLEMENTATION                                     |
-// #define MX_GUI_IMPLEMENTATION                                              |
-// #include "mxgui.hpp"                                                       |
-//                                                                            |
-//----------------------------with raylib--------------------------------------
-//                                                                            |
-// #define MX_RAYLIB_BACKEND_IMPLEMENTATION                                   |
-// #define MX_GUI_IMPLEMENTATION                                              |
-// #include "mxgui.hpp"                                                       |
-//                                                                            |
-//-----------------------------------------------------------------------------
-
-//--------------------------------MXGUI----------------------------------------
-//
-//  (Panel)                           | Component | state     |
-//  (Image)                           | Component | stateless |
-//  (Button) -> (Label)               | Component | stateless |
-//  (Label)                           | Component | stateless |
-//  (ScrollPanel)                     | Component | state     | Container(begin)(end)
-//  (Slider)                          | Component | state     |
-//  (SliderProgress)                  | Component | stateless |
-//  (Icon)                            | Component | stateless |
-//  (ButtonIcon)                      | Component | stateless |
-//  (ToggleEx)                        | Component | stateless |
-//  (CheckBox) -> (ToggleEx)          | Component | stateless |
-//  (Toogle) -> (ToggleEx)            | Component | stateless |
-//  (ListView) -> (Panel) -> (Label)  | Component | state     |
-//  (ToolTip)                         | Component | state     |
-//  (TextBox)                         | Component | state     |
-//
-//-----------------------------------------------------------------------------
 
 //-----------------------------------------------------------------------------
 // This file is organized by sections.
@@ -53,7 +99,7 @@
 // (SECTION) Library version
 //-----------------------------------------------------------------------------
 
-#define MXGUI_VERSION "0.0.1"
+#define MXGUI_VERSION "0.0.2"
 #define MXGUI_VERSION_NUM 0
 #define MXGUI_VERSION_TYPE "DEV"
 
@@ -13933,7 +13979,7 @@ namespace mxgui
 
     void textSize(MxGuiContext* ctx, int newSize);
     void iconSize(MxGuiContext* ctx, int newSize);
-    bool pushFont(MxGuiContext* ctx, const MxNameID& fontName, int newSize);
+    bool useFont(MxGuiContext* ctx, const MxNameID& fontName, int newSize);
 
     MxVec2 guiPanel(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor = MxVec2{0}, bool enableDrag = false);
     void guiImage(MxGuiContext* ctx, const MxNameID& textureNameID, MxRect bounds, MxVec2 anchor = MxVec2{0}, MxColor color = MxColor::White);
@@ -13943,15 +13989,16 @@ namespace mxgui
     void guiScrollPanelEnd(MxGuiContext* ctx, const MxTag& tag);
     float guiSlider(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor, bool enable);
     void guiSliderProgress(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, float progress);
-    void guiIcon(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size = -1);
-    bool guiIconButton(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size = -1, bool enable = true);
+    void guiIcon(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size = -1, MxColor color = MxColor::Transparent);
+    bool guiIconButton(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size = -1, MxColor color = MxColor::Transparent, bool enable = true);
     bool guiCheckBox(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked);
-    bool guiToogle(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked);
+    bool guiToggle(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked);
     int guiListView(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor, const std::string& list);
     int guiToolTip(MxGuiContext* ctx, const MxTag& tag, const std::string& text, MxRect bounds, float wait = 0.7f);
     MxTextBoxEvents guiTextBox(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor = MxVec2{0});
 
     MxVec2 getWindowSize();
+    MxVec2 getMeasureText(MxGuiContext* ctx, const std::string& text);
 
 } // namespace mxgui
 
@@ -14212,7 +14259,6 @@ struct MxGuiContext
 
 #include <cstdio>
 
-#include "mxgui.hpp"
 #include "raylib.h"
 
 struct MxTextureNative
@@ -17583,7 +17629,7 @@ namespace mxgui
         ctx->m_style.iconSize = newSize;
     }
 
-    bool pushFont(MxGuiContext* ctx, const MxNameID& fontName, int newSize)
+    bool useFont(MxGuiContext* ctx, const MxNameID& fontName, int newSize)
     {
         const MxFont* font = getFont(fontName, newSize);
         if (!isValidFont(*font))
@@ -17825,7 +17871,6 @@ namespace mxgui
         drawRectangleLinesEx(rect, ctx->m_style.borderWidth, ctx->m_style.borderColor);
         pushScissor((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height); // call internal BeginScissorMode();
 
-        drawRectanglePro(rectCanvas, MxVec2{}, 0, fadeColor(MxColor::LightGray, 0.5f)); // debug visual feedback
 
         ctx->updateCurrents(transform, MxMouseEvents{});
     }
@@ -17918,18 +17963,18 @@ namespace mxgui
         drawRectanglePro(transformBar.worldBounds, MxVec2{}, 0, fadeColor(color, 1.0f));
     }
 
-    void guiIcon(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size)
+    void guiIcon(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size, MxColor color)
     {
         const int iconSize = (size < 0) ? ctx->m_style.iconSize : size;
         bounds.width = iconSize;
         bounds.height = iconSize;
         MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
-        MxColor color = ctx->m_style.primaryColor;
+        MxColor iconColor = colorIsEquals(color, MxColor::Transparent) ? ctx->m_style.primaryColor : color;
 
-        drawIconEx(codepoint, toMxVec2(transform.worldBounds), color, iconSize);
+        drawIconEx(codepoint, toMxVec2(transform.worldBounds), iconColor, iconSize);
     }
 
-    bool guiIconButton(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size, bool enable)
+    bool guiIconButton(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size, MxColor color, bool enable)
     {
         const int iconSize = (size < 0) ? ctx->m_style.iconSize : size;
         bounds.width = iconSize;
@@ -17958,13 +18003,13 @@ namespace mxgui
             }
         }
 
-        MxColor color = ctx->m_style.primaryColor;
-        color.r = mxClamp(color.r - paint, 0, 255);
-        color.g = mxClamp(color.g - paint, 0, 255);
-        color.b = mxClamp(color.b - paint, 0, 255);
+        MxColor iconColor = colorIsEquals(color, MxColor::Transparent) ? ctx->m_style.primaryColor : color;
+        iconColor.r = mxClamp(iconColor.r - paint, 0, 255);
+        iconColor.g = mxClamp(iconColor.g - paint, 0, 255);
+        iconColor.b = mxClamp(iconColor.b - paint, 0, 255);
 
 
-        drawIconEx(codepoint, toMxVec2(transform.worldBounds), color, iconSize);
+        drawIconEx(codepoint, toMxVec2(transform.worldBounds), iconColor, iconSize);
 
         ctx->updateCurrents(transform, mouseEvents);
 
@@ -18007,7 +18052,7 @@ namespace mxgui
 #endif // MX_FONT_AWESOME
     }
 
-    bool guiToogle(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked)
+    bool guiToggle(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked)
     {
 #if MX_FONT_AWESOME
         return guiToogleEx(ctx, bounds, anchor, checked, ICON_FA_TOGGLE_ON, ICON_FA_TOGGLE_OFF);
@@ -18086,7 +18131,10 @@ namespace mxgui
                 color = ctx->m_style.borderColor;
             }
 
-            guiLabel(ctx, texts[i], textPosition, MxVec2{}, color);
+            const MxStyle style = ctx->m_style;
+            drawText(style.fontName, texts[i], MxVec2{std::round(textPosition.x), std::round(textPosition.y)}, style.textSize, style.textSpacing, color);
+
+
             nextItemY += rectBox.height + padding / 2.0f;
         }
         nextItemY += padding / 2.0f;
@@ -18109,8 +18157,8 @@ namespace mxgui
         {
             tooTip.wait = 0.0f;
         }
-        
-        
+
+
         MxTransform transform = updateTransformWorld(ctx, bounds, MxVec2{});
         MxRect rect = transform.worldBounds;
 
@@ -18121,16 +18169,20 @@ namespace mxgui
 
         if (mouseEvents.isMouseHover && tooTip.wait > wait)
         {
-            constexpr float paddingX = 8.0f; 
-            constexpr float paddingY = 4.0f; 
-            constexpr float offset = 28.0f; 
+            constexpr float paddingX = 8.0f;
+            constexpr float paddingY = 4.0f;
+            constexpr float offset = 28.0f;
             MxVec2 mouse = getMousePosition();
             mouse.x += offset;
             mouse.y += offset;
             MxVec2 textSize = measureText(ctx->m_style.fontName, text, ctx->m_style.textSize, ctx->m_style.textSpacing);
             MxRect rectBox = MxRect{mouse.x - paddingX, mouse.y - paddingY, textSize.x + paddingX * 2, textSize.y + paddingY * 2};
             drawRectanglePro(rectBox, MxVec2{}, 0, fadeColor(ctx->m_style.primaryColor, 1.0f));
-            guiLabel(ctx, text, mouse, MxVec2{}, ctx->m_style.panelColor);
+               
+            const MxStyle style = ctx->m_style;
+            drawText(style.fontName, text, MxVec2{std::round(mouse.x), std::round(mouse.y)}, style.textSize, style.textSpacing, style.panelColor);
+            
+            return 1;
         }
 
         return 0;
@@ -18352,8 +18404,7 @@ namespace mxgui
         }
 
         // draw text
-        drawTextEx(*textEdit.font, ctx->m_currentTextBoxValue, MxVec2{textX + offsetX, textY}, textEdit.fontSize, textEdit.spacing, ctx->m_style.textColor);
-
+        drawTextEx(*textEdit.font, ctx->m_currentTextBoxValue, MxVec2{std::round(textX + offsetX), std::round(textY)}, textEdit.fontSize, textEdit.spacing, ctx->m_style.textColor);
         popScissor();
 
         // draw cursor
@@ -18384,6 +18435,12 @@ namespace mxgui
     MxVec2 getWindowSize()
     {
         return windowSize();
+    }
+
+    MxVec2 getMeasureText(MxGuiContext* ctx, const std::string& text)
+    {
+        const MxStyle& style = ctx->m_style;
+        return getCore().fontManager.measureText(style.fontName, text, style.textSize, style.textSpacing);
     }
 
 } // namespace mxgui
