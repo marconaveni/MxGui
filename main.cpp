@@ -59,7 +59,7 @@ int main()
     MxVec2 anchor{10, 10};
     bool checked = false;
     bool toggle = false;
-    std::string list = "Charmander,Bulbasaur,Squirtle,Pikachu,Eevee,Pidgey";
+    std::string list = "Charmander;Bulbasaur;Squirtle;Pikachu;Eevee;Pidgey";
     float progress = 0.5f;
 
     int themeIndex = 1;
@@ -103,23 +103,23 @@ int main()
 
         mxgui::guiImage(ctx, "testpng", MxRect{210, 35, 180, 180}, anchor);
 
-        if (mxgui::guiIconButton(ctx, MxRect{10, 140, 20, 20}, anchor, ICON_FA_CIRCLE_PLAY, 28))
+        if (mxgui::guiIconButton(ctx, MxVec2{10, 140}, anchor, ICON_FA_CIRCLE_PLAY, MxVec2{6, 6}, 28))
         {
             MX_LOG("Clicked Icon");
-            if (list == "Charmander,Bulbasaur,Squirtle,Pikachu,Eevee,Pidgey")
+            if (list == "Charmander;Bulbasaur;Squirtle;Pikachu;Eevee;Pidgey")
             {
-                //list = "Chikorita,Cyndaquil,Totodile,Pichu,Marill,Hoothoot";
-                list = "Chikorita,Cyndaquil,Totodile,Pichu";
+                //list = "Chikorita;Cyndaquil;Totodile;Pichu;Marill;Hoothoot";
+                list = "Chikorita;Cyndaquil;Totodile;Pichu";
             }
             else
             {
-                list = "Charmander,Bulbasaur,Squirtle,Pikachu,Eevee,Pidgey";
+                list = "Charmander;Bulbasaur;Squirtle;Pikachu;Eevee;Pidgey";
             }
         }
-        mxgui::guiIcon(ctx, MxRect{10, 180, 0, 0}, anchor, ICON_FA_CIRCLE_PLAY);
+        mxgui::guiIcon(ctx, MxVec2{10, 180}, anchor, ICON_FA_CIRCLE_PLAY);
 
         mxgui::iconSize(ctx, 50);
-        mxgui::guiIcon(ctx, MxRect{10, 260, 0, 0}, anchor, ICON_FA_COPY);
+        mxgui::guiIcon(ctx, MxVec2{10, 260}, anchor, ICON_FA_COPY);
         mxgui::iconSize(ctx, 28);
 
 
@@ -139,15 +139,16 @@ int main()
         
         
         //mxgui::textSize(ctx, 20);
-        mxgui::guiTextBox(ctx, "textbox", MxRect{200, 300, 150, 0});
         mxgui::useFont(ctx, "inter", 20);
+        mxgui::guiTextBox(ctx, "textbox", MxRect{200, 300, 150, 0});
+        mxgui::useFont(ctx, "inter", 22);
         mxgui::guiTextBox(ctx, "textbox2", MxRect{200, 350, 150, 0});
 
         mxgui::useFont(ctx, MX_FONT_NOTO_ID, 20);
 
-        mxgui::guiSlider(ctx, "Slider", MxRect{50, 530, mxgui::getWindowSize().x - 100, 6}, MxVec2{}, true, progress);
+        mxgui::guiSlider(ctx, "Slider", MxRect{50, 530, mxgui::getWindowSize().x - 100, 8}, MxVec2{}, true, progress);
         mxgui::guiLabel(ctx, std::to_string(progress), MxVec2{10, 30});
-        mxgui::guiSliderProgress(ctx, MxRect{50, 560, mxgui::getWindowSize().x - 100, 6}, MxVec2{}, 0.8f);
+        mxgui::guiSliderProgress(ctx, MxRect{50, 560, mxgui::getWindowSize().x - 100, 8}, MxVec2{}, 0.8f);
         mxgui::guiListView(ctx, "guiListView", MxRect{20, 400, 100, 150}, anchor, list);
 
 

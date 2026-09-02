@@ -784,13 +784,13 @@ namespace mxgui
     MxVec2 guiPanel(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor = MxVec2{0}, bool enableDrag = false);
     void guiImage(MxGuiContext* ctx, const MxNameID& textureNameID, MxRect bounds, MxVec2 anchor = MxVec2{0}, MxColor color = MxColor::White);
     bool guiButton(MxGuiContext* ctx, const std::string& text, MxRect bounds, MxVec2 anchor = MxVec2{0}, int buttonStyle = MX_BUTTON_CONTAINED, bool enable = true);
-    void guiLabel(MxGuiContext* ctx, const std::string& text, MxVec2 bounds, MxVec2 anchor = MxVec2{0}, MxColor color = MxColor::Transparent);
+    void guiLabel(MxGuiContext* ctx, const std::string& text, MxVec2 position, MxVec2 anchor = MxVec2{0}, MxColor color = MxColor::Transparent);
     void guiScrollPanelBegin(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxRect scrollBounds, MxVec2 anchor = MxVec2{0}, bool enable = true);
     void guiScrollPanelEnd(MxGuiContext* ctx, const MxTag& tag);
     void guiSlider(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor, bool enable, float& progress);
     void guiSliderProgress(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, float progress);
-    void guiIcon(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size = -1, MxColor color = MxColor::Transparent);
-    bool guiIconButton(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size = -1, MxColor color = MxColor::Transparent, bool enable = true);
+    void guiIcon(MxGuiContext* ctx, MxVec2 position, MxVec2 anchor, int codepoint, int size = -1, MxColor color = MxColor::Transparent);
+    bool guiIconButton(MxGuiContext* ctx, MxVec2 position, MxVec2 anchor, int codepoint, MxVec2 padding = MxVec2{2, 2}, int size = -1, MxColor color = MxColor::Transparent, bool enable = true);
     bool guiCheckBox(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked);
     bool guiToggle(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked);
     int guiListView(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor, const std::string& list);
@@ -1104,8 +1104,9 @@ struct MxFontManager
         {
             fontData.codepoints = (int*)MX_MALLOC(codepointCount * sizeof(int));
             memcpy(fontData.codepoints, codepoints, codepointCount * sizeof(int));
-            fontData.codepointCount = codepointCount;
         }
+        
+        fontData.codepointCount = codepointCount;
 
         const std::string textureNameID = GEN_TEXTURE_NAME_ID(fontNameID, fontSize);
         MxFont font = loadFontFromMemoryInternal(textureNameID, fontData.fileData, fontSize, codepoints, codepointCount);
@@ -2705,9 +2706,9 @@ namespace mxgui
         ctx->updateCurrents(transform, MxMouseEvents{});
     }
 
-    void guiLabel(MxGuiContext* ctx, const std::string& text, MxVec2 bounds, MxVec2 anchor, MxColor color)
+    void guiLabel(MxGuiContext* ctx, const std::string& text, MxVec2 position, MxVec2 anchor, MxColor color)
     {
-        MxTransform transform = updateTransformWorld(ctx, toMxRect(bounds), anchor);
+        MxTransform transform = updateTransformWorld(ctx, toMxRect(position), anchor);
         MxRect rect = transform.worldBounds;
         const MxStyle style = ctx->m_style;
 
@@ -2784,7 +2785,7 @@ namespace mxgui
 
         ctx->updateCurrents(transform, mouseEvents);
 
-        return mouseEvents.isMousePressed;
+        return mouseEvents.isMouseRelease;
     }
 
     void guiScrollPanelBegin(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxRect scrollBounds, MxVec2 anchor, bool enable)
@@ -2870,10 +2871,11 @@ namespace mxgui
             };
         }
 
-        drawRectangleLinesEx(rect, ctx->m_style.borderWidth, ctx->m_style.borderColor);
-        pushScissor((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height); // call internal BeginScissorMode();
+        const int borderWidth = ctx->m_style.borderWidth;
+        drawRectangleLinesEx(rect, borderWidth, ctx->m_style.borderColor);
+        pushScissor((int)rect.x + borderWidth, (int)rect.y + borderWidth, (int)rect.width - borderWidth * 2, (int)rect.height - borderWidth * 2); // call internal BeginScissorMode();
 
-        // drawRectanglePro(rectCanvas, MxVec2{}, 0, fadeColor(MxColor::LightGray, 0.5f)); // debug visual feedback  @mx_build  ignore_line()
+        // drawRectanglePro(rectCanvas, MxVec2{}, 0, fadeColor(MxColor::LightGray, 0.5f)); // DEBUG: visual feedback  @mx_build  ignore_line()
 
         ctx->updateCurrents(transform, MxMouseEvents{});
     }
@@ -2890,7 +2892,7 @@ namespace mxgui
         rect.x += MX_DRAG_OFFSET;
         rect.width -= MX_DRAG_OFFSET * 2;
 
-        // drawRectanglePro(scrollPanel.scrollBarThumb, MxVec2{}, 0, MxColor::Blue); // debug offset
+        // drawRectanglePro(scrollPanel.scrollBarThumb, MxVec2{}, 0, MxColor::Blue); // DEBUG: offset
         drawRectanglePro(rect, MxVec2{}, 0, ctx->m_style.primaryColor);
     }
 
@@ -2898,7 +2900,7 @@ namespace mxgui
     {
         SliderComponent& slider = *ctx->getSliderComponent(tag);
 
-        const float radius = 8.0f;
+        const float radius = bounds.height + 2.0f;
         MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
         MxTransform transformBar = transform;
         MxTransform transformBarCollision = transform;
@@ -2956,7 +2958,6 @@ namespace mxgui
 
     void guiSliderProgress(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, float progress)
     {
-        bounds.height = 12;
 
         MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
         MxTransform transformBar = transform;
@@ -2973,24 +2974,25 @@ namespace mxgui
         drawRectanglePro(transformBar.worldBounds, MxVec2{}, 0, fadeColor(color, 1.0f));
     }
 
-    void guiIcon(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size, MxColor color)
+    void guiIcon(MxGuiContext* ctx, MxVec2 position, MxVec2 anchor, int codepoint, int size, MxColor color)
     {
         const int iconSize = (size < 0) ? ctx->m_style.iconSize : size;
-        bounds.width = iconSize;
-        bounds.height = iconSize;
-        MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
+        MxTransform transform = updateTransformWorld(ctx, toMxRect(position), anchor);
         MxColor iconColor = colorIsEquals(color, MxColor::Transparent) ? ctx->m_style.primaryColor : color;
 
         drawIconEx(codepoint, toMxVec2(transform.worldBounds), iconColor, iconSize);
     }
 
-    bool guiIconButton(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size, MxColor color, bool enable)
+    bool guiIconButton(MxGuiContext* ctx, MxVec2 position, MxVec2 anchor, int codepoint, MxVec2 padding, int size, MxColor color, bool enable)
     {
         const int iconSize = (size < 0) ? ctx->m_style.iconSize : size;
-        bounds.width = iconSize;
-        bounds.height = iconSize;
-        MxTransform transform = updateTransformWorld(ctx, bounds, anchor);
+        MxTransform transform = updateTransformWorld(ctx, MxRect{position.x, position.y, (float)size, (float)size}, anchor);
         MxRect rect = transform.worldBounds;
+
+        rect.x -= padding.x;
+        rect.y -= padding.y;
+        rect.width += padding.x * 2;
+        rect.height+= padding.y * 2;
 
         MxMouseEvents mouseEvents{};
 
@@ -3023,7 +3025,7 @@ namespace mxgui
 
         ctx->updateCurrents(transform, mouseEvents);
 
-        return mouseEvents.isMousePressed;
+        return mouseEvents.isMouseRelease;
     }
 
     bool guiToogleEx(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, bool& checked, int codeEnable, int codeDisable)
@@ -3047,7 +3049,7 @@ namespace mxgui
 
         int codepoint = checked ? codeEnable : codeDisable;
 
-        guiIcon(ctx, bounds, anchor, codepoint);
+        guiIcon(ctx, toMxVec2(bounds), anchor, codepoint);
 
         ctx->updateCurrents(transform, mouseEvents);
         return mouseEvents.isMouseRelease;
@@ -3093,8 +3095,8 @@ namespace mxgui
             static std::string token;
             for (const auto& c : list)
             {
-                // Split using ',' as a character delimiter
-                if (c == ',')
+                // Split using ';' as a character delimiter
+                if (c == ';')
                 {
                     texts.push_back(token);
                     token = "";
@@ -3129,7 +3131,7 @@ namespace mxgui
             drawRectangleLinesEx(rectBox, ctx->m_style.borderWidth, fadeColor(ctx->m_style.borderColor, 0.5f));
             MxColor color = ctx->m_style.textColor;
 
-            if (i == listView.idActived || mouseEvents.isMousePressed)
+            if (i == listView.idActived || mouseEvents.isMouseRelease)
             {
                 drawRectanglePro(rectBox, MxVec2{}, 0, fadeColor(ctx->m_style.primaryColor, 1.0f));
                 color = ctx->m_style.panelColor;
