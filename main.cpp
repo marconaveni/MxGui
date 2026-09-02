@@ -60,6 +60,7 @@ int main()
     bool checked = false;
     bool toggle = false;
     std::string list = "Charmander,Bulbasaur,Squirtle,Pikachu,Eevee,Pidgey";
+    float progress = 0.5f;
 
     int themeIndex = 1;
 
@@ -95,7 +96,10 @@ int main()
             setSmoothTexture(MX_FONT_AWESOME_ID, !isSmoothTexture(MX_FONT_AWESOME_ID));
         }
         mxgui::guiButton(ctx, "Click", MxRect{95, 35, 75, 35}, anchor, MX_BUTTON_OUTLINE_FILL, true);
-        mxgui::guiButton(ctx, "Click", MxRect{10, 85, 75, 35}, anchor, MX_BUTTON_CONTAINED, true);
+        if(mxgui::guiButton(ctx, "Click", MxRect{10, 85, 75, 35}, anchor, MX_BUTTON_CONTAINED, true))
+        {
+            progress = 0.5f;
+        }
 
         mxgui::guiImage(ctx, "testpng", MxRect{210, 35, 180, 180}, anchor);
 
@@ -141,7 +145,7 @@ int main()
 
         mxgui::useFont(ctx, MX_FONT_NOTO_ID, 20);
 
-        const float progress = mxgui::guiSlider(ctx, "Slider", MxRect{50, 530, mxgui::getWindowSize().x - 100, 6}, MxVec2{}, true);
+        mxgui::guiSlider(ctx, "Slider", MxRect{50, 530, mxgui::getWindowSize().x - 100, 6}, MxVec2{}, true, progress);
         mxgui::guiLabel(ctx, std::to_string(progress), MxVec2{10, 30});
         mxgui::guiSliderProgress(ctx, MxRect{50, 560, mxgui::getWindowSize().x - 100, 6}, MxVec2{}, 0.8f);
         mxgui::guiListView(ctx, "guiListView", MxRect{20, 400, 100, 150}, anchor, list);

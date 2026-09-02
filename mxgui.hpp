@@ -787,7 +787,7 @@ namespace mxgui
     void guiLabel(MxGuiContext* ctx, const std::string& text, MxVec2 bounds, MxVec2 anchor = MxVec2{0}, MxColor color = MxColor::Transparent);
     void guiScrollPanelBegin(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxRect scrollBounds, MxVec2 anchor = MxVec2{0}, bool enable = true);
     void guiScrollPanelEnd(MxGuiContext* ctx, const MxTag& tag);
-    float guiSlider(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor, bool enable);
+    void guiSlider(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor, bool enable, float& progress);
     void guiSliderProgress(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, float progress);
     void guiIcon(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size = -1, MxColor color = MxColor::Transparent);
     bool guiIconButton(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size = -1, MxColor color = MxColor::Transparent, bool enable = true);
@@ -2894,7 +2894,7 @@ namespace mxgui
         drawRectanglePro(rect, MxVec2{}, 0, ctx->m_style.primaryColor);
     }
 
-    float guiSlider(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor, bool enable)
+    void guiSlider(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor, bool enable, float& progress)
     {
         SliderComponent& slider = *ctx->getSliderComponent(tag);
 
@@ -2906,6 +2906,13 @@ namespace mxgui
         transformBarCollision.worldBounds.y -= (MX_DRAG_OFFSET + radius) / 2;
         transformBarCollision.worldBounds.width += (MX_DRAG_OFFSET + radius);
         transformBarCollision.worldBounds.height += (MX_DRAG_OFFSET + radius);
+
+        const float progressClamp = mxClamp(progress, 0.0f, 1.0f);
+        if (progressClamp != slider.progress)
+        {
+            slider.progress = progressClamp;
+        }
+        
 
         MxMouseEvents mouseEvents{};
 
@@ -2944,7 +2951,7 @@ namespace mxgui
         MxVec2 point{.x = transformBar.worldBounds.x + transformBar.worldBounds.width, .y = transformBar.worldBounds.y + transformBar.worldBounds.height / 2};
         drawCircle(point, radius, fadeColor(color, 1.0f));
 
-        return slider.progress;
+        progress = slider.progress;
     }
 
     void guiSliderProgress(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, float progress)

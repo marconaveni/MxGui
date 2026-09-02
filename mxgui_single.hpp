@@ -21,30 +21,27 @@
 *
 *
 *  DESCRIPTION:
-*  - MxGui é uma immediate mode GUI API suas inspirações e referencias são
-*  RAYGUI, IMGUI e NUKLEAR, A lib é pensanda para funcionar primeiramente
-*  com a raylib, mas api esta sendo desenvolvida para ser  compativel com outros
-*  frameworks
-
+*  - MxGui is an immediate-mode GUI API inspired by and referencing
+*    RAYGUI, IMGUI, and NUKLEAR. MxGui is designed to work primarily
+*    with raylib, but the API is being developed to be compatible with other
+*    frameworks.
+*
 *  FEATURES:
-*  - Immediate-mode gui, minimal retained-mode
-*  - suporte a customização MxStyle
-*  - suporte a icones providos de https://fontawesome.com/
+*  - Immediate-mode GUI, minimal retained-mode
+*  - Support for MxStyle customization
+*  - Support for icons provided by https://fontawesome.com/
 *
 *  LIMITATIONS:
-*  - sem gerenciamento de layout, isso fica por conta do usuario posicionar,
-*    a planos ajudar na organização dos componentes.
-*  - sem EditText multi-line word-wraped
-*
+*  - no layout management; the user is responsible for positioning components,
+*    layouts help organize the components.
+*  - no multi-line, word-wrapping EditText
 *
 *  NOTES:
-*  - A fonte padrão é notosans apenas com ascii 32..126 , carregue sua propria
-*    fonte createFont(...) conforme sua necessidade
-*  - A lib esta em desenvolvimento e mudanças aconteceram na api
-*
+*  - The default font is Noto Sans containing only ASCII characters 32–126; load your own
+*    font using createFont(...) as needed
+*  - The library is under development, and API changes have occurred
 *
 *  COMPONENTS:
-*
 *  # Basic components provided
 *
 *  (Panel)                           | Component | state     |
@@ -13987,7 +13984,7 @@ namespace mxgui
     void guiLabel(MxGuiContext* ctx, const std::string& text, MxVec2 bounds, MxVec2 anchor = MxVec2{0}, MxColor color = MxColor::Transparent);
     void guiScrollPanelBegin(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxRect scrollBounds, MxVec2 anchor = MxVec2{0}, bool enable = true);
     void guiScrollPanelEnd(MxGuiContext* ctx, const MxTag& tag);
-    float guiSlider(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor, bool enable);
+    void guiSlider(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor, bool enable, float& progress);
     void guiSliderProgress(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, float progress);
     void guiIcon(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size = -1, MxColor color = MxColor::Transparent);
     bool guiIconButton(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, int codepoint, int size = -1, MxColor color = MxColor::Transparent, bool enable = true);
@@ -17891,7 +17888,7 @@ namespace mxgui
         drawRectanglePro(rect, MxVec2{}, 0, ctx->m_style.primaryColor);
     }
 
-    float guiSlider(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor, bool enable)
+    void guiSlider(MxGuiContext* ctx, const MxTag& tag, MxRect bounds, MxVec2 anchor, bool enable, float& progress)
     {
         SliderComponent& slider = *ctx->getSliderComponent(tag);
 
@@ -17903,6 +17900,13 @@ namespace mxgui
         transformBarCollision.worldBounds.y -= (MX_DRAG_OFFSET + radius) / 2;
         transformBarCollision.worldBounds.width += (MX_DRAG_OFFSET + radius);
         transformBarCollision.worldBounds.height += (MX_DRAG_OFFSET + radius);
+
+        const float progressClamp = mxClamp(progress, 0.0f, 1.0f);
+        if (progressClamp != slider.progress)
+        {
+            slider.progress = progressClamp;
+        }
+        
 
         MxMouseEvents mouseEvents{};
 
@@ -17941,7 +17945,7 @@ namespace mxgui
         MxVec2 point{.x = transformBar.worldBounds.x + transformBar.worldBounds.width, .y = transformBar.worldBounds.y + transformBar.worldBounds.height / 2};
         drawCircle(point, radius, fadeColor(color, 1.0f));
 
-        return slider.progress;
+        progress = slider.progress;
     }
 
     void guiSliderProgress(MxGuiContext* ctx, MxRect bounds, MxVec2 anchor, float progress)
