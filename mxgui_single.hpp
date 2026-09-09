@@ -1,88 +1,88 @@
 /*******************************************************************************************************
-*  LICENSE: zlib/libpng
-*
-*  MxGui - Mini XPerience Gui
-*  Copyright (c) 2026 Marco Naveni
-*
-*  This software is provided "as-is", without any express or implied warranty. In no event
-*  will the authors be held liable for any damages arising from the use of this software.
-*
-*  Permission is granted to anyone to use this software for any purpose, including commercial
-*  applications, and to alter it and redistribute it freely, subject to the following restrictions:
-*
-*    1. The origin of this software must not be misrepresented; you must not claim that you
-*    wrote the original software. If you use this software in a product, an acknowledgment
-*    in the product documentation would be appreciated but is not required.
-*
-*    2. Altered source versions must be plainly marked as such, and must not be misrepresented
-*    as being the original software.
-*
-*    3. This notice may not be removed or altered from any source distribution.
-*
-*
-*  DESCRIPTION:
-*  - MxGui is an immediate-mode GUI API inspired by and referencing
-*    RAYGUI, IMGUI, and NUKLEAR. MxGui is designed to work primarily
-*    with raylib, but the API is being developed to be compatible with other
-*    frameworks.
-*
-*  FEATURES:
-*  - Immediate-mode GUI, minimal retained-mode
-*  - Support for MxStyle customization
-*  - Support for icons provided by https://fontawesome.com/
-*
-*  LIMITATIONS:
-*  - no layout management; the user is responsible for positioning components,
-*    layouts help organize the components.
-*  - no multi-line, word-wrapping EditText
-*
-*  NOTES:
-*  - The default font is Noto Sans containing only ASCII characters 32–126; load your own
-*    font using createFont(...) as needed
-*  - The library is under development, and API changes have occurred
-*
-*  COMPONENTS:
-*  # Basic components provided
-*
-*  (Panel)                           | Component | state     |
-*  (Image)                           | Component | stateless |
-*  (Button) -> (Label)               | Component | stateless |
-*  (Label)                           | Component | stateless |
-*  (ScrollPanel)                     | Component | state     | Container(begin)(end)
-*  (Slider)                          | Component | state     |
-*  (SliderProgress)                  | Component | stateless |
-*  (Icon)                            | Component | stateless |
-*  (ButtonIcon)                      | Component | stateless |
-*  (ToggleEx)                        | Component | stateless |
-*  (CheckBox) -> (ToggleEx)          | Component | stateless |
-*  (Toggle) -> (ToggleEx)            | Component | stateless |
-*  (ListView) -> (Panel) -> (Label)  | Component | state     |
-*  (ToolTip)                         | Component | state     |
-*  (TextBox)                         | Component | state     |
-*
-*  ---------------------------------------------------------------------------
-*
-*  To use this library, you can define it like this:
-*
-*  --------------------------custom backend-----------------------------------
-*
-*  #define MX_GUI_IMPLEMENTATION
-*  #include "mxgui.hpp"
-*
-*  --------------------------with Sfml----------------------------------------
-*
-*  #define MX_SFML_BACKEND_IMPLEMENTATION
-*  #define MX_GUI_IMPLEMENTATION
-*  #include "mxgui.hpp"
-*
-*  --------------------------with raylib--------------------------------------
-*
-*  #define MX_RAYLIB_BACKEND_IMPLEMENTATION
-*  #define MX_GUI_IMPLEMENTATION
-*  #include "mxgui.hpp"
-*
-*  ---------------------------------------------------------------------------
-*******************************************************************************************************/
+ *  LICENSE: zlib/libpng
+ *
+ *  MxGui - Mini XPerience Gui
+ *  Copyright (c) 2026 Marco Naveni
+ *
+ *  This software is provided "as-is", without any express or implied warranty. In no event
+ *  will the authors be held liable for any damages arising from the use of this software.
+ *
+ *  Permission is granted to anyone to use this software for any purpose, including commercial
+ *  applications, and to alter it and redistribute it freely, subject to the following restrictions:
+ *
+ *    1. The origin of this software must not be misrepresented; you must not claim that you
+ *    wrote the original software. If you use this software in a product, an acknowledgment
+ *    in the product documentation would be appreciated but is not required.
+ *
+ *    2. Altered source versions must be plainly marked as such, and must not be misrepresented
+ *    as being the original software.
+ *
+ *    3. This notice may not be removed or altered from any source distribution.
+ *
+ *
+ *  DESCRIPTION:
+ *  - MxGui is an immediate-mode GUI API inspired by and referencing
+ *    RAYGUI, IMGUI, and NUKLEAR. MxGui is designed to work primarily
+ *    with raylib, but the API is being developed to be compatible with other
+ *    frameworks.
+ *
+ *  FEATURES:
+ *  - Immediate-mode GUI, minimal retained-mode
+ *  - Support for MxStyle customization
+ *  - Support for icons provided by https://fontawesome.com/
+ *
+ *  LIMITATIONS:
+ *  - no layout management; the user is responsible for positioning components,
+ *    layouts help organize the components.
+ *  - no multi-line, word-wrapping EditText
+ *
+ *  NOTES:
+ *  - The default font is Noto Sans containing only ASCII characters 32–126; load your own
+ *    font using createFont(...) as needed
+ *  - The library is under development, and API changes have occurred
+ *
+ *  COMPONENTS:
+ *  # Basic components provided
+ *
+ *  (Panel)                           | Component | state     |
+ *  (Image)                           | Component | stateless |
+ *  (Button) -> (Label)               | Component | stateless |
+ *  (Label)                           | Component | stateless |
+ *  (ScrollPanel)                     | Component | state     | Container(begin)(end)
+ *  (Slider)                          | Component | state     |
+ *  (SliderProgress)                  | Component | stateless |
+ *  (Icon)                            | Component | stateless |
+ *  (ButtonIcon)                      | Component | stateless |
+ *  (ToggleEx)                        | Component | stateless |
+ *  (CheckBox) -> (ToggleEx)          | Component | stateless |
+ *  (Toggle) -> (ToggleEx)            | Component | stateless |
+ *  (ListView) -> (Panel) -> (Label)  | Component | state     |
+ *  (ToolTip)                         | Component | state     |
+ *  (TextBox)                         | Component | state     |
+ *
+ *  ---------------------------------------------------------------------------
+ *
+ *  To use this library, you can define it like this:
+ *
+ *  --------------------------custom backend-----------------------------------
+ *
+ *  #define MX_GUI_IMPLEMENTATION
+ *  #include "mxgui.hpp"
+ *
+ *  --------------------------with Sfml----------------------------------------
+ *
+ *  #define MX_SFML_BACKEND_IMPLEMENTATION
+ *  #define MX_GUI_IMPLEMENTATION
+ *  #include "mxgui.hpp"
+ *
+ *  --------------------------with raylib--------------------------------------
+ *
+ *  #define MX_RAYLIB_BACKEND_IMPLEMENTATION
+ *  #define MX_GUI_IMPLEMENTATION
+ *  #include "mxgui.hpp"
+ *
+ *  ---------------------------------------------------------------------------
+ *******************************************************************************************************/
 
 #ifndef MXGUI_HPP
 #define MXGUI_HPP
@@ -13500,6 +13500,7 @@ struct TextBoxComponent;
 
 // Managers
 struct MxGuiContext;
+struct MxIconManager;
 struct MxFontManager;
 struct MxTextureManager;
 
@@ -15013,15 +15014,21 @@ void drawFPS(float x, float y)
 //-----------------------------------------------------------------------------
 
 //-----------------------------------------------------------------------------
-// Font Manager
+// Icon Manager
 //-----------------------------------------------------------------------------
-struct MxFontManager
+struct MxIconManager
 {
-
     void init(MxStyle style)
     {
-        setupDefaultFont(style.textSize);
-        setupFontAwesome(style.iconSize);
+#if MX_FONT_AWESOME
+        int arrayOriginalSize = 414704;
+        unsigned char* fontAwesomeData = (unsigned char*)MX_MALLOC(arrayOriginalSize);
+        stb_decompress(fontAwesomeData, fa_compressed_data, fa_compressed_size);
+        int count = sizeof(codepointsFontAwesome) / sizeof(codepointsFontAwesome[0]);
+
+        loadFromMemory(MX_FONT_AWESOME_ID, fontAwesomeData, arrayOriginalSize, style.iconSize, codepointsFontAwesome, count, true);
+        MX_FREE(fontAwesomeData);
+#endif
     }
 
     void loadFromMemory(const std::string& fontNameID, const unsigned char* fileData, int dataSize, int fontSize, const int* codepoints, int codepointCount, bool smooth)
@@ -15036,7 +15043,110 @@ struct MxFontManager
             fontData.codepoints = (int*)MX_MALLOC(codepointCount * sizeof(int));
             memcpy(fontData.codepoints, codepoints, codepointCount * sizeof(int));
         }
-        
+
+        fontData.codepointCount = codepointCount;
+
+        const std::string textureNameID = GEN_TEXTURE_NAME_ID(fontNameID, fontSize);
+        MxFont font = loadFontFromMemoryInternal(textureNameID, fontData.fileData, fontSize, codepoints, codepointCount);
+
+        setSmoothTexture(font.textureNameID, smooth);
+
+        fontData.fonts.insert_or_assign(fontSize, font);
+        m_fonts.insert_or_assign(fontNameID, fontData);
+    }
+
+        void unload()
+    {
+        for (auto& [idFontName, fontDatas] : m_fonts)
+        {
+            for (auto& [id, font] : fontDatas.fonts)
+            {
+                unloadFont(font);
+            }
+            MX_FREE(fontDatas.fileData);
+            if (fontDatas.codepoints != nullptr)
+            {
+                MX_FREE(fontDatas.codepoints);
+            }
+        }
+        m_fonts.clear();
+    }
+
+    void unloadFont(MxFont font)
+    {
+        if (font.glyphs != NULL)
+        {
+            for (int i = 0; i < font.glyphCount; i++)
+            {
+                if (isValidImage(font.glyphs[i].image))
+                {
+                    MX_FREE(font.glyphs[i].image.data);
+                }
+            }
+            MX_FREE(font.glyphs);
+        }
+        unloadTexture(font.textureNameID);
+        MX_FREE(font.recs);
+
+        MX_LOG("INFO: Unloaded font data from RAM and VRAM");
+    }
+
+    MxVec2 measureText(const std::string& fontNameID, const std::string& text, int fontSize, int spacing)
+    {
+        const MxFont* font = getFont(fontNameID, fontSize);
+        return measureTextInternal(*font, text, fontSize, spacing);
+    }
+
+    const MxFont* getFont(const std::string& fontNameID, int size)
+    {
+        static MxFont empty{};
+
+        auto itFontData = m_fonts.find(fontNameID);
+        if (itFontData != m_fonts.end())
+        {
+            auto& fontData = itFontData->second;
+            auto itFont = fontData.fonts.find(size);
+            if (itFont != fontData.fonts.end())
+            {
+                return &itFont->second;
+            }
+
+            const std::string textureNameID = GEN_TEXTURE_NAME_ID(fontNameID, size);
+            MxFont font = loadFontFromMemoryInternal(textureNameID, fontData.fileData, size, fontData.codepoints, fontData.codepointCount);
+            fontData.fonts.insert_or_assign(size, font);
+            return &fontData.fonts.at(size);
+        }
+        return &empty;
+    }
+
+    std::unordered_map<std::string, MxFontData> m_fonts{};
+};
+
+//-----------------------------------------------------------------------------
+// Font Manager
+//-----------------------------------------------------------------------------
+struct MxFontManager
+{
+
+    void init(MxStyle style)
+    {
+        setupDefaultFont(style.textSize);
+        // setupFontAwesome(style.iconSize);
+    }
+
+    void loadFromMemory(const std::string& fontNameID, const unsigned char* fileData, int dataSize, int fontSize, const int* codepoints, int codepointCount, bool smooth)
+    {
+        MxFontData fontData{};
+
+        fontData.fileData = (unsigned char*)MX_MALLOC(dataSize * sizeof(unsigned char));
+        memcpy(fontData.fileData, fileData, dataSize * sizeof(unsigned char));
+
+        if (codepoints != NULL)
+        {
+            fontData.codepoints = (int*)MX_MALLOC(codepointCount * sizeof(int));
+            memcpy(fontData.codepoints, codepoints, codepointCount * sizeof(int));
+        }
+
         fontData.codepointCount = codepointCount;
 
         const std::string textureNameID = GEN_TEXTURE_NAME_ID(fontNameID, fontSize);
@@ -15059,18 +15169,18 @@ struct MxFontManager
         loadFromMemory(MX_FONT_NOTO_ID, notosans::data, notosans::size, textSize, codepoints, 95, false);
     }
 
-    void setupFontAwesome(int iconSize)
-    {
-#if MX_FONT_AWESOME
-        int arrayOriginalSize = 414704;
-        unsigned char* fontAwesomeData = (unsigned char*)MX_MALLOC(arrayOriginalSize);
-        stb_decompress(fontAwesomeData, fa_compressed_data, fa_compressed_size);
-        int count = sizeof(codepointsFontAwesome) / sizeof(codepointsFontAwesome[0]);
+//     void setupFontAwesome(int iconSize)
+//     {
+// #if MX_FONT_AWESOME
+//         int arrayOriginalSize = 414704;
+//         unsigned char* fontAwesomeData = (unsigned char*)MX_MALLOC(arrayOriginalSize);
+//         stb_decompress(fontAwesomeData, fa_compressed_data, fa_compressed_size);
+//         int count = sizeof(codepointsFontAwesome) / sizeof(codepointsFontAwesome[0]);
 
-        loadFromMemory(MX_FONT_AWESOME_ID, fontAwesomeData, arrayOriginalSize, iconSize, codepointsFontAwesome, count, true);
-        MX_FREE(fontAwesomeData);
-#endif
-    }
+//         loadFromMemory(MX_FONT_AWESOME_ID, fontAwesomeData, arrayOriginalSize, iconSize, codepointsFontAwesome, count, true);
+//         MX_FREE(fontAwesomeData);
+// #endif
+//     }
 
     void unload()
     {
@@ -15228,6 +15338,7 @@ struct MxCore
     std::list<MxGuiContext> contexts{};
     MxTextEdit textEdit{};
     std::vector<MxRect> stackScissors{};
+    MxIconManager iconManager{};
     MxFontManager fontManager{};
     MxTextureManager textureManager{};
     float frameTime{0.0f};
@@ -15242,6 +15353,7 @@ inline MxCore& getCore()
 void initManagers(MxStyle style)
 {
     MxCore& core = getCore();
+    core.iconManager.init(style);
     core.fontManager.init(style);
     core.textureManager.init();
 }
@@ -15249,6 +15361,7 @@ void initManagers(MxStyle style)
 void closeManagers()
 {
     MxCore& core = getCore();
+    core.iconManager.unload();
     core.fontManager.unload();
     core.textureManager.unload();
 }
@@ -15296,7 +15409,7 @@ void drawIconEx(int codepoint, MxVec2 position, MxColor color, int size)
     // Convert codepoint to UTF-8 before to draw
     int byteCount = 0;
     const char* icon = codepointToUTF8(codepoint, &byteCount);
-    const MxFont* font = getCore().fontManager.getFont(MX_FONT_AWESOME_ID, size);
+    const MxFont* font = getCore().iconManager.getFont(MX_FONT_AWESOME_ID, size);
 
     drawTextEx(*font, icon, position, size, 0, color);
 }
@@ -17908,7 +18021,7 @@ namespace mxgui
         {
             slider.progress = progressClamp;
         }
-        
+
 
         MxMouseEvents mouseEvents{};
 
@@ -17986,7 +18099,7 @@ namespace mxgui
         rect.x -= padding.x;
         rect.y -= padding.y;
         rect.width += padding.x * 2;
-        rect.height+= padding.y * 2;
+        rect.height += padding.y * 2;
 
         MxMouseEvents mouseEvents{};
 
@@ -18184,10 +18297,10 @@ namespace mxgui
             MxVec2 textSize = measureText(ctx->m_style.fontName, text, ctx->m_style.textSize, ctx->m_style.textSpacing);
             MxRect rectBox = MxRect{mouse.x - paddingX, mouse.y - paddingY, textSize.x + paddingX * 2, textSize.y + paddingY * 2};
             drawRectanglePro(rectBox, MxVec2{}, 0, fadeColor(ctx->m_style.primaryColor, 1.0f));
-               
+
             const MxStyle style = ctx->m_style;
             drawText(style.fontName, text, MxVec2{std::round(mouse.x), std::round(mouse.y)}, style.textSize, style.textSpacing, style.panelColor);
-            
+
             return 1;
         }
 
