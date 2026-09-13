@@ -50,6 +50,8 @@ int main()
     styleLight.iconSize = 28;
     styleDark.iconSize = 28;
     MxGuiContext* ctx = mxgui::createContext(styleLight);
+
+    mxgui::createIcon({ICON_FA_CIRCLE_PLAY, ICON_FA_COPY}, 28);
     
     mxgui::createFont("inter", "assets/inter.ttf", 20, NULL, 255, false);
     mxgui::createTexture("assets/test.png", "testpng");
@@ -93,7 +95,6 @@ int main()
 
             MX_LOG("Clicked");
             setSmoothTexture(MX_FONT_NOTO_ID, !isSmoothTexture(MX_FONT_NOTO_ID));
-            setSmoothTexture(MX_FONT_AWESOME_ID, !isSmoothTexture(MX_FONT_AWESOME_ID));
         }
         mxgui::guiButton(ctx, "Click", MxRect{95, 35, 75, 35}, anchor, MX_BUTTON_OUTLINE_FILL, true);
         if(mxgui::guiButton(ctx, "Click", MxRect{10, 85, 75, 35}, anchor, MX_BUTTON_CONTAINED, true))
